@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom'
+import { useState } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   Package,
@@ -11,6 +12,12 @@ import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  Settings,
+  Tag,
+  Store,
+  Coins,
+  TrendingUp,
 } from 'lucide-react'
 
 const navItems = [
@@ -22,12 +29,26 @@ const navItems = [
   { to: '/usuarios', icon: Users, label: 'Usuarios' },
 ]
 
+const adminSubItems = [
+  { to: '/administracion/productos', icon: BookOpen, label: 'Productos' },
+  { to: '/administracion/categorias', icon: Tag, label: 'Categorías' },
+  { to: '/administracion/editoriales', icon: Building2, label: 'Editoriales' },
+  { to: '/administracion/sucursales', icon: Store, label: 'Sucursales' },
+  { to: '/administracion/proveedores', icon: Truck, label: 'Proveedores' },
+  { to: '/administracion/monedas', icon: Coins, label: 'Monedas' },
+  { to: '/administracion/tasas-cambio', icon: TrendingUp, label: 'Tasas de Cambio' },
+]
+
 interface SidebarProps {
   collapsed: boolean
   onToggle: () => void
 }
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+  const location = useLocation()
+  const isAdminActive = location.pathname.startsWith('/administracion')
+  const [adminExpanded, setAdminExpanded] = useState(isAdminActive)
+
   return (
     <aside
       className={`fixed left-0 top-0 z-40 h-screen bg-corporate text-white transition-all duration-300 flex flex-col ${
@@ -65,6 +86,79 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             {!collapsed && <span>{item.label}</span>}
           </NavLink>
         ))}
+
+        <div className="pt-2 mt-2 border-t border-white/10">
+          {collapsed ? (
+            <NavLink
+              to="/administracion"
+              className={({ isActive }) =>
+                `flex items-center justify-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive || isAdminActive
+                    ? 'bg-gold text-corporate'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                }`
+              }
+              title="Administración"
+            >
+              <Settings size={20} />
+            </NavLink>
+          ) : (
+            <>
+              <button
+                onClick={() => setAdminExpanded(!adminExpanded)}
+                className={`flex items-center justify-between w-full gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isAdminActive
+                    ? 'bg-white/10 text-white'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Settings size={20} className="shrink-0" />
+                  <span>Administración</span>
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={`shrink-0 transition-transform duration-200 ${adminExpanded ? 'rotate-180' : ''}`}
+                />
+              </button>
+
+              {adminExpanded && (
+                <div className="mt-1 ml-3 pl-3 border-l border-white/10 space-y-0.5">
+                  <NavLink
+                    to="/administracion"
+                    end
+                    className={({ isActive }) =>
+                      `flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                        isActive
+                          ? 'bg-gold text-corporate'
+                          : 'text-white/60 hover:bg-white/10 hover:text-white'
+                      }`
+                    }
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />
+                    General
+                  </NavLink>
+                  {adminSubItems.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      className={({ isActive }) =>
+                        `flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                          isActive
+                            ? 'bg-gold text-corporate'
+                            : 'text-white/60 hover:bg-white/10 hover:text-white'
+                        }`
+                      }
+                    >
+                      <item.icon size={14} className="shrink-0" />
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </nav>
 
       <div className="px-3 py-4 border-t border-white/10 space-y-1">

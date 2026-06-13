@@ -10,12 +10,24 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/editoriales': { title: 'Gestión de Editoriales', subtitle: 'Contratos y proveedores editoriales' },
   '/eventos': { title: 'Eventos y Ferias', subtitle: 'Calendario y reservaciones' },
   '/usuarios': { title: 'Usuarios y Permisos', subtitle: 'Roles, accesos y auditoría' },
+  '/administracion': { title: 'Administración General', subtitle: 'Gestión de Catálogos Maestros' },
+  '/administracion/productos': { title: 'Productos', subtitle: 'Catálogo maestro de productos' },
+  '/administracion/categorias': { title: 'Categorías', subtitle: 'Clasificación de productos' },
+  '/administracion/editoriales': { title: 'Editoriales', subtitle: 'Catálogo maestro de editoriales' },
+  '/administracion/sucursales': { title: 'Sucursales', subtitle: 'Puntos de venta y almacén central' },
+  '/administracion/proveedores': { title: 'Proveedores', subtitle: 'Proveedores y distribuidores' },
+  '/administracion/monedas': { title: 'Monedas', subtitle: 'Monedas habilitadas en el sistema' },
+  '/administracion/tasas-cambio': { title: 'Tasas de Cambio', subtitle: 'Tipos de cambio y historial' },
+}
+
+function getPageInfo(pathname: string) {
+  return pageTitles[pathname] ?? { title: 'LibroSys', subtitle: '' }
 }
 
 export function Layout() {
   const [collapsed, setCollapsed] = useState(false)
   const location = useLocation()
-  const page = pageTitles[location.pathname] ?? { title: 'LibroSys', subtitle: '' }
+  const page = getPageInfo(location.pathname)
 
   return (
     <div className="min-h-screen bg-surface">
