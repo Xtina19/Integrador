@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
@@ -6,6 +7,7 @@ import { Badge } from '../../components/ui/Badge'
 import { Table } from '../../components/ui/Table'
 import { TableActions } from '../../components/ui/TableActions'
 import { adminCurrencies } from '../../data/adminMockData'
+import { adminPath } from '../../lib/adminConfig'
 
 const statusMap: Record<string, { label: string; variant: 'success' | 'neutral' }> = {
   active: { label: 'Activa', variant: 'success' },
@@ -13,6 +15,8 @@ const statusMap: Record<string, { label: string; variant: 'success' | 'neutral' 
 }
 
 export function AdminCurrencies() {
+  const navigate = useNavigate()
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -22,7 +26,9 @@ export function AdminCurrencies() {
           <span>Monedas</span>
           <span className="ml-2">— {adminCurrencies.length} registros</span>
         </div>
-        <Button icon={Plus}>Registrar Moneda</Button>
+        <Button icon={Plus} onClick={() => navigate(adminPath('monedas', 'nuevo'))}>
+          Registrar Moneda
+        </Button>
       </div>
 
       <Card>
@@ -54,7 +60,13 @@ export function AdminCurrencies() {
               {
                 key: 'actions',
                 header: 'Acciones',
-                render: () => <TableActions onEdit={() => {}} onDelete={() => {}} />,
+                render: (c) => (
+                  <TableActions
+                    onView={() => navigate(adminPath('monedas', 'ver', c.id))}
+                    onEdit={() => navigate(adminPath('monedas', 'editar', c.id))}
+                    onDelete={() => navigate(adminPath('monedas', 'eliminar', c.id))}
+                  />
+                ),
               },
             ]}
           />

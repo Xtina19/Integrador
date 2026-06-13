@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
+import { resolveAdminPageTitle } from '../../lib/adminPageTitles'
 
 const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/': { title: 'Dashboard', subtitle: 'Resumen general del sistema' },
@@ -21,7 +22,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
 }
 
 function getPageInfo(pathname: string) {
-  return pageTitles[pathname] ?? { title: 'LibroSys', subtitle: '' }
+  return pageTitles[pathname] ?? resolveAdminPageTitle(pathname) ?? { title: 'LibroSys', subtitle: '' }
 }
 
 export function Layout() {

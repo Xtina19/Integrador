@@ -1,4 +1,5 @@
-import { Plus, Globe, Mail, BookMarked } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Globe, BookMarked, Mail } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
@@ -6,6 +7,7 @@ import { Badge } from '../../components/ui/Badge'
 import { Table } from '../../components/ui/Table'
 import { TableActions } from '../../components/ui/TableActions'
 import { adminPublishers } from '../../data/adminMockData'
+import { adminPath } from '../../lib/adminConfig'
 
 const statusMap: Record<string, { label: string; variant: 'success' | 'neutral' }> = {
   active: { label: 'Activo', variant: 'success' },
@@ -13,6 +15,8 @@ const statusMap: Record<string, { label: string; variant: 'success' | 'neutral' 
 }
 
 export function AdminPublishers() {
+  const navigate = useNavigate()
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -22,7 +26,9 @@ export function AdminPublishers() {
           <span>Editoriales</span>
           <span className="ml-2">— {adminPublishers.length} registros</span>
         </div>
-        <Button icon={Plus}>Registrar Editorial</Button>
+        <Button icon={Plus} onClick={() => navigate(adminPath('editoriales', 'nuevo'))}>
+          Registrar Editorial
+        </Button>
       </div>
 
       <Card>
@@ -34,13 +40,18 @@ export function AdminPublishers() {
             columns={[
               {
                 key: 'name',
-                header: 'Nombre',
+                header: 'Editorial',
                 render: (p) => (
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-lg bg-corporate/10 flex items-center justify-center shrink-0">
                       <BookMarked size={16} className="text-corporate" />
                     </div>
-                    <span className="font-medium text-gray-900">{p.name}</span>
+                    <div>
+                      <p className="font-medium text-gray-900">{p.name}</p>
+                      <p className="text-xs text-gray-400 flex items-center gap-1">
+                        <Mail size={10} /> {p.contact}
+                      </p>
+                    </div>
                   </div>
                 ),
               },
@@ -52,15 +63,6 @@ export function AdminPublishers() {
                     <Globe size={14} className="text-gray-400" />
                     <span>{p.country}</span>
                   </div>
-                ),
-              },
-              {
-                key: 'contact',
-                header: 'Contacto',
-                render: (p) => (
-                  <span className="text-xs text-gray-500 flex items-center gap-1">
-                    <Mail size={10} /> {p.contact}
-                  </span>
                 ),
               },
               { key: 'contractType', header: 'Tipo de Contrato', className: 'text-sm' },
@@ -80,7 +82,13 @@ export function AdminPublishers() {
               {
                 key: 'actions',
                 header: 'Acciones',
-                render: () => <TableActions onView={() => {}} onEdit={() => {}} onDelete={() => {}} />,
+                render: (p) => (
+                  <TableActions
+                    onView={() => navigate(adminPath('editoriales', 'ver', p.id))}
+                    onEdit={() => navigate(adminPath('editoriales', 'editar', p.id))}
+                    onDelete={() => navigate(adminPath('editoriales', 'eliminar', p.id))}
+                  />
+                ),
               },
             ]}
           />

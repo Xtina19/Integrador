@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { Plus, ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
@@ -6,8 +7,11 @@ import { Badge } from '../../components/ui/Badge'
 import { Table } from '../../components/ui/Table'
 import { TableActions } from '../../components/ui/TableActions'
 import { adminExchangeRates, exchangeRateHistory } from '../../data/adminMockData'
+import { adminPath } from '../../lib/adminConfig'
 
 export function AdminExchangeRates() {
+  const navigate = useNavigate()
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -17,7 +21,9 @@ export function AdminExchangeRates() {
           <span>Tasas de Cambio</span>
           <span className="ml-2">— {adminExchangeRates.length} tasas vigentes</span>
         </div>
-        <Button icon={Plus}>Actualizar Tasa</Button>
+        <Button icon={Plus} onClick={() => navigate(adminPath('tasas-cambio', 'nuevo'))}>
+          Actualizar Tasa
+        </Button>
       </div>
 
       <Card>
@@ -53,7 +59,13 @@ export function AdminExchangeRates() {
               {
                 key: 'actions',
                 header: 'Acciones',
-                render: () => <TableActions onEdit={() => {}} />,
+                render: (r) => (
+                  <TableActions
+                    onView={() => navigate(adminPath('tasas-cambio', 'ver', r.id))}
+                    onEdit={() => navigate(adminPath('tasas-cambio', 'editar', r.id))}
+                    onDelete={() => navigate(adminPath('tasas-cambio', 'eliminar', r.id))}
+                  />
+                ),
               },
             ]}
           />

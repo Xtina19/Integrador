@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { Plus, MapPin, Phone, User } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
@@ -6,6 +7,7 @@ import { Badge } from '../../components/ui/Badge'
 import { Table } from '../../components/ui/Table'
 import { TableActions } from '../../components/ui/TableActions'
 import { adminBranches } from '../../data/adminMockData'
+import { adminPath } from '../../lib/adminConfig'
 
 const statusMap: Record<string, { label: string; variant: 'success' | 'neutral' }> = {
   active: { label: 'Activo', variant: 'success' },
@@ -13,6 +15,8 @@ const statusMap: Record<string, { label: string; variant: 'success' | 'neutral' 
 }
 
 export function AdminBranches() {
+  const navigate = useNavigate()
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -22,7 +26,9 @@ export function AdminBranches() {
           <span>Sucursales</span>
           <span className="ml-2">— {adminBranches.length} registros</span>
         </div>
-        <Button icon={Plus}>Registrar Sucursal</Button>
+        <Button icon={Plus} onClick={() => navigate(adminPath('sucursales', 'nuevo'))}>
+          Registrar Sucursal
+        </Button>
       </div>
 
       <Card>
@@ -79,7 +85,13 @@ export function AdminBranches() {
               {
                 key: 'actions',
                 header: 'Acciones',
-                render: () => <TableActions onView={() => {}} onEdit={() => {}} onDelete={() => {}} />,
+                render: (b) => (
+                  <TableActions
+                    onView={() => navigate(adminPath('sucursales', 'ver', b.id))}
+                    onEdit={() => navigate(adminPath('sucursales', 'editar', b.id))}
+                    onDelete={() => navigate(adminPath('sucursales', 'eliminar', b.id))}
+                  />
+                ),
               },
             ]}
           />

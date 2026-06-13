@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Filter } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
@@ -7,17 +8,16 @@ import { Input, Select } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
 import { Table } from '../../components/ui/Table'
 import { TableActions } from '../../components/ui/TableActions'
-import { adminProducts } from '../../data/adminMockData'
-import { categories } from '../../data/mockData'
+import { adminProducts, categoryNames, publisherNames } from '../../data/adminMockData'
+import { adminPath } from '../../lib/adminConfig'
 
 const statusMap: Record<string, { label: string; variant: 'success' | 'neutral' }> = {
   active: { label: 'Activo', variant: 'success' },
   inactive: { label: 'Inactivo', variant: 'neutral' },
 }
 
-const publisherNames = [...new Set(adminProducts.map((p) => p.publisher))]
-
 export function AdminProducts() {
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('all')
   const [publisher, setPublisher] = useState('all')
@@ -46,7 +46,9 @@ export function AdminProducts() {
           <span>Productos</span>
           <span className="ml-2">— {filtered.length} de {adminProducts.length} registros</span>
         </div>
-        <Button icon={Plus}>Crear Producto</Button>
+        <Button icon={Plus} onClick={() => navigate(adminPath('productos', 'nuevo'))}>
+          Crear Producto
+        </Button>
       </div>
 
       <Card>
@@ -66,7 +68,7 @@ export function AdminProducts() {
               onChange={(e) => setCategory(e.target.value)}
               options={[
                 { value: 'all', label: 'Todas las categorías' },
-                ...categories.map((c) => ({ value: c, label: c })),
+                ...categoryNames.map((c) => ({ value: c, label: c })),
               ]}
             />
             <Select
@@ -115,7 +117,7 @@ export function AdminProducts() {
               {
                 key: 'price',
                 header: 'Precio',
-                render: (p) => <span className="font-semibold text-corporate">${p.price.toLocaleString()}</span>,
+                render: (p) => <span className="font-semibold text-corporate">RD${p.price.toLocaleString()}</span>,
               },
               { key: 'currency', header: 'Moneda', render: (p) => <Badge variant="gold">{p.currency}</Badge> },
               {
@@ -129,7 +131,13 @@ export function AdminProducts() {
               {
                 key: 'actions',
                 header: 'Acciones',
-                render: () => <TableActions onView={() => {}} onEdit={() => {}} onDelete={() => {}} />,
+                render: (p) => (
+                  <TableActions
+                    onView={() => navigate(adminPath('productos', 'ver', p.id))}
+                    onEdit={() => navigate(adminPath('productos', 'editar', p.id))}
+                    onDelete={() => navigate(adminPath('productos', 'eliminar', p.id))}
+                  />
+                ),
               },
             ]}
           />
