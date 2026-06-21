@@ -1,7 +1,9 @@
+import { getContractVisualStatus } from '../lib/publisherContractStatus'
+
 export const adminProducts = [
   { id: 'P-001', code: 'LJS-001', isbn: '978-0307474728', title: 'Cien años de soledad', author: 'Gabriel García Márquez', category: 'Literatura', publisher: 'Alfaguara', price: 850, currency: 'DOP', status: 'active', createdAt: '2024-03-15', updatedAt: '2026-05-20' },
   { id: 'P-002', code: 'LJS-002', isbn: '978-0156012195', title: 'El principito', author: 'Antoine de Saint-Exupéry', category: 'Infantil', publisher: 'Salvat', price: 450, currency: 'DOP', status: 'active', createdAt: '2024-01-10', updatedAt: '2026-04-12' },
-  { id: 'P-003', code: 'LJS-003', isbn: '978-045_DIPSETTING4935', title: '1984', author: 'George Orwell', category: 'Literatura', publisher: 'Debolsillo', price: 320, currency: 'DOP', status: 'active', createdAt: '2023-11-05', updatedAt: '2026-06-01' },
+  { id: 'P-003', code: 'LJS-003', isbn: '978-0451524935', title: '1984', author: 'George Orwell', category: 'Literatura', publisher: 'Debolsillo', price: 320, currency: 'DOP', status: 'active', createdAt: '2023-11-05', updatedAt: '2026-06-01' },
   { id: 'P-004', code: 'LJS-004', isbn: '978-8491050675', title: 'Don Quijote de la Mancha', author: 'Miguel de Cervantes', category: 'Literatura', publisher: 'Real Academia Española', price: 1200, currency: 'DOP', status: 'active', createdAt: '2023-08-22', updatedAt: '2026-03-18' },
   { id: 'P-005', code: 'LJS-005', isbn: '978-8498384453', title: 'Harry Potter y la piedra filosofal', author: 'J.K. Rowling', category: 'Infantil', publisher: 'Salamandra', price: 680, currency: 'DOP', status: 'active', createdAt: '2024-06-01', updatedAt: '2026-05-30' },
   { id: 'P-006', code: 'LJS-006', isbn: '978-6073159015', title: 'Sapiens', author: 'Yuval Noah Harari', category: 'Académico', publisher: 'Debate', price: 590, currency: 'DOP', status: 'active', createdAt: '2024-02-14', updatedAt: '2026-06-04' },
@@ -25,7 +27,7 @@ export const adminPublishers = [
   { id: 'ED-02', name: 'Planeta', country: 'España', contact: 'comercial@planeta.es', phone: '+34 91 555 0200', contractType: 'Distribución exclusiva', contractStatus: 'active' as const, status: 'active' as const, productCount: 342, contractExpiry: '2026-12-31', address: 'Av. Diagonal 662, Barcelona' },
   { id: 'ED-03', name: 'Alfaguara', country: 'España', contact: 'ventas@alfaguara.es', phone: '+34 91 555 0300', contractType: 'Distribución exclusiva', contractStatus: 'expiring' as const, status: 'active' as const, productCount: 198, contractExpiry: '2026-06-21', address: 'Torre Picasso, Madrid' },
   { id: 'ED-04', name: 'Anaya', country: 'España', contact: 'distribucion@anaya.es', phone: '+34 91 555 0400', contractType: 'Distribución nacional', contractStatus: 'active' as const, status: 'active' as const, productCount: 156, contractExpiry: '2026-09-20', address: 'C/ Torrelaguna 58, Madrid' },
-  { id: 'ED-05', name: 'Salvat', country: 'España', contact: 'ventas@salvat.es', phone: '+34 93 555 0100', contractType: 'Convenio institucional', contractStatus: 'active' as const, status: 'active' as const, productCount: 134, contractExpiry: '2026-08-10', address: 'Av. Diagonal 662, Barcelona' },
+  { id: 'ED-05', name: 'Salvat', country: 'España', contact: 'ventas@salvat.es', phone: '+34 93 555 0100', contractType: 'Convenio institucional', contractStatus: 'expired' as const, status: 'active' as const, productCount: 134, contractExpiry: '2026-03-15', address: 'Av. Diagonal 662, Barcelona' },
   { id: 'ED-06', name: 'Debolsillo', country: 'México', contact: 'distribucion@debolsillo.mx', phone: '+52 55 555 0600', contractType: 'Distribución regional', contractStatus: 'active' as const, status: 'active' as const, productCount: 198, contractExpiry: '2026-08-10', address: 'Ciudad de México' },
   { id: 'ED-07', name: 'Fondo de Cultura Económica', country: 'México', contact: 'comercial@fce.com.mx', phone: '+52 55 555 0700', contractType: 'Distribución nacional', contractStatus: 'active' as const, status: 'active' as const, productCount: 421, contractExpiry: '2027-06-01', address: 'Ciudad de México' },
 ]
@@ -76,9 +78,25 @@ export const productHistory = [
 ]
 
 export const publisherContracts = [
-  { id: 'CT-01', publisherId: 'ED-01', name: 'Contrato Distribución LATAM 2025-2027', startDate: '2025-03-15', endDate: '2027-03-15', status: 'active' },
-  { id: 'CT-02', publisherId: 'ED-02', name: 'Convenio Exclusivo República Dominicana', startDate: '2024-01-01', endDate: '2026-12-31', status: 'active' },
-  { id: 'CT-03', publisherId: 'ED-03', name: 'Acuerdo Alfaguara Caribe', startDate: '2023-06-01', endDate: '2026-06-21', status: 'expiring' },
+  { id: 'CT-01', code: 'CT-2025-001', publisherId: 'ED-01', publisherName: 'Penguin Random House', type: 'Distribución regional', name: 'Contrato Distribución LATAM 2025-2027', startDate: '2025-03-15', endDate: '2027-03-15', status: 'active' as const, responsible: 'María González' },
+  { id: 'CT-02', code: 'CT-2024-012', publisherId: 'ED-02', publisherName: 'Planeta', type: 'Distribución exclusiva', name: 'Convenio Exclusivo República Dominicana', startDate: '2024-01-01', endDate: '2026-12-31', status: 'active' as const, responsible: 'Carlos Ruiz' },
+  { id: 'CT-03', code: 'CT-2023-008', publisherId: 'ED-03', publisherName: 'Alfaguara', type: 'Distribución exclusiva', name: 'Acuerdo Alfaguara Caribe', startDate: '2023-06-01', endDate: '2026-06-21', status: 'expiring' as const, responsible: 'Ana Martínez' },
+  { id: 'CT-04', code: 'CT-2025-003', publisherId: 'ED-04', publisherName: 'Anaya', type: 'Distribución nacional', name: 'Acuerdo Anaya Educación', startDate: '2025-01-15', endDate: '2026-09-20', status: 'active' as const, responsible: 'Luis Hernández' },
+  { id: 'CT-05', code: 'CT-2024-018', publisherId: 'ED-05', publisherName: 'Salvat', type: 'Convenio institucional', name: 'Convenio Salvat Institucional', startDate: '2024-03-01', endDate: '2026-03-15', status: 'expired' as const, responsible: 'María González' },
+]
+
+export const contractRenewals = [
+  { id: 'REN-001', contractId: 'CT-03', publisherName: 'Alfaguara', previousEnd: '2025-06-01', newEnd: '2026-06-21', date: '2025-05-28', user: 'Ana Martínez' },
+  { id: 'REN-002', contractId: 'CT-02', publisherName: 'Planeta', previousEnd: '2025-12-31', newEnd: '2026-12-31', date: '2025-11-15', user: 'Carlos Ruiz' },
+  { id: 'REN-003', contractId: 'CT-01', publisherName: 'Penguin Random House', previousEnd: '2026-03-15', newEnd: '2027-03-15', date: '2026-02-20', user: 'María González' },
+]
+
+export const commercialConditions = [
+  { publisherId: 'ED-01', publisherName: 'Penguin Random House', discount: '12%', credit: '30 días', currency: 'USD', contact: 'latam@penguinrandom.com', notes: 'Descuento por volumen trimestral' },
+  { publisherId: 'ED-02', publisherName: 'Planeta', discount: '15%', credit: '45 días', currency: 'EUR', contact: 'comercial@planeta.es', notes: 'Exclusividad territorial RD' },
+  { publisherId: 'ED-03', publisherName: 'Alfaguara', discount: '10%', credit: '30 días', currency: 'EUR', contact: 'ventas@alfaguara.es', notes: 'Renovación pendiente junio 2026' },
+  { publisherId: 'ED-04', publisherName: 'Anaya', discount: '8%', credit: '60 días', currency: 'EUR', contact: 'distribucion@anaya.es', notes: 'Enfoque material educativo' },
+  { publisherId: 'ED-07', publisherName: 'Fondo de Cultura Económica', discount: '18%', credit: '30 días', currency: 'MXN', contact: 'comercial@fce.com.mx', notes: 'Distribución nacional México y Caribe' },
 ]
 
 export const adminStats = {
@@ -152,3 +170,19 @@ export function getSupplierPurchases(supplierId: string) {
 export const publisherNames = adminPublishers.map((p) => p.name)
 export const categoryNames = adminCategories.filter((c) => c.status === 'active').map((c) => c.name)
 export const currencyCodes = adminCurrencies.filter((c) => c.status === 'active').map((c) => c.code)
+
+export function getPublisherStats() {
+  const totalProducts = adminPublishers.reduce((sum, p) => sum + p.productCount, 0)
+  const activeContracts = adminPublishers.filter((p) => getContractVisualStatus(p.contractExpiry) === 'active').length
+  const expiringContracts = adminPublishers.filter((p) => getContractVisualStatus(p.contractExpiry) === 'expiring')
+  const expiredContracts = adminPublishers.filter((p) => getContractVisualStatus(p.contractExpiry) === 'expired').length
+
+  return {
+    totalPublishers: adminPublishers.length,
+    totalProducts,
+    activeContracts,
+    expiringCount: expiringContracts.length,
+    expiredContracts,
+    expiringSoon: expiringContracts,
+  }
+}

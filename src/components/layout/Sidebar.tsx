@@ -7,6 +7,8 @@ import {
   Building2,
   CalendarDays,
   Users,
+  ShoppingCart,
+  Globe,
   Truck,
   Warehouse,
   BookOpen,
@@ -18,20 +20,30 @@ import {
   Store,
   Coins,
   TrendingUp,
+  FileText,
+  ClipboardList,
+  HelpCircle,
 } from 'lucide-react'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/inventario', icon: Package, label: 'Inventario' },
+  { to: '/ventas', icon: TrendingUp, label: 'Ventas' },
+  { to: '/compras', icon: ShoppingCart, label: 'Compras' },
+  { to: '/importaciones', icon: Globe, label: 'Importaciones' },
   { to: '/transferencias', icon: ArrowLeftRight, label: 'Transferencias' },
+  { to: '/editoriales', icon: Building2, label: 'Editoriales' },
   { to: '/eventos', icon: CalendarDays, label: 'Eventos y Ferias' },
+  { to: '/reportes', icon: FileText, label: 'Reportes' },
   { to: '/usuarios', icon: Users, label: 'Usuarios' },
+  { to: '/auditoria', icon: ClipboardList, label: 'Auditoría' },
+  { to: '/configuracion', icon: Settings, label: 'Configuración' },
+  { to: '/ayuda', icon: HelpCircle, label: 'Ayuda' },
 ]
 
 const adminSubItems = [
   { to: '/administracion/productos', icon: BookOpen, label: 'Productos' },
   { to: '/administracion/categorias', icon: Tag, label: 'Categorías' },
-  { to: '/administracion/editoriales', icon: Building2, label: 'Editoriales' },
   { to: '/administracion/sucursales', icon: Store, label: 'Sucursales' },
   { to: '/administracion/proveedores', icon: Truck, label: 'Proveedores' },
   { to: '/administracion/monedas', icon: Coins, label: 'Monedas' },

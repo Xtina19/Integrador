@@ -1,7 +1,6 @@
 import {
   BookOpen,
   Tag,
-  Building2,
   Store,
   Truck,
   Coins,
@@ -15,7 +14,6 @@ import { adminStats } from '../../data/adminMockData'
 const quickAccessItems = [
   { to: '/administracion/productos', icon: BookOpen, label: 'Productos', description: 'Catálogo maestro de productos', count: adminStats.totalProducts },
   { to: '/administracion/categorias', icon: Tag, label: 'Categorías', description: 'Clasificación de productos', count: adminStats.totalCategories },
-  { to: '/administracion/editoriales', icon: Building2, label: 'Editoriales', description: 'Editoriales y contratos', count: adminStats.totalPublishers },
   { to: '/administracion/sucursales', icon: Store, label: 'Sucursales', description: 'Puntos de venta y almacén', count: adminStats.totalBranches },
   { to: '/administracion/proveedores', icon: Truck, label: 'Proveedores', description: 'Proveedores y distribuidores', count: adminStats.totalSuppliers },
   { to: '/administracion/monedas', icon: Coins, label: 'Monedas', description: 'Monedas del sistema', count: adminStats.activeCurrencies },
@@ -25,7 +23,7 @@ const quickAccessItems = [
 export function AdminHome() {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
         <StatCard
           title="Total de Productos"
           value={adminStats.totalProducts.toLocaleString()}
@@ -37,12 +35,6 @@ export function AdminHome() {
           value={adminStats.totalCategories}
           detail="Clasificaciones activas"
           icon={<Tag size={22} />}
-        />
-        <StatCard
-          title="Total de Editoriales"
-          value={adminStats.totalPublishers}
-          detail="Contratos registrados"
-          icon={<Building2 size={22} />}
         />
         <StatCard
           title="Total de Sucursales"

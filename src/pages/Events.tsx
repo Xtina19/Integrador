@@ -1,9 +1,14 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Calendar, MapPin, Users, Ticket } from 'lucide-react'
 import { Card, CardHeader, CardBody, StatCard } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Table } from '../components/ui/Table'
 import { events, calendarEvents } from '../data/mockData'
+import { eventBudgets, eventCosts, eventIncome, eventPublishers, eventStaff } from '../data/eventsMockData'
+
+type Tab = 'calendario' | 'presupuestos' | 'costos' | 'ingresos' | 'editoriales' | 'personal'
 
 const eventStatus: Record<string, { label: string; variant: 'success' | 'warning' | 'info' | 'neutral' }> = {
   active: { label: 'Activo', variant: 'success' },
@@ -20,9 +25,20 @@ const daysInMonth = 30
 const firstDayOffset = 6
 
 export function Events() {
+  const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState<Tab>('calendario')
   const activeEvents = events.filter((e) => e.status === 'active').length
   const totalReservations = events.reduce((sum, e) => sum + e.reservations, 0)
   const totalParticipants = events.reduce((sum, e) => sum + e.participants, 0)
+
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'calendario', label: 'Calendario' },
+    { id: 'presupuestos', label: 'Presupuestos' },
+    { id: 'costos', label: 'Costos' },
+    { id: 'ingresos', label: 'Ingresos' },
+    { id: 'editoriales', label: 'Editoriales' },
+    { id: 'personal', label: 'Personal' },
+  ]
 
   return (
     <div className="space-y-6">
@@ -47,10 +63,25 @@ export function Events() {
         />
       </div>
 
-      <div className="flex justify-end">
-        <Button icon={Plus}>Nuevo Evento</Button>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-200 p-1 overflow-x-auto">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === tab.id ? 'bg-corporate text-white' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <Button icon={Plus} onClick={() => navigate('/eventos/nuevo')}>Nuevo Evento</Button>
       </div>
 
+      {activeTab === 'calendario' && (
+      <>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-1">
           <CardHeader title="Calendario" subtitle="Junio 2026" />
@@ -182,6 +213,83 @@ export function Events() {
           </div>
         </CardBody>
       </Card>
+      </>
+      )}
+
+      {activeTab === 'presupuestos' && (
+        <Card>
+          <CardHeader title="Presupuestos por Evento" subtitle="Control presupuestario" />
+          <CardBody className="!p-0">
+            <Table
+              keyField="eventId"
+              data={eventBudgets}
+              columns={[
+                { key: 'eventName', header: 'Evento', render: (b) => <span className="font-medium">{b.eventName}</span> },
+                { key: 'budget', header: 'Presupuesto', render: (b) => <span className="font-semibold text-corporate">RD${b.budget.toLocaleString()}</span> },
+                { key: 'spent', header: 'Gastado', render: (b) => <span>RD${b.spent.toLocaleString()}</span> },
+                { key: 'remaining', header: 'Disponible', render: (b) => <Badge variant={b.remaining > 10000 ? 'success' : 'warning'}>RD${b.remaining.toLocaleString()}</Badge> },
+              ]}
+            />
+          </CardBody>
+        </Card>
+      )}
+
+      {activeTab === 'costos' && (
+        <Card>
+          <CardHeader title="Costos de Eventos" subtitle="Gastos registrados" />
+          <CardBody className="!p-0">
+            <Table keyField="id" data={eventCosts} columns={[
+              { key: 'event', header: 'Evento', render: (c) => <span className="font-medium">{c.event}</span> },
+              { key: 'concept', header: 'Concepto' },
+              { key: 'amount', header: 'Monto', render: (c) => <span className="font-semibold text-corporate">RD${c.amount.toLocaleString()}</span> },
+              { key: 'date', header: 'Fecha' },
+            ]} />
+          </CardBody>
+        </Card>
+      )}
+
+      {activeTab === 'ingresos' && (
+        <Card>
+          <CardHeader title="Ingresos de Eventos" subtitle="Ventas y entradas" />
+          <CardBody className="!p-0">
+            <Table keyField="id" data={eventIncome} columns={[
+              { key: 'event', header: 'Evento', render: (i) => <span className="font-medium">{i.event}</span> },
+              { key: 'concept', header: 'Concepto' },
+              { key: 'amount', header: 'Monto', render: (i) => <span className="font-semibold text-emerald-600">RD${i.amount.toLocaleString()}</span> },
+              { key: 'date', header: 'Fecha' },
+            ]} />
+          </CardBody>
+        </Card>
+      )}
+
+      {activeTab === 'editoriales' && (
+        <Card>
+          <CardHeader title="Editoriales Participantes" subtitle="Stands y productos por feria" />
+          <CardBody className="!p-0">
+            <Table keyField="eventId" data={eventPublishers} columns={[
+              { key: 'eventName', header: 'Evento' },
+              { key: 'publisher', header: 'Editorial', render: (p) => <span className="font-medium">{p.publisher}</span> },
+              { key: 'stand', header: 'Stand', render: (p) => <Badge variant="gold">{p.stand}</Badge> },
+              { key: 'products', header: 'Productos' },
+            ]} />
+          </CardBody>
+        </Card>
+      )}
+
+      {activeTab === 'personal' && (
+        <Card>
+          <CardHeader title="Asignación de Personal" subtitle="Equipo por evento" />
+          <CardBody className="!p-0">
+            <Table keyField="eventId" data={eventStaff} columns={[
+              { key: 'eventName', header: 'Evento' },
+              { key: 'employee', header: 'Empleado', render: (s) => <span className="font-medium">{s.employee}</span> },
+              { key: 'role', header: 'Rol' },
+              { key: 'shift', header: 'Turno' },
+            ]} />
+          </CardBody>
+        </Card>
+      )}
+
     </div>
   )
 }

@@ -10,6 +10,7 @@ import { Table } from '../../../components/ui/Table'
 import { RecordNotFound } from '../../../components/admin/RecordNotFound'
 import { ADMIN_MODULES } from '../../../lib/adminConfig'
 import { getPublisherById, getPublisherContracts, getPublisherProducts } from '../../../data/adminMockData'
+import { contractStatusConfig, getContractVisualStatus } from '../../../lib/publisherContractStatus'
 
 const config = ADMIN_MODULES.editoriales
 const statusOptions = [
@@ -84,6 +85,8 @@ export function PublisherDetailPage() {
 
   const contracts = getPublisherContracts(publisher.id)
   const products = getPublisherProducts(publisher.name)
+  const contractStatus = getContractVisualStatus(publisher.contractExpiry)
+  const contractBadge = contractStatusConfig[contractStatus]
 
   return (
     <AdminDetailLayout
@@ -106,6 +109,7 @@ export function PublisherDetailPage() {
             <DetailRow label="Dirección" value={publisher.address} />
             <DetailRow label="Tipo de Contrato" value={<Badge variant="gold">{publisher.contractType}</Badge>} />
             <DetailRow label="Vencimiento" value={publisher.contractExpiry} />
+            <DetailRow label="Estado del contrato" value={<Badge variant={contractBadge.variant}>{contractBadge.label}</Badge>} />
             <DetailRow label="Productos asociados" value={<span className="font-bold text-corporate">{publisher.productCount}</span>} />
           </dl>
         </DetailSection>
@@ -118,7 +122,15 @@ export function PublisherDetailPage() {
               { key: 'name', header: 'Contrato', render: (c) => <span className="font-medium">{c.name}</span> },
               { key: 'startDate', header: 'Inicio', className: 'text-xs' },
               { key: 'endDate', header: 'Fin', className: 'text-xs' },
-              { key: 'status', header: 'Estado', render: (c) => <Badge variant={c.status === 'expiring' ? 'warning' : 'success'}>{c.status === 'expiring' ? 'Por vencer' : 'Vigente'}</Badge> },
+              {
+                key: 'status',
+                header: 'Estado',
+                render: (c) => {
+                  const status = getContractVisualStatus(c.endDate)
+                  const config = contractStatusConfig[status]
+                  return <Badge variant={config.variant}>{config.label}</Badge>
+                },
+              },
             ]}
           />
         </DetailSection>

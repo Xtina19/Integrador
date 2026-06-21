@@ -58,7 +58,7 @@ export const ADMIN_MODULES: Record<AdminModuleKey, AdminModuleConfig> = {
   },
   editoriales: {
     key: 'editoriales',
-    basePath: '/administracion/editoriales',
+    basePath: '/editoriales',
     label: 'Editoriales',
     singular: 'Editorial',
     createLabel: 'Registrar Editorial',
