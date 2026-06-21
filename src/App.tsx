@@ -3,17 +3,17 @@ import { Layout } from './components/layout/Layout'
 import { Dashboard } from './pages/Dashboard'
 import { Inventory } from './pages/Inventory'
 import { Transfers } from './pages/Transfers'
-import { Publishers } from './pages/Publishers'
 import { Events } from './pages/Events'
 import { Users } from './pages/Users'
 import { AdminHome } from './pages/admin/AdminHome'
+import { Editoriales } from './pages/admin/Editoriales'
 import { AdminProducts } from './pages/admin/AdminProducts'
 import { AdminCategories } from './pages/admin/AdminCategories'
-import { AdminPublishers } from './pages/admin/AdminPublishers'
 import { AdminBranches } from './pages/admin/AdminBranches'
 import { AdminSuppliers } from './pages/admin/AdminSuppliers'
 import { AdminCurrencies } from './pages/admin/AdminCurrencies'
 import { AdminExchangeRates } from './pages/admin/AdminExchangeRates'
+import { EditorialesLegacyRedirect } from './components/admin/EditorialesLegacyRedirect'
 import { ProductFormPage, ProductDetailPage, ProductDeletePage } from './pages/admin/crud/ProductCrud'
 import { CategoryFormPage, CategoryDetailPage, CategoryDeletePage } from './pages/admin/crud/CategoryCrud'
 import { PublisherFormPage, PublisherDetailPage, PublisherDeletePage } from './pages/admin/crud/PublisherCrud'
@@ -29,7 +29,6 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="inventario" element={<Inventory />} />
         <Route path="transferencias" element={<Transfers />} />
-        <Route path="editoriales" element={<Publishers />} />
         <Route path="eventos" element={<Events />} />
         <Route path="usuarios" element={<Users />} />
 
@@ -47,7 +46,7 @@ export default function App() {
         <Route path="administracion/categorias/ver/:id" element={<CategoryDetailPage />} />
         <Route path="administracion/categorias/eliminar/:id" element={<CategoryDeletePage />} />
 
-        <Route path="administracion/editoriales" element={<AdminPublishers />} />
+        <Route path="administracion/editoriales" element={<Editoriales />} />
         <Route path="administracion/editoriales/nuevo" element={<PublisherFormPage />} />
         <Route path="administracion/editoriales/editar/:id" element={<PublisherFormPage />} />
         <Route path="administracion/editoriales/ver/:id" element={<PublisherDetailPage />} />
@@ -76,6 +75,9 @@ export default function App() {
         <Route path="administracion/tasas-cambio/editar/:id" element={<ExchangeRateFormPage />} />
         <Route path="administracion/tasas-cambio/ver/:id" element={<ExchangeRateDetailPage />} />
         <Route path="administracion/tasas-cambio/eliminar/:id" element={<ExchangeRateDeletePage />} />
+
+        {/* Redirección legacy: /editoriales → /administracion/editoriales */}
+        <Route path="editoriales/*" element={<EditorialesLegacyRedirect />} />
       </Route>
     </Routes>
   )

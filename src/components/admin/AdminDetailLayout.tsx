@@ -21,6 +21,9 @@ interface AdminDetailLayoutProps {
   children: React.ReactNode
   showEdit?: boolean
   showDelete?: boolean
+  listPath?: string
+  editPath?: string
+  deletePath?: string
 }
 
 export function AdminDetailLayout({
@@ -33,24 +36,28 @@ export function AdminDetailLayout({
   children,
   showEdit = true,
   showDelete = true,
+  listPath,
+  editPath,
+  deletePath,
 }: AdminDetailLayoutProps) {
   const navigate = useNavigate()
+  const backPath = listPath ?? config.basePath
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <AdminBreadcrumb items={breadcrumbs} />
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" icon={ArrowLeft} onClick={() => navigate(config.basePath)}>
+          <Button variant="outline" size="sm" icon={ArrowLeft} onClick={() => navigate(backPath)}>
             Regresar
           </Button>
           {showEdit && (
-            <Button variant="outline" size="sm" icon={Pencil} onClick={() => navigate(adminPath(config.key, 'editar', id))}>
+            <Button variant="outline" size="sm" icon={Pencil} onClick={() => navigate(editPath ?? adminPath(config.key, 'editar', id))}>
               Editar
             </Button>
           )}
           {showDelete && (
-            <Button variant="outline" size="sm" icon={Trash2} onClick={() => navigate(adminPath(config.key, 'eliminar', id))}>
+            <Button variant="outline" size="sm" icon={Trash2} onClick={() => navigate(deletePath ?? adminPath(config.key, 'eliminar', id))}>
               Eliminar
             </Button>
           )}
@@ -81,6 +88,7 @@ interface AdminDeleteLayoutProps {
   recordSubtitle?: string
   recordSummary: { label: string; value: React.ReactNode }[]
   children?: React.ReactNode
+  listPath?: string
 }
 
 export function AdminDeleteLayout({
@@ -90,14 +98,16 @@ export function AdminDeleteLayout({
   recordSubtitle,
   recordSummary,
   children,
+  listPath,
 }: AdminDeleteLayoutProps) {
   const navigate = useNavigate()
+  const backPath = listPath ?? config.basePath
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <AdminBreadcrumb items={breadcrumbs} />
-        <Button variant="outline" size="sm" icon={ArrowLeft} onClick={() => navigate(config.basePath)}>
+        <Button variant="outline" size="sm" icon={ArrowLeft} onClick={() => navigate(backPath)}>
           Regresar
         </Button>
       </div>
@@ -152,10 +162,10 @@ export function AdminDeleteLayout({
       </Card>
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-2 border-t border-gray-200">
-        <Button variant="outline" onClick={() => navigate(config.basePath)}>
+        <Button variant="outline" onClick={() => navigate(backPath)}>
           Cancelar
         </Button>
-        <Button variant="danger" icon={Trash2} onClick={() => navigate(config.basePath)}>
+        <Button variant="danger" icon={Trash2} onClick={() => navigate(backPath)}>
           Confirmar eliminación
         </Button>
       </div>

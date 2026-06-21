@@ -8,7 +8,6 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/': { title: 'Dashboard', subtitle: 'Resumen general del sistema' },
   '/inventario': { title: 'Gestión de Inventario', subtitle: 'Control de productos y stock' },
   '/transferencias': { title: 'Transferencias', subtitle: 'Movimientos entre sucursales' },
-  '/editoriales': { title: 'Gestión de Editoriales', subtitle: 'Contratos y proveedores editoriales' },
   '/eventos': { title: 'Eventos y Ferias', subtitle: 'Calendario y reservaciones' },
   '/usuarios': { title: 'Usuarios y Permisos', subtitle: 'Roles, accesos y auditoría' },
   '/administracion': { title: 'Administración General', subtitle: 'Gestión de Catálogos Maestros' },

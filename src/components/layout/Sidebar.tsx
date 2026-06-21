@@ -24,7 +24,6 @@ const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/inventario', icon: Package, label: 'Inventario' },
   { to: '/transferencias', icon: ArrowLeftRight, label: 'Transferencias' },
-  { to: '/editoriales', icon: Building2, label: 'Editoriales' },
   { to: '/eventos', icon: CalendarDays, label: 'Eventos y Ferias' },
   { to: '/usuarios', icon: Users, label: 'Usuarios' },
 ]

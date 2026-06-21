@@ -21,11 +21,13 @@ export const adminCategories = [
 ]
 
 export const adminPublishers = [
-  { id: 'ED-01', name: 'Penguin Random House', country: 'Estados Unidos', contact: 'latam@penguinrandom.com', phone: '+1 212 555 0100', contractType: 'Distribución regional', status: 'active', productCount: 289, contractExpiry: '2027-03-15', address: '375 Hudson Street, New York, NY' },
-  { id: 'ED-02', name: 'Planeta', country: 'España', contact: 'comercial@planeta.es', phone: '+34 91 555 0200', contractType: 'Distribución exclusiva', status: 'active', productCount: 342, contractExpiry: '2026-12-31', address: 'Av. Diagonal 662, Barcelona' },
-  { id: 'ED-03', name: 'Alfaguara', country: 'España', contact: 'ventas@alfaguara.es', phone: '+34 91 555 0300', contractType: 'Distribución exclusiva', status: 'active', productCount: 198, contractExpiry: '2026-09-20', address: 'Torre Picasso, Madrid' },
-  { id: 'ED-04', name: 'Anaya', country: 'España', contact: 'distribucion@anaya.es', phone: '+34 91 555 0400', contractType: 'Distribución nacional', status: 'active', productCount: 156, contractExpiry: '2027-01-10', address: 'C/ Torrelaguna 58, Madrid' },
-  { id: 'ED-05', name: 'Salvat', country: 'España', contact: 'ventas@salvat.es', phone: '+34 93 555 0100', contractType: 'Convenio institucional', status: 'active', productCount: 134, contractExpiry: '2026-11-30', address: 'Av. Diagonal 662, Barcelona' },
+  { id: 'ED-01', name: 'Penguin Random House', country: 'Estados Unidos', contact: 'latam@penguinrandom.com', phone: '+1 212 555 0100', contractType: 'Distribución regional', contractStatus: 'active' as const, status: 'active' as const, productCount: 289, contractExpiry: '2027-03-15', address: '375 Hudson Street, New York, NY' },
+  { id: 'ED-02', name: 'Planeta', country: 'España', contact: 'comercial@planeta.es', phone: '+34 91 555 0200', contractType: 'Distribución exclusiva', contractStatus: 'active' as const, status: 'active' as const, productCount: 342, contractExpiry: '2026-12-31', address: 'Av. Diagonal 662, Barcelona' },
+  { id: 'ED-03', name: 'Alfaguara', country: 'España', contact: 'ventas@alfaguara.es', phone: '+34 91 555 0300', contractType: 'Distribución exclusiva', contractStatus: 'expiring' as const, status: 'active' as const, productCount: 198, contractExpiry: '2026-06-21', address: 'Torre Picasso, Madrid' },
+  { id: 'ED-04', name: 'Anaya', country: 'España', contact: 'distribucion@anaya.es', phone: '+34 91 555 0400', contractType: 'Distribución nacional', contractStatus: 'active' as const, status: 'active' as const, productCount: 156, contractExpiry: '2026-09-20', address: 'C/ Torrelaguna 58, Madrid' },
+  { id: 'ED-05', name: 'Salvat', country: 'España', contact: 'ventas@salvat.es', phone: '+34 93 555 0100', contractType: 'Convenio institucional', contractStatus: 'active' as const, status: 'active' as const, productCount: 134, contractExpiry: '2026-08-10', address: 'Av. Diagonal 662, Barcelona' },
+  { id: 'ED-06', name: 'Debolsillo', country: 'México', contact: 'distribucion@debolsillo.mx', phone: '+52 55 555 0600', contractType: 'Distribución regional', contractStatus: 'active' as const, status: 'active' as const, productCount: 198, contractExpiry: '2026-08-10', address: 'Ciudad de México' },
+  { id: 'ED-07', name: 'Fondo de Cultura Económica', country: 'México', contact: 'comercial@fce.com.mx', phone: '+52 55 555 0700', contractType: 'Distribución nacional', contractStatus: 'active' as const, status: 'active' as const, productCount: 421, contractExpiry: '2027-06-01', address: 'Ciudad de México' },
 ]
 
 export const adminBranches = [
@@ -76,13 +78,13 @@ export const productHistory = [
 export const publisherContracts = [
   { id: 'CT-01', publisherId: 'ED-01', name: 'Contrato Distribución LATAM 2025-2027', startDate: '2025-03-15', endDate: '2027-03-15', status: 'active' },
   { id: 'CT-02', publisherId: 'ED-02', name: 'Convenio Exclusivo República Dominicana', startDate: '2024-01-01', endDate: '2026-12-31', status: 'active' },
-  { id: 'CT-03', publisherId: 'ED-03', name: 'Acuerdo Alfaguara Caribe', startDate: '2023-06-01', endDate: '2026-09-20', status: 'active' },
+  { id: 'CT-03', publisherId: 'ED-03', name: 'Acuerdo Alfaguara Caribe', startDate: '2023-06-01', endDate: '2026-06-21', status: 'expiring' },
 ]
 
 export const adminStats = {
   totalProducts: 12470,
   totalCategories: 5,
-  totalPublishers: 5,
+  totalPublishers: 7,
   totalBranches: 5,
   totalSuppliers: 5,
   activeCurrencies: 3,

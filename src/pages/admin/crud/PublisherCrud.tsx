@@ -30,7 +30,16 @@ export function PublisherFormPage() {
 
   if (isEdit && !existing) return <RecordNotFound moduleLabel="editorial" listPath={config.basePath} />
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    name: string
+    country: string
+    contact: string
+    phone: string
+    address: string
+    contractType: string
+    contractExpiry: string
+    status: string
+  }>({
     name: existing?.name ?? '',
     country: existing?.country ?? '',
     contact: existing?.contact ?? '',
@@ -45,7 +54,10 @@ export function PublisherFormPage() {
 
   return (
     <AdminFormLayout
-      breadcrumbs={[{ label: config.label, to: config.basePath }, { label: isEdit ? config.editTitle : config.createTitle }]}
+      breadcrumbs={[
+        { label: config.label, to: config.basePath },
+        { label: isEdit ? config.editTitle : config.createTitle },
+      ]}
       title={isEdit ? config.editTitle : config.createTitle}
       subtitle={isEdit ? `Modificando ${existing!.name}` : 'Nueva editorial en catálogo maestro'}
       listPath={config.basePath}
@@ -77,7 +89,10 @@ export function PublisherDetailPage() {
     <AdminDetailLayout
       config={config}
       id={publisher.id}
-      breadcrumbs={[{ label: config.label, to: config.basePath }, { label: config.detailTitle }]}
+      breadcrumbs={[
+        { label: config.label, to: config.basePath },
+        { label: config.detailTitle },
+      ]}
       title={publisher.name}
       subtitle={publisher.country}
       statusBadge={<Badge variant={publisher.status === 'active' ? 'success' : 'neutral'}>{publisher.status === 'active' ? 'Activo' : 'Inactivo'}</Badge>}
@@ -103,7 +118,7 @@ export function PublisherDetailPage() {
               { key: 'name', header: 'Contrato', render: (c) => <span className="font-medium">{c.name}</span> },
               { key: 'startDate', header: 'Inicio', className: 'text-xs' },
               { key: 'endDate', header: 'Fin', className: 'text-xs' },
-              { key: 'status', header: 'Estado', render: () => <Badge variant="success">Vigente</Badge> },
+              { key: 'status', header: 'Estado', render: (c) => <Badge variant={c.status === 'expiring' ? 'warning' : 'success'}>{c.status === 'expiring' ? 'Por vencer' : 'Vigente'}</Badge> },
             ]}
           />
         </DetailSection>
@@ -133,7 +148,10 @@ export function PublisherDeletePage() {
   return (
     <AdminDeleteLayout
       config={config}
-      breadcrumbs={[{ label: config.label, to: config.basePath }, { label: config.deleteTitle }]}
+      breadcrumbs={[
+        { label: config.label, to: config.basePath },
+        { label: config.deleteTitle },
+      ]}
       recordTitle={publisher.name}
       recordSubtitle={publisher.country}
       recordSummary={[

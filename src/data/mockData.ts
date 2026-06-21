@@ -74,15 +74,6 @@ export const transferHistory = [
   { id: 'TR-085', origin: 'Sucursal Guadalajara', destination: 'Sucursal Centro', product: 'Cien años de soledad', qty: 10, status: 'completed', date: '2026-05-28' },
 ]
 
-export const publishers = [
-  { id: 'ED-01', name: 'Planeta', country: 'España', products: 342, contractStatus: 'active', contractExpiry: '2026-12-31', contact: 'comercial@planeta.es' },
-  { id: 'ED-02', name: 'Penguin Random House', country: 'Estados Unidos', products: 289, contractStatus: 'active', contractExpiry: '2027-03-15', contact: 'latam@penguinrandom.com' },
-  { id: 'ED-03', name: 'Salamandra', country: 'España', products: 156, contractStatus: 'active', contractExpiry: '2026-09-20', contact: 'ventas@salamandra.es' },
-  { id: 'ED-04', name: 'Debolsillo', country: 'México', products: 198, contractStatus: 'active', contractExpiry: '2026-08-10', contact: 'distribucion@debolsillo.mx' },
-  { id: 'ED-05', name: 'Fondo de Cultura Económica', country: 'México', products: 421, contractStatus: 'active', contractExpiry: '2027-06-01', contact: 'comercial@fce.com.mx' },
-  { id: 'ED-06', name: 'Alfaguara', country: 'España', products: 134, contractStatus: 'expiring', contractExpiry: '2026-06-21', contact: 'ventas@alfaguara.es' },
-]
-
 export const events = [
   { id: 'EV-01', name: 'Feria Internacional del Libro CDMX', type: 'feria', startDate: '2026-06-15', endDate: '2026-06-25', location: 'Centro Citibanamex', status: 'upcoming', participants: 12, reservations: 450 },
   { id: 'EV-02', name: 'Presentación: Nuevo catálogo infantil', type: 'evento', startDate: '2026-06-10', endDate: '2026-06-10', location: 'Sucursal Coyoacán', status: 'active', participants: 5, reservations: 80 },
