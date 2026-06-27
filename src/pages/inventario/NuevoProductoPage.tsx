@@ -3,8 +3,11 @@ import { FormPageLayout } from '../../components/ui/FormPageLayout'
 import { Input, Select } from '../../components/ui/Input'
 import { categories } from '../../data/mockData'
 import { publisherNames, adminSuppliers } from '../../data/adminMockData'
+import { useERP } from '../../store/ERPProvider'
 
 export function NuevoProductoPage() {
+  const { createProduct } = useERP()
+  const [error, setError] = useState('')
   const [form, setForm] = useState({
     code: '',
     isbn: '',
@@ -29,7 +32,27 @@ export function NuevoProductoPage() {
       title="Nuevo Producto"
       subtitle="Registro de producto en inventario"
       listPath="/inventario"
+      onSave={() => {
+        const result = createProduct({
+          code: form.code,
+          isbn: form.isbn,
+          name: form.name,
+          category: form.category,
+          publisher: form.publisher,
+          stock: Number(form.stock) || 0,
+          minStock: Number(form.minStock) || 0,
+          location: form.location,
+          cost: Number(form.cost) || 0,
+          price: Number(form.price) || 0,
+        })
+        if (!result.success) {
+          setError(result.errors?.join(' ') ?? 'Error al guardar')
+          return false
+        }
+        return true
+      }}
     >
+      {error && <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2 mb-4">{error}</div>}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Input label="Código *" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
         <Input label="ISBN *" value={form.isbn} onChange={(e) => setForm({ ...form, isbn: e.target.value })} />

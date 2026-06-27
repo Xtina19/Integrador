@@ -22,19 +22,11 @@ import type { TooltipProps } from 'recharts'
 import { StatCard, Card, CardHeader, CardBody } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Table } from '../components/ui/Table'
-import { lowStockProducts, events, inventoryChartData, stockByCategory } from '../data/mockData'
-import { salesStats } from '../data/salesMockData'
-import { purchaseStats } from '../data/purchasesMockData'
-import { importStats } from '../data/importsMockData'
+import { useERP } from '../store/ERPProvider'
+import { dashboardService } from '../services/dashboardService'
+import { refreshActivityTimes } from '../services/activityService'
 
 const CATEGORY_ORDER = ['Literatura', 'Académico', 'Infantil', 'Cómics', 'Otros']
-
-const categoryData = CATEGORY_ORDER.map((name) => {
-  const item = stockByCategory.find((c) => c.name === name)!
-  return item
-})
-
-const categoryTotal = categoryData.reduce((sum, c) => sum + c.value, 0)
 
 function InventoryTooltip({ active, payload, label }: TooltipProps<number, string>) {
   if (!active || !payload?.length) return null
@@ -63,7 +55,7 @@ function InventoryTooltip({ active, payload, label }: TooltipProps<number, strin
 
 function CategoryTooltip({ active, payload }: TooltipProps<number, string>) {
   if (!active || !payload?.length) return null
-  const item = payload[0].payload as (typeof categoryData)[0] & { percent: number }
+  const item = payload[0].payload as { name: string; value: number; percent: number }
   return (
     <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-lg">
       <p className="text-sm font-semibold text-gray-900">{item.name}</p>
@@ -75,45 +67,55 @@ function CategoryTooltip({ active, payload }: TooltipProps<number, string>) {
 }
 
 export function Dashboard() {
-  const upcomingEvents = events.filter((e) => e.status === 'upcoming' || e.status === 'active').length
-  const nextEvent = events.find((e) => e.status === 'upcoming' || e.status === 'active')
+  const { state, metrics, lowStockProducts, activities } = useERP()
+  const inventoryChartData = dashboardService.getInventoryChart(state)
+  const stockByCategory = dashboardService.getStockByCategory(state)
+  const nextEventName = dashboardService.getNextEventName(state)
+
+  const categoryData = CATEGORY_ORDER.map((name) => {
+    const item = stockByCategory.find((c) => c.name === name)!
+    return item
+  })
+  const categoryTotal = categoryData.reduce((sum, c) => sum + c.value, 0)
 
   const donutData = categoryData.map((cat) => ({
     ...cat,
-    percent: (cat.value / categoryTotal) * 100,
+    percent: categoryTotal > 0 ? (cat.value / categoryTotal) * 100 : 0,
   }))
+
+  const recentActivities = refreshActivityTimes(activities).slice(0, 8)
 
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <StatCard
           title="Ventas del Mes"
-          value={`RD$${salesStats.monthlySales.toLocaleString()}`}
-          detail={`Ticket prom. RD$${salesStats.avgTicket}`}
+          value={`RD$${metrics.monthlySales.toLocaleString()}`}
+          detail={`Ticket prom. RD$${metrics.avgTicket}`}
           icon={<TrendingUp size={22} />}
         />
         <StatCard
           title="Compras del Mes"
-          value={`RD$${purchaseStats.monthlyPurchases.toLocaleString()}`}
-          detail={`${purchaseStats.openOrders} órdenes abiertas`}
+          value={`RD$${metrics.monthlyPurchases.toLocaleString()}`}
+          detail={`${metrics.openOrders} órdenes abiertas`}
           icon={<ShoppingCart size={22} />}
         />
         <StatCard
           title="Stock Crítico"
-          value={lowStockProducts.length}
+          value={metrics.criticalStockCount}
           detail="Productos bajo mínimo"
           icon={<AlertTriangle size={22} />}
         />
         <StatCard
           title="Importaciones Activas"
-          value={importStats.activeShipments}
-          detail={`${importStats.boxesInTransit} cajas en tránsito`}
+          value={metrics.activeShipments}
+          detail={`${metrics.boxesInTransit} cajas en tránsito`}
           icon={<Globe size={22} />}
         />
         <StatCard
           title="Eventos Próximos"
-          value={upcomingEvents}
-          detail={nextEvent ? nextEvent.name.slice(0, 28) : 'Sin eventos programados'}
+          value={metrics.upcomingEvents}
+          detail={nextEventName ? nextEventName.slice(0, 28) : 'Sin eventos programados'}
           icon={<CalendarDays size={22} />}
         />
       </div>
@@ -242,6 +244,27 @@ export function Dashboard() {
               { key: 'branch', header: 'Sucursal' },
             ]}
           />
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="Centro de Actividad" subtitle="Acciones recientes del sistema" />
+        <CardBody>
+          {recentActivities.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">Las acciones del sistema aparecerán aquí.</p>
+          ) : (
+            <div className="space-y-3">
+              {recentActivities.map((a) => (
+                <div key={a.id} className="flex items-start gap-3 p-3 rounded-lg bg-surface">
+                  <span className="w-2 h-2 rounded-full bg-gold mt-2 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800">{a.message}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{a.relativeTime} · {a.module}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardBody>
       </Card>
     </div>

@@ -10,9 +10,10 @@ interface TableProps<T> {
   data: T[]
   keyField: keyof T
   onRowClick?: (item: T) => void
+  highlightId?: string | null
 }
 
-export function Table<T extends Record<string, unknown>>({ columns, data, keyField, onRowClick }: TableProps<T>) {
+export function Table<T extends Record<string, unknown>>({ columns, data, keyField, onRowClick, highlightId }: TableProps<T>) {
   return (
     <div className="overflow-x-auto scrollbar-thin">
       <table className="w-full text-sm">
@@ -29,11 +30,17 @@ export function Table<T extends Record<string, unknown>>({ columns, data, keyFie
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {data.map((item) => (
+          {data.map((item) => {
+            const rowId = String(item[keyField])
+            const highlighted = highlightId != null && rowId === highlightId
+            return (
             <tr
-              key={String(item[keyField])}
+              key={rowId}
+              id={highlighted ? `highlight-${rowId}` : undefined}
               onClick={() => onRowClick?.(item)}
-              className={`hover:bg-gray-50/80 transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
+              className={`hover:bg-gray-50/80 transition-colors ${onRowClick ? 'cursor-pointer' : ''} ${
+                highlighted ? 'bg-gold/15 ring-1 ring-inset ring-gold/50' : ''
+              }`}
             >
               {columns.map((col) => (
                 <td key={col.key} className={`px-4 py-3 text-gray-700 ${col.className ?? ''}`}>
@@ -41,7 +48,8 @@ export function Table<T extends Record<string, unknown>>({ columns, data, keyFie
                 </td>
               ))}
             </tr>
-          ))}
+            )
+          })}
         </tbody>
       </table>
     </div>

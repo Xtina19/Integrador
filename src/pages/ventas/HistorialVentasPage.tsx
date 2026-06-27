@@ -2,21 +2,26 @@ import { useState, useMemo } from 'react'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
 import { Badge } from '../../components/ui/Badge'
 import { Table } from '../../components/ui/Table'
+import { TableActions } from '../../components/ui/TableActions'
 import { Toolbar } from '../../components/ui/Toolbar'
 import { Select } from '../../components/ui/Input'
-import { salesHistory } from '../../data/salesMockData'
+import { SaleRecordDialog } from '../../components/ventas/SaleRecordDialog'
+import { useSalesData } from '../../context/SalesDataContext'
 
 const statusConfig = {
   paid: { label: 'Pagada', variant: 'success' as const },
   cancelled: { label: 'Cancelada', variant: 'danger' as const },
 }
 
-const branches = [...new Set(salesHistory.map((s) => s.branch))].sort()
-
 export function HistorialVentasPage() {
+  const { salesHistory } = useSalesData()
   const [search, setSearch] = useState('')
   const [branchFilter, setBranchFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [viewId, setViewId] = useState<string | null>(null)
+
+  const branches = [...new Set(salesHistory.map((s) => s.branch))].sort()
+  const selectedSale = viewId ? salesHistory.find((s) => s.id === viewId) ?? null : null
 
   const filtered = useMemo(() => {
     return salesHistory.filter((s) => {
@@ -28,7 +33,7 @@ export function HistorialVentasPage() {
       const matchStatus = statusFilter === 'all' || s.status === statusFilter
       return matchSearch && matchBranch && matchStatus
     })
-  }, [search, branchFilter, statusFilter])
+  }, [search, branchFilter, statusFilter, salesHistory])
 
   const activeFilters = [
     ...(branchFilter !== 'all' ? [branchFilter] : []),
@@ -87,27 +92,10 @@ export function HistorialVentasPage() {
                   <span className="font-mono text-xs font-medium text-corporate">{s.id}</span>
                 ),
               },
-              {
-                key: 'date',
-                header: 'Fecha',
-                className: 'text-sm whitespace-nowrap',
-              },
-              {
-                key: 'customer',
-                header: 'Cliente',
-                render: (s) => <span className="font-medium text-gray-900">{s.customer}</span>,
-              },
-              {
-                key: 'branch',
-                header: 'Sucursal',
-              },
-              {
-                key: 'total',
-                header: 'Total',
-                render: (s) => (
-                  <span className="font-semibold text-corporate">${s.total.toLocaleString()}</span>
-                ),
-              },
+              { key: 'date', header: 'Fecha', className: 'text-sm whitespace-nowrap' },
+              { key: 'customer', header: 'Cliente', render: (s) => <span className="font-medium text-gray-900">{s.customer}</span> },
+              { key: 'branch', header: 'Sucursal' },
+              { key: 'total', header: 'Total', render: (s) => <span className="font-semibold text-corporate">${s.total.toLocaleString()}</span> },
               {
                 key: 'status',
                 header: 'Estado',
@@ -116,10 +104,17 @@ export function HistorialVentasPage() {
                   return <Badge variant={cfg.variant}>{cfg.label}</Badge>
                 },
               },
+              {
+                key: 'actions',
+                header: 'Acciones',
+                render: (s) => <TableActions onView={() => setViewId(s.id)} />,
+              },
             ]}
           />
         </CardBody>
       </Card>
+
+      <SaleRecordDialog sale={selectedSale} open={Boolean(selectedSale)} onClose={() => setViewId(null)} />
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Filter } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -8,23 +8,63 @@ import { Input, Select } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
 import { Table } from '../../components/ui/Table'
 import { TableActions } from '../../components/ui/TableActions'
-import { adminProducts, categoryNames, publisherNames } from '../../data/adminMockData'
+import { FormDialog, DetailRow } from '../../components/ui/FormDialog'
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { categoryNames, publisherNames, currencyCodes } from '../../data/adminMockData'
 import { adminPath } from '../../lib/adminConfig'
+import { useAdminCatalog } from '../../context/AdminCatalogContext'
 
 const statusMap: Record<string, { label: string; variant: 'success' | 'neutral' }> = {
   active: { label: 'Activo', variant: 'success' },
   inactive: { label: 'Inactivo', variant: 'neutral' },
 }
 
+const statusOptions = [
+  { value: 'active', label: 'Activo' },
+  { value: 'inactive', label: 'Inactivo' },
+]
+
 export function AdminProducts() {
   const navigate = useNavigate()
+  const { products, updateProduct, deleteProduct } = useAdminCatalog()
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('all')
   const [publisher, setPublisher] = useState('all')
   const [status, setStatus] = useState('all')
+  const [dialog, setDialog] = useState<{ id: string; mode: 'view' | 'edit' } | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    code: '',
+    isbn: '',
+    title: '',
+    author: '',
+    category: '',
+    publisher: '',
+    price: '',
+    currency: 'DOP',
+    status: 'active',
+  })
+
+  const selected = dialog ? products.find((p) => p.id === dialog.id) ?? null : null
+
+  useEffect(() => {
+    if (selected && dialog?.mode === 'edit') {
+      setForm({
+        code: selected.code,
+        isbn: selected.isbn,
+        title: selected.title,
+        author: selected.author,
+        category: selected.category,
+        publisher: selected.publisher,
+        price: String(selected.price),
+        currency: selected.currency,
+        status: selected.status,
+      })
+    }
+  }, [selected, dialog?.mode, dialog?.id])
 
   const filtered = useMemo(() => {
-    return adminProducts.filter((p) => {
+    return products.filter((p) => {
       const matchSearch =
         search === '' ||
         p.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -35,7 +75,23 @@ export function AdminProducts() {
       const matchStatus = status === 'all' || p.status === status
       return matchSearch && matchCategory && matchPublisher && matchStatus
     })
-  }, [search, category, publisher, status])
+  }, [products, search, category, publisher, status])
+
+  function handleSave() {
+    if (!selected) return
+    updateProduct(selected.id, {
+      code: form.code,
+      isbn: form.isbn,
+      title: form.title,
+      author: form.author,
+      category: form.category,
+      publisher: form.publisher,
+      price: Number(form.price) || 0,
+      currency: form.currency,
+      status: form.status as 'active' | 'inactive',
+    })
+    setDialog(null)
+  }
 
   return (
     <div className="space-y-6">
@@ -44,7 +100,7 @@ export function AdminProducts() {
           <Link to="/administracion" className="text-corporate hover:underline">Administración</Link>
           <span>/</span>
           <span>Productos</span>
-          <span className="ml-2">— {filtered.length} de {adminProducts.length} registros</span>
+          <span className="ml-2">— {filtered.length} de {products.length} registros</span>
         </div>
         <Button icon={Plus} onClick={() => navigate(adminPath('productos', 'nuevo'))}>
           Crear Producto
@@ -133,9 +189,9 @@ export function AdminProducts() {
                 header: 'Acciones',
                 render: (p) => (
                   <TableActions
-                    onView={() => navigate(adminPath('productos', 'ver', p.id))}
-                    onEdit={() => navigate(adminPath('productos', 'editar', p.id))}
-                    onDelete={() => navigate(adminPath('productos', 'eliminar', p.id))}
+                    onView={() => setDialog({ id: p.id, mode: 'view' })}
+                    onEdit={() => setDialog({ id: p.id, mode: 'edit' })}
+                    onDelete={() => setDeleteId(p.id)}
                   />
                 ),
               },
@@ -143,6 +199,53 @@ export function AdminProducts() {
           />
         </CardBody>
       </Card>
+
+      <FormDialog
+        open={Boolean(dialog && selected)}
+        onClose={() => setDialog(null)}
+        title={dialog?.mode === 'edit' ? 'Editar Producto' : 'Detalle de Producto'}
+        subtitle={selected?.code}
+        mode={dialog?.mode ?? 'view'}
+        onEdit={() => setDialog((d) => (d ? { ...d, mode: 'edit' } : null))}
+        onSave={handleSave}
+      >
+        {selected && dialog?.mode === 'view' ? (
+          <>
+            <DetailRow label="Código Interno" value={<span className="font-mono text-corporate">{selected.code}</span>} />
+            <DetailRow label="ISBN" value={<span className="font-mono">{selected.isbn}</span>} />
+            <DetailRow label="Título" value={selected.title} />
+            <DetailRow label="Autor" value={selected.author} />
+            <DetailRow label="Categoría" value={<Badge variant="neutral">{selected.category}</Badge>} />
+            <DetailRow label="Editorial" value={selected.publisher} />
+            <DetailRow label="Precio" value={<span className="font-semibold text-corporate">RD${selected.price.toLocaleString()}</span>} />
+            <DetailRow label="Moneda" value={<Badge variant="gold">{selected.currency}</Badge>} />
+            <DetailRow label="Estado" value={<Badge variant={statusMap[selected.status].variant}>{statusMap[selected.status].label}</Badge>} />
+          </>
+        ) : selected ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input label="Código Interno" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+            <Input label="ISBN" value={form.isbn} onChange={(e) => setForm({ ...form, isbn: e.target.value })} />
+            <Input label="Título" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="md:col-span-2" />
+            <Input label="Autor" value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} className="md:col-span-2" />
+            <Select label="Categoría" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} options={categoryNames.map((c) => ({ value: c, label: c }))} />
+            <Select label="Editorial" value={form.publisher} onChange={(e) => setForm({ ...form, publisher: e.target.value })} options={publisherNames.map((p) => ({ value: p, label: p }))} />
+            <Input label="Precio" type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+            <Select label="Moneda" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} options={currencyCodes.map((c) => ({ value: c, label: c }))} />
+            <Select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={statusOptions} />
+          </div>
+        ) : null}
+      </FormDialog>
+
+      <ConfirmDialog
+        open={Boolean(deleteId)}
+        onClose={() => setDeleteId(null)}
+        onConfirm={() => {
+          if (!deleteId) return
+          deleteProduct(deleteId)
+          setDeleteId(null)
+        }}
+        message="¿Está seguro de eliminar este producto del catálogo maestro?"
+      />
     </div>
   )
 }

@@ -7,13 +7,23 @@ import { Badge } from '../components/ui/Badge'
 import { Table } from '../components/ui/Table'
 import { roles, permissions } from '../data/mockData'
 import { activeSessions, accessHistory, failedAttempts, mfaSettings } from '../data/usersMockData'
+import { useGlobalSearchRecordEffect, useRecordHighlightScroll } from '../context/GlobalSearchNavigationContext'
 
 type Tab = 'roles' | 'permissions' | 'sesiones' | 'accesos' | 'fallidos' | 'mfa'
 
 export function Users() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<Tab>('roles')
+  const [highlightId, setHighlightId] = useState<string | null>(null)
   const totalUsers = roles.reduce((sum, r) => sum + r.users, 0)
+
+  useGlobalSearchRecordEffect('user', {
+    onHighlight: (recordId) => {
+      setActiveTab('mfa')
+      setHighlightId(recordId)
+    },
+  })
+  useRecordHighlightScroll(highlightId)
 
   const tabs: { id: Tab; label: string; icon: typeof Shield }[] = [
     { id: 'roles', label: 'Roles', icon: Shield },
@@ -173,6 +183,7 @@ export function Users() {
           <CardBody className="!p-0">
             <Table
               keyField="user"
+              highlightId={highlightId}
               data={mfaSettings}
               columns={[
                 { key: 'name', header: 'Usuario', render: (m) => <span className="font-medium">{m.name}</span> },

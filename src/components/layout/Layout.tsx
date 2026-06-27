@@ -3,6 +3,8 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { resolveAdminPageTitle } from '../../lib/adminPageTitles'
+import { ImportacionesSearchProvider } from '../../context/ImportacionesSearchContext'
+import { GlobalSearchNavigationProvider } from '../../context/GlobalSearchNavigationContext'
 
 const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/': { title: 'Dashboard', subtitle: 'Resumen general del sistema' },
@@ -24,7 +26,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/editoriales/condiciones': { title: 'Condiciones Comerciales', subtitle: 'Descuentos y crédito' },
   '/editoriales/productos': { title: 'Productos Asociados', subtitle: 'Libros por editorial' },
   '/eventos': { title: 'Eventos y Ferias', subtitle: 'Calendario y reservaciones' },
-  '/eventos/nuevo': { title: 'Nuevo Evento', subtitle: 'Registro de feria o evento' },
+  '/eventos/nuevo': { title: 'Nuevo Evento', subtitle: 'Asignación inteligente de personal' },
   '/reportes': { title: 'Reportes', subtitle: 'Informes y exportaciones' },
   '/usuarios': { title: 'Usuarios y Permisos', subtitle: 'Roles, accesos y seguridad' },
   '/usuarios/nuevo': { title: 'Nuevo Usuario', subtitle: 'Alta de usuario del sistema' },
@@ -65,18 +67,22 @@ export function Layout() {
   const page = getPageInfo(location.pathname)
 
   return (
-    <div className="min-h-screen bg-surface">
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
-      <Header title={page.title} subtitle={page.subtitle} sidebarCollapsed={collapsed} />
-      <main
-        className={`pt-16 min-h-screen transition-all duration-300 ${
-          collapsed ? 'pl-[72px]' : 'pl-64'
-        }`}
-      >
-        <div className="p-6">
-          <Outlet />
+    <ImportacionesSearchProvider>
+      <GlobalSearchNavigationProvider>
+        <div className="min-h-screen bg-surface">
+          <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
+          <Header title={page.title} subtitle={page.subtitle} sidebarCollapsed={collapsed} />
+          <main
+            className={`pt-16 min-h-screen transition-all duration-300 ${
+              collapsed ? 'pl-[72px]' : 'pl-64'
+            }`}
+          >
+            <div className="p-6">
+              <Outlet />
+            </div>
+          </main>
         </div>
-      </main>
-    </div>
+      </GlobalSearchNavigationProvider>
+    </ImportacionesSearchProvider>
   )
 }

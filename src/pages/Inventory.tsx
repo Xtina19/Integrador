@@ -6,9 +6,18 @@ import { Button } from '../components/ui/Button'
 import { Select } from '../components/ui/Input'
 import { Badge } from '../components/ui/Badge'
 import { Table } from '../components/ui/Table'
+import { TableActions } from '../components/ui/TableActions'
 import { Toolbar } from '../components/ui/Toolbar'
-import { products, categories } from '../data/mockData'
-import { kardexMovements, locations, inventoryAdjustments, physicalCounts } from '../data/inventoryMockData'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
+import { ProductRecordDialog } from '../components/inventario/ProductRecordDialog'
+import { FormDialog, DetailRow } from '../components/ui/FormDialog'
+import { categories } from '../data/mockData'
+import { locations, physicalCounts } from '../data/inventoryMockData'
+import type { Product, KardexMovement, InventoryAdjustment } from '../types/domain'
+import { useERP } from '../store/ERPProvider'
+import { useToast } from '../context/ToastContext'
+import { useTableExport } from '../lib/useTableExport'
+import { useGlobalSearchRecordEffect, useRecordHighlightScroll } from '../context/GlobalSearchNavigationContext'
 
 type Tab = 'general' | 'kardex' | 'ubicaciones' | 'ajustes' | 'conteos'
 
@@ -28,10 +37,30 @@ const tabs: { id: Tab; label: string }[] = [
 
 export function Inventory() {
   const navigate = useNavigate()
+  const { state, deleteProduct } = useERP()
+  const { showSuccess } = useToast()
+  const { onExportPdf, onExportExcel } = useTableExport('Inventario')
+  const products = state.products
+  const kardexMovements = state.kardexMovements
+  const inventoryAdjustments = state.inventoryAdjustments
   const [activeTab, setActiveTab] = useState<Tab>('general')
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('all')
   const [status, setStatus] = useState('all')
+  const [highlightId, setHighlightId] = useState<string | null>(null)
+  const [productDialog, setProductDialog] = useState<{ productId: string; mode: 'view' | 'edit' } | null>(null)
+  const [deleteProductId, setDeleteProductId] = useState<string | null>(null)
+  const [countDialogOpen, setCountDialogOpen] = useState(false)
+
+  const selectedProduct = productDialog ? products.find((p) => p.id === productDialog.productId) ?? null : null
+
+  useGlobalSearchRecordEffect('product', {
+    onHighlight: (recordId) => {
+      setActiveTab('general')
+      setHighlightId(recordId)
+    },
+  })
+  useRecordHighlightScroll(highlightId)
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
@@ -111,8 +140,13 @@ export function Inventory() {
                   ...(category !== 'all' ? [category] : []),
                   ...(status !== 'all' ? [statusMap[status]?.label ?? status] : []),
                 ]}
-                onExportPdf={() => {}}
-                onExportExcel={() => {}}
+                onExportPdf={onExportPdf}
+                onExportExcel={() =>
+                  onExportExcel(
+                    ['ISBN', 'Título', 'Autor', 'Categoría', 'Stock', 'Ubicación', 'Estado'],
+                    filtered.map((p) => [p.isbn, p.title, p.author, p.category, String(p.stock), p.location, p.status])
+                  )
+                }
               />
             </CardBody>
           </Card>
@@ -122,7 +156,8 @@ export function Inventory() {
             <CardBody className="!p-0">
               <Table
                 keyField="id"
-                data={filtered}
+                highlightId={highlightId}
+                data={filtered as (Product & Record<string, unknown>)[]}
                 columns={[
                   { key: 'isbn', header: 'ISBN', className: 'text-xs font-mono text-gray-500' },
                   {
@@ -156,6 +191,17 @@ export function Inventory() {
                       return <Badge variant={s.variant}>{s.label}</Badge>
                     },
                   },
+                  {
+                    key: 'actions',
+                    header: 'Acciones',
+                    render: (p) => (
+                      <TableActions
+                        onView={() => setProductDialog({ productId: p.id, mode: 'view' })}
+                        onEdit={() => setProductDialog({ productId: p.id, mode: 'edit' })}
+                        onDelete={() => setDeleteProductId(p.id)}
+                      />
+                    ),
+                  },
                 ]}
               />
             </CardBody>
@@ -169,7 +215,7 @@ export function Inventory() {
           <CardBody className="!p-0">
             <Table
               keyField="id"
-              data={kardexMovements}
+              data={kardexMovements as (KardexMovement & Record<string, unknown>)[]}
               columns={[
                 { key: 'date', header: 'Fecha', className: 'text-xs whitespace-nowrap' },
                 { key: 'product', header: 'Producto', render: (m) => <span className="font-medium">{m.product}</span> },
@@ -211,7 +257,7 @@ export function Inventory() {
           <CardBody className="!p-0">
             <Table
               keyField="id"
-              data={inventoryAdjustments}
+              data={inventoryAdjustments as (InventoryAdjustment & Record<string, unknown>)[]}
               columns={[
                 { key: 'id', header: 'ID', className: 'text-xs font-mono text-corporate' },
                 { key: 'date', header: 'Fecha' },
@@ -229,7 +275,7 @@ export function Inventory() {
 
       {activeTab === 'conteos' && (
         <Card>
-          <CardHeader title="Conteos Físicos" subtitle="Auditorías de inventario" action={<Button icon={Plus} size="sm">Nuevo Conteo</Button>} />
+          <CardHeader title="Conteos Físicos" subtitle="Auditorías de inventario" action={<Button icon={Plus} size="sm" onClick={() => setCountDialogOpen(true)}>Nuevo Conteo</Button>} />
           <CardBody className="!p-0">
             <Table
               keyField="id"
@@ -246,6 +292,44 @@ export function Inventory() {
           </CardBody>
         </Card>
       )}
+      <ProductRecordDialog
+        product={selectedProduct}
+        mode={productDialog?.mode ?? 'view'}
+        open={Boolean(productDialog && selectedProduct)}
+        onClose={() => setProductDialog(null)}
+        onEdit={() => setProductDialog((d) => (d ? { ...d, mode: 'edit' } : null))}
+      />
+      <ConfirmDialog
+        open={Boolean(deleteProductId)}
+        onClose={() => setDeleteProductId(null)}
+        onConfirm={() => {
+          if (!deleteProductId) return
+          const result = deleteProduct(deleteProductId)
+          if (result.success) showSuccess('Producto eliminado correctamente')
+          setDeleteProductId(null)
+        }}
+        message="¿Está seguro de eliminar este producto del inventario?"
+      />
+      <FormDialog
+        open={countDialogOpen}
+        onClose={() => setCountDialogOpen(false)}
+        title="Nuevo Conteo Físico"
+        subtitle="Programación de auditoría de inventario"
+        mode="edit"
+        onSave={() => {
+          showSuccess('Conteo físico programado correctamente')
+          setCountDialogOpen(false)
+        }}
+        saveLabel="Programar conteo"
+      >
+        <div className="space-y-4">
+          <DetailRow label="Almacén" value="Almacén Central" />
+          <DetailRow label="Fecha programada" value={new Date().toISOString().slice(0, 10)} />
+          <DetailRow label="Productos a contar" value={products.length} />
+          <DetailRow label="Estado" value={<Badge variant="info">Programado</Badge>} />
+          <p className="text-sm text-gray-500">El conteo quedará registrado como &quot;En progreso&quot; en la tabla de conteos físicos.</p>
+        </div>
+      </FormDialog>
     </div>
   )
 }

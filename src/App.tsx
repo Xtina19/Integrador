@@ -1,4 +1,9 @@
 import { Routes, Route } from 'react-router-dom'
+import { ERPProvider } from './store/ERPProvider'
+import { StaffAssignmentProvider } from './context/StaffAssignmentContext'
+import { ToastProvider } from './context/ToastContext'
+import { AdminCatalogProvider } from './context/AdminCatalogContext'
+import { SalesDataProvider } from './context/SalesDataContext'
 import { Layout } from './components/layout/Layout'
 import { Dashboard } from './pages/Dashboard'
 import { Inventory } from './pages/Inventory'
@@ -73,7 +78,12 @@ import { PalletsCajasPage } from './pages/importaciones/PalletsCajasPage'
 
 export default function App() {
   return (
-    <Routes>
+    <ERPProvider>
+      <ToastProvider>
+        <AdminCatalogProvider>
+          <SalesDataProvider>
+            <StaffAssignmentProvider>
+      <Routes>
       <Route element={<Layout />}>
         <Route index element={<Dashboard />} />
         <Route path="inventario" element={<Inventory />} />
@@ -190,5 +200,10 @@ export default function App() {
         <Route path="ayuda" element={<AyudaPage />} />
       </Route>
     </Routes>
+      </StaffAssignmentProvider>
+          </SalesDataProvider>
+        </AdminCatalogProvider>
+      </ToastProvider>
+    </ERPProvider>
   )
 }

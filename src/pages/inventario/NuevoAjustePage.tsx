@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { FormPageLayout } from '../../components/ui/FormPageLayout'
 import { Input, Select } from '../../components/ui/Input'
-import { products } from '../../data/mockData'
+import { useERP } from '../../store/ERPProvider'
 
 export function NuevoAjustePage() {
+  const { state, createAdjustment } = useERP()
+  const products = state.products
+  const [error, setError] = useState('')
   const [form, setForm] = useState({
     product: products[0]?.title ?? '',
     type: 'Entrada',
@@ -21,7 +24,22 @@ export function NuevoAjustePage() {
       title="Nuevo Ajuste de Inventario"
       subtitle="Entrada, salida o corrección de stock"
       listPath="/inventario"
+      onSave={() => {
+        const result = createAdjustment({
+          productTitle: form.product,
+          type: form.type,
+          qty: Number(form.qty),
+          reason: form.reason,
+          notes: form.notes,
+        })
+        if (!result.success) {
+          setError(result.errors?.join(' ') ?? 'Error al guardar')
+          return false
+        }
+        return true
+      }}
     >
+      {error && <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2 mb-4">{error}</div>}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Select
           label="Producto *"

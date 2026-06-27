@@ -1,19 +1,32 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Calendar, MapPin, Users, Ticket } from 'lucide-react'
 import { Card, CardHeader, CardBody, StatCard } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Table } from '../components/ui/Table'
-import { events, calendarEvents } from '../data/mockData'
-import { eventBudgets, eventCosts, eventIncome, eventPublishers, eventStaff } from '../data/eventsMockData'
+import { Toolbar } from '../components/ui/Toolbar'
+import { calendarEvents } from '../data/mockData'
+import { useERP } from '../store/ERPProvider'
+import { useGlobalSearchRecordEffect, useRecordHighlightScroll } from '../context/GlobalSearchNavigationContext'
+import { TableActions } from '../components/ui/TableActions'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
+import { EventRecordDialog } from '../components/eventos/EventRecordDialog'
+import { useToast } from '../context/ToastContext'
+import { eventBudgets, eventCosts, eventIncome, eventPublishers } from '../data/eventsMockData'
+import { useStaffAssignment } from '../context/StaffAssignmentContext'
+import { STAFF_AREA_LABELS, type StaffAssignmentRecord } from '../types/staffAssignment'
 
-type Tab = 'calendario' | 'presupuestos' | 'costos' | 'ingresos' | 'editoriales' | 'personal'
+import { eventStatusLabels } from '../business-rules/stateMachines'
+import type { EventStatus, LibroSysEvent } from '../types/domain'
 
-const eventStatus: Record<string, { label: string; variant: 'success' | 'warning' | 'info' | 'neutral' }> = {
-  active: { label: 'Activo', variant: 'success' },
-  upcoming: { label: 'Próximo', variant: 'info' },
-  planned: { label: 'Planificado', variant: 'neutral' },
+type Tab = 'calendario' | 'presupuestos' | 'costos' | 'ingresos' | 'editoriales' | 'asignaciones'
+
+const eventStatusVariants: Record<EventStatus, 'success' | 'warning' | 'info' | 'neutral'> = {
+  scheduled: 'info',
+  staff_assigned: 'neutral',
+  in_progress: 'success',
+  finalized: 'neutral',
 }
 
 const eventType: Record<string, { label: string; variant: 'gold' | 'info' }> = {
@@ -26,8 +39,36 @@ const firstDayOffset = 6
 
 export function Events() {
   const navigate = useNavigate()
+  const { history } = useStaffAssignment()
+  const { state, deleteEvent } = useERP()
+  const { showSuccess } = useToast()
+  const events = state.events
   const [activeTab, setActiveTab] = useState<Tab>('calendario')
-  const activeEvents = events.filter((e) => e.status === 'active').length
+  const [highlightId, setHighlightId] = useState<string | null>(null)
+  const [eventDialog, setEventDialog] = useState<{ eventId: string; mode: 'view' | 'edit' } | null>(null)
+  const [deleteEventId, setDeleteEventId] = useState<string | null>(null)
+
+  const selectedEvent = eventDialog ? events.find((e) => e.id === eventDialog.eventId) ?? null : null
+
+  useGlobalSearchRecordEffect('event', {
+    onHighlight: (recordId) => {
+      setActiveTab('calendario')
+      setHighlightId(recordId)
+    },
+  })
+  useRecordHighlightScroll(highlightId)
+  const [assignmentSearch, setAssignmentSearch] = useState('')
+  const filteredAssignments = useMemo(() => {
+    if (!assignmentSearch) return history
+    const q = assignmentSearch.toLowerCase()
+    return history.filter(
+      (r) =>
+        r.eventName.toLowerCase().includes(q) ||
+        r.employeeName.toLowerCase().includes(q) ||
+        STAFF_AREA_LABELS[r.area].toLowerCase().includes(q)
+    )
+  }, [history, assignmentSearch])
+  const activeEvents = events.filter((e) => e.status === 'in_progress').length
   const totalReservations = events.reduce((sum, e) => sum + e.reservations, 0)
   const totalParticipants = events.reduce((sum, e) => sum + e.participants, 0)
 
@@ -37,7 +78,7 @@ export function Events() {
     { id: 'costos', label: 'Costos' },
     { id: 'ingresos', label: 'Ingresos' },
     { id: 'editoriales', label: 'Editoriales' },
-    { id: 'personal', label: 'Personal' },
+    { id: 'asignaciones', label: 'Asignaciones de Personal' },
   ]
 
   return (
@@ -132,7 +173,8 @@ export function Events() {
           <CardBody className="!p-0">
             <Table
               keyField="id"
-              data={events}
+              highlightId={highlightId}
+              data={events as (LibroSysEvent & Record<string, unknown>)[]}
               columns={[
                 {
                   key: 'name',
@@ -167,8 +209,8 @@ export function Events() {
                   key: 'status',
                   header: 'Estado',
                   render: (e) => {
-                    const s = eventStatus[e.status]
-                    return <Badge variant={s.variant}>{s.label}</Badge>
+                    const st = e.status as EventStatus
+                    return <Badge variant={eventStatusVariants[st]}>{eventStatusLabels[st]}</Badge>
                   },
                 },
                 {
@@ -185,6 +227,17 @@ export function Events() {
                   key: 'reservations',
                   header: 'Reservaciones',
                   render: (e) => <span className="font-semibold text-corporate">{e.reservations}</span>,
+                },
+                {
+                  key: 'actions',
+                  header: 'Acciones',
+                  render: (e) => (
+                    <TableActions
+                      onView={() => setEventDialog({ eventId: e.id, mode: 'view' })}
+                      onEdit={() => setEventDialog({ eventId: e.id, mode: 'edit' })}
+                      onDelete={() => setDeleteEventId(e.id)}
+                    />
+                  ),
                 },
               ]}
             />
@@ -276,20 +329,74 @@ export function Events() {
         </Card>
       )}
 
-      {activeTab === 'personal' && (
+      {activeTab === 'asignaciones' && (
         <Card>
-          <CardHeader title="Asignación de Personal" subtitle="Equipo por evento" />
-          <CardBody className="!p-0">
-            <Table keyField="eventId" data={eventStaff} columns={[
-              { key: 'eventName', header: 'Evento' },
-              { key: 'employee', header: 'Empleado', render: (s) => <span className="font-medium">{s.employee}</span> },
-              { key: 'role', header: 'Rol' },
-              { key: 'shift', header: 'Turno' },
-            ]} />
+          <CardHeader
+            title="Asignaciones de Personal"
+            subtitle={`${history.length} registros en el historial de rotación`}
+          />
+          <CardBody className="space-y-4">
+            <Toolbar
+              search={assignmentSearch}
+              onSearchChange={setAssignmentSearch}
+              searchPlaceholder="Buscar por evento, empleado o área..."
+            />
+            <div className="!p-0 border border-gray-100 rounded-lg overflow-hidden">
+              <Table
+                keyField="id"
+                data={filteredAssignments as (StaffAssignmentRecord & Record<string, unknown>)[]}
+                columns={[
+                  { key: 'eventName', header: 'Evento', render: (r) => <span className="font-medium">{r.eventName}</span> },
+                  { key: 'employeeName', header: 'Empleado', render: (r) => <span className="font-medium">{r.employeeName}</span> },
+                  {
+                    key: 'area',
+                    header: 'Área',
+                    render: (r) => <Badge variant="neutral">{STAFF_AREA_LABELS[r.area]}</Badge>,
+                  },
+                  {
+                    key: 'startDate',
+                    header: 'Fecha',
+                    render: (r) => (
+                      <span className="text-sm">
+                        {r.startDate === r.endDate ? r.startDate : `${r.startDate} — ${r.endDate}`}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'status',
+                    header: 'Estado',
+                    render: (r) => (
+                      <Badge variant={r.status === 'confirmed' ? 'success' : 'info'}>
+                        {r.status === 'confirmed' ? 'Confirmado' : 'Propuesto'}
+                      </Badge>
+                    ),
+                  },
+                ]}
+              />
+            </div>
           </CardBody>
         </Card>
       )}
 
+      <EventRecordDialog
+        event={selectedEvent}
+        mode={eventDialog?.mode ?? 'view'}
+        open={Boolean(eventDialog && selectedEvent)}
+        onClose={() => setEventDialog(null)}
+        onEdit={() => setEventDialog((d) => (d ? { ...d, mode: 'edit' } : null))}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteEventId)}
+        onClose={() => setDeleteEventId(null)}
+        onConfirm={() => {
+          if (!deleteEventId) return
+          const result = deleteEvent(deleteEventId)
+          if (result.success) showSuccess('Evento eliminado correctamente')
+          setDeleteEventId(null)
+        }}
+        message="¿Está seguro de eliminar este evento?"
+      />
     </div>
   )
 }

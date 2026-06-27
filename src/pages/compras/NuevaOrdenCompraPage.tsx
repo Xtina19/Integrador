@@ -3,10 +3,11 @@ import { Plus, Trash2 } from 'lucide-react'
 import { FormPageLayout } from '../../components/ui/FormPageLayout'
 import { Input, Select } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
-import { adminSuppliers } from '../../data/adminMockData'
-import { currencyCodes } from '../../data/adminMockData'
+import { nationalSupplierNames, internationalSupplierNames, currencyCodes } from '../../data/adminMockData'
 import { posProducts } from '../../data/salesMockData'
-import { purchaseStatusMap } from '../../data/purchasesMockData'
+import { purchaseStatusLabels } from '../../business-rules/stateMachines'
+import type { PurchaseStatus, PurchaseType } from '../../types/domain'
+import { useERP } from '../../store/ERPProvider'
 
 interface OrderLine {
   id: string
@@ -16,21 +17,43 @@ interface OrderLine {
 }
 
 export function NuevaOrdenCompraPage() {
+  const { createPurchaseOrder } = useERP()
+  const [error, setError] = useState('')
   const [form, setForm] = useState({
-    orderNumber: 'OC-2026-090',
-    supplier: adminSuppliers[0]?.name ?? '',
+    orderNumber: '',
+    purchaseType: 'national' as PurchaseType,
+    supplier: nationalSupplierNames[0] ?? '',
     date: new Date().toISOString().slice(0, 10),
-    currency: currencyCodes[0] ?? 'DOP',
-    status: 'draft',
+    currency: 'DOP',
+    status: 'pending' as PurchaseStatus,
   })
   const [lines, setLines] = useState<OrderLine[]>([
     { id: '1', product: posProducts[0]?.title ?? '', qty: 1, unitCost: 320 },
   ])
 
+  const supplierOptions = useMemo(
+    () =>
+      (form.purchaseType === 'international' ? internationalSupplierNames : nationalSupplierNames).map((name) => ({
+        value: name,
+        label: name,
+      })),
+    [form.purchaseType]
+  )
+
   const total = useMemo(
     () => lines.reduce((sum, line) => sum + line.qty * line.unitCost, 0),
     [lines]
   )
+
+  function handlePurchaseTypeChange(purchaseType: PurchaseType) {
+    const names = purchaseType === 'international' ? internationalSupplierNames : nationalSupplierNames
+    setForm({
+      ...form,
+      purchaseType,
+      supplier: names[0] ?? '',
+      currency: purchaseType === 'international' ? 'EUR' : 'DOP',
+    })
+  }
 
   function addLine() {
     setLines((prev) => [
@@ -59,30 +82,66 @@ export function NuevaOrdenCompraPage() {
       title="Nueva Orden de Compra"
       subtitle="Registro de orden con detalle de productos"
       listPath="/compras/ordenes"
+      onSave={() => {
+        const result = createPurchaseOrder({
+          orderNumber: form.orderNumber,
+          supplier: form.supplier,
+          date: form.date,
+          currency: form.currency,
+          status: form.status,
+          purchaseType: form.purchaseType,
+          lines: lines.map((l) => ({ product: l.product, qty: l.qty, unitCost: l.unitCost })),
+        })
+        if (!result.success) {
+          setError(result.errors?.join(' ') ?? 'Error al guardar')
+          return false
+        }
+        return true
+      }}
     >
+      {error && <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2 mb-4">{error}</div>}
       <div className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Input label="Número OC *" value={form.orderNumber} onChange={(e) => setForm({ ...form, orderNumber: e.target.value })} />
           <Select
+            label="Tipo de Compra *"
+            value={form.purchaseType}
+            onChange={(e) => handlePurchaseTypeChange(e.target.value as PurchaseType)}
+            options={[
+              { value: 'national', label: 'Nacional' },
+              { value: 'international', label: 'Internacional' },
+            ]}
+          />
+          <Select
             label="Proveedor *"
             value={form.supplier}
             onChange={(e) => setForm({ ...form, supplier: e.target.value })}
-            options={adminSuppliers.map((s) => ({ value: s.name, label: s.name }))}
+            options={supplierOptions}
           />
           <Input label="Fecha *" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
           <Select
             label="Moneda *"
             value={form.currency}
             onChange={(e) => setForm({ ...form, currency: e.target.value })}
-            options={currencyCodes.map((c) => ({ value: c, label: c }))}
+            options={
+              form.purchaseType === 'international'
+                ? currencyCodes.filter((c) => c !== 'DOP').map((c) => ({ value: c, label: c }))
+                : currencyCodes.map((c) => ({ value: c, label: c }))
+            }
           />
           <Select
             label="Estado *"
             value={form.status}
-            onChange={(e) => setForm({ ...form, status: e.target.value })}
-            options={Object.entries(purchaseStatusMap).map(([value, cfg]) => ({ value, label: cfg.label }))}
+            onChange={(e) => setForm({ ...form, status: e.target.value as PurchaseStatus })}
+            options={Object.entries(purchaseStatusLabels).map(([value, label]) => ({ value, label }))}
           />
         </div>
+
+        {form.purchaseType === 'international' && (
+          <p className="text-sm text-gray-600 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
+            Al aprobar esta orden se generará una <strong>Factura Internacional</strong> y quedará disponible en el módulo de Importaciones para registrar embarque, costos y recepción.
+          </p>
+        )}
 
         <div>
           <div className="flex items-center justify-between mb-4">
@@ -124,7 +183,10 @@ export function NuevaOrdenCompraPage() {
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Subtotal</label>
-                    <p className="py-2 text-sm font-semibold text-corporate">RD${subtotal.toLocaleString()}</p>
+                    <p className="py-2 text-sm font-semibold text-corporate">
+                      {form.currency === 'DOP' ? 'RD$' : form.currency === 'EUR' ? '€' : '$'}
+                      {subtotal.toLocaleString()}
+                    </p>
                   </div>
                   <div className="md:col-span-1 flex justify-end">
                     <button
@@ -145,7 +207,10 @@ export function NuevaOrdenCompraPage() {
         <div className="flex justify-end pt-4 border-t border-gray-200">
           <div className="text-right">
             <p className="text-sm text-gray-500">Total de la orden</p>
-            <p className="text-2xl font-bold text-corporate">RD${total.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-corporate">
+              {form.currency === 'DOP' ? 'RD$' : form.currency === 'EUR' ? '€' : '$'}
+              {total.toLocaleString()}
+            </p>
           </div>
         </div>
       </div>

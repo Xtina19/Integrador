@@ -5,18 +5,20 @@ import { Button } from '../components/ui/Button'
 import { Input, Select } from '../components/ui/Input'
 import { Badge } from '../components/ui/Badge'
 import { Table } from '../components/ui/Table'
-import { transfers, transferHistory, branches } from '../data/mockData'
-import { transferRequests, transferApprovals, transferReceptions } from '../data/inventoryMockData'
+import { branches } from '../data/mockData'
+import { transferStatusLabels } from '../business-rules/stateMachines'
+import type { TransferStatus } from '../types/domain'
+import { useERP } from '../store/ERPProvider'
+import { useGlobalSearchRecordEffect, useRecordHighlightScroll } from '../context/GlobalSearchNavigationContext'
 
 type Tab = 'solicitudes' | 'aprobaciones' | 'transito' | 'recepcion' | 'historial'
 
-const statusConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'gold' }> = {
-  pending: { label: 'Pendiente', variant: 'warning' },
-  approved: { label: 'Aprobada', variant: 'info' },
-  in_transit: { label: 'En tránsito', variant: 'info' },
-  pending_receipt: { label: 'Por recibir', variant: 'gold' },
-  received: { label: 'Recibida', variant: 'success' },
-  completed: { label: 'Completada', variant: 'success' },
+const statusVariants: Record<TransferStatus, 'success' | 'warning' | 'danger' | 'info' | 'gold'> = {
+  requested: 'warning',
+  approved: 'info',
+  in_transit: 'info',
+  received: 'gold',
+  finalized: 'success',
 }
 
 const tabs: { id: Tab; label: string }[] = [
@@ -28,10 +30,60 @@ const tabs: { id: Tab; label: string }[] = [
 ]
 
 export function Transfers() {
+  const {
+    state,
+    createTransfer,
+    approveTransfer,
+    shipTransfer,
+    receiveTransfer,
+    finalizeTransfer,
+  } = useERP()
+  const { transfers, transferHistory, products } = state
+
   const [activeTab, setActiveTab] = useState<Tab>('transito')
   const [showForm, setShowForm] = useState(false)
+  const [highlightId, setHighlightId] = useState<string | null>(null)
 
-  const inTransit = transfers.filter((t) => t.status === 'in_transit' || t.status === 'pending_receipt')
+  useGlobalSearchRecordEffect('transfer', {
+    onHighlight: (recordId) => {
+      const t = transfers.find((x) => x.id === recordId)
+      const inHistory = transferHistory.some((x) => x.id === recordId)
+      if (inHistory) setActiveTab('historial')
+      else if (t?.status === 'requested') setActiveTab('solicitudes')
+      else if (t?.status === 'approved') setActiveTab('aprobaciones')
+      else if (t?.status === 'in_transit') setActiveTab('transito')
+      else if (t?.status === 'received') setActiveTab('recepcion')
+      else setActiveTab('transito')
+      setHighlightId(recordId)
+    },
+  })
+  useRecordHighlightScroll(highlightId)
+  const [form, setForm] = useState({
+    origin: branches[0]?.name ?? '',
+    destination: branches[1]?.name ?? '',
+    product: products[0]?.title ?? '',
+    qty: '1',
+    transport: 'Distribución interna',
+  })
+
+  const requested = transfers.filter((t) => t.status === 'requested')
+  const approved = transfers.filter((t) => t.status === 'approved')
+  const inTransit = transfers.filter((t) => t.status === 'in_transit')
+  const toReceive = transfers.filter((t) => t.status === 'received')
+
+  function handleCreate() {
+    const result = createTransfer({
+      origin: form.origin,
+      destination: form.destination,
+      product: form.product,
+      qty: Number(form.qty) || 1,
+      transport: form.transport,
+    })
+    if (result.success) {
+      setShowForm(false)
+      setActiveTab('solicitudes')
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -43,7 +95,7 @@ export function Transfers() {
                 <Clock size={20} className="text-amber-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-corporate">{transferRequests.filter((t) => t.status === 'pending').length}</p>
+                <p className="text-2xl font-bold text-corporate">{requested.length}</p>
                 <p className="text-xs text-gray-500">Solicitudes pendientes</p>
               </div>
             </div>
@@ -99,12 +151,35 @@ export function Transfers() {
           <CardHeader title="Nueva Solicitud de Transferencia" subtitle="Distribución interna entre sucursales" />
           <CardBody>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <Select label="Sucursal origen" options={branches.map((b) => ({ value: b.id, label: b.name }))} />
-              <Select label="Sucursal destino" options={branches.map((b) => ({ value: b.id, label: b.name }))} />
-              <Input label="Producto" placeholder="Buscar producto por ISBN o título..." />
-              <Input label="Cantidad" type="number" placeholder="0" min={1} />
-              <Select label="Método de transporte" options={[{ value: 'internal', label: 'Distribución interna' }, { value: 'own', label: 'Transporte propio' }]} />
-              <div className="flex items-end"><Button className="w-full">Crear Solicitud</Button></div>
+              <Select
+                label="Sucursal origen"
+                value={form.origin}
+                onChange={(e) => setForm({ ...form, origin: e.target.value })}
+                options={branches.map((b) => ({ value: b.name, label: b.name }))}
+              />
+              <Select
+                label="Sucursal destino"
+                value={form.destination}
+                onChange={(e) => setForm({ ...form, destination: e.target.value })}
+                options={branches.map((b) => ({ value: b.name, label: b.name }))}
+              />
+              <Select
+                label="Producto"
+                value={form.product}
+                onChange={(e) => setForm({ ...form, product: e.target.value })}
+                options={products.map((p) => ({ value: p.title, label: p.title }))}
+              />
+              <Input label="Cantidad" type="number" min={1} value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} />
+              <Select
+                label="Método de transporte"
+                value={form.transport}
+                onChange={(e) => setForm({ ...form, transport: e.target.value })}
+                options={[
+                  { value: 'Distribución interna', label: 'Distribución interna' },
+                  { value: 'Transporte propio', label: 'Transporte propio' },
+                ]}
+              />
+              <div className="flex items-end"><Button className="w-full" onClick={handleCreate}>Crear Solicitud</Button></div>
             </div>
           </CardBody>
         </Card>
@@ -116,14 +191,21 @@ export function Transfers() {
           <CardBody className="!p-0">
             <Table
               keyField="id"
-              data={transferRequests}
+              highlightId={highlightId}
+              data={requested as unknown as Record<string, unknown>[]}
               columns={[
-                { key: 'id', header: 'ID', render: (t) => <span className="font-mono text-xs text-corporate">{t.id}</span> },
-                { key: 'origin', header: 'Origen → Destino', render: (t) => <span>{t.origin} → {t.destination}</span> },
+                { key: 'id', header: 'ID', render: (t) => <span className="font-mono text-xs text-corporate">{(t as { id: string }).id}</span> },
+                { key: 'origin', header: 'Origen → Destino', render: (t) => { const x = t as { origin: string; destination: string }; return <span>{x.origin} → {x.destination}</span> } },
                 { key: 'product', header: 'Producto' },
                 { key: 'qty', header: 'Cantidad' },
                 { key: 'date', header: 'Fecha' },
-                { key: 'status', header: 'Estado', render: () => <Badge variant="warning">Pendiente</Badge> },
+                {
+                  key: 'actions',
+                  header: 'Acciones',
+                  render: (t) => (
+                    <Button size="sm" onClick={() => approveTransfer((t as { id: string }).id)}>Aprobar</Button>
+                  ),
+                },
               ]}
             />
           </CardBody>
@@ -132,19 +214,25 @@ export function Transfers() {
 
       {activeTab === 'aprobaciones' && (
         <Card>
-          <CardHeader title="Aprobaciones" subtitle="Solicitudes aprobadas" />
+          <CardHeader title="Aprobaciones" subtitle="Listas para despacho" />
           <CardBody className="!p-0">
             <Table
               keyField="id"
-              data={transferApprovals}
+              highlightId={highlightId}
+              data={approved as unknown as Record<string, unknown>[]}
               columns={[
                 { key: 'id', header: 'Solicitud' },
-                { key: 'origin', header: 'Ruta', render: (t) => <span>{t.origin} → {t.destination}</span> },
+                { key: 'origin', header: 'Ruta', render: (t) => { const x = t as { origin: string; destination: string }; return <span>{x.origin} → {x.destination}</span> } },
                 { key: 'product', header: 'Producto' },
                 { key: 'qty', header: 'Cantidad' },
-                { key: 'approvedBy', header: 'Aprobado por' },
                 { key: 'date', header: 'Fecha' },
-                { key: 'status', header: 'Estado', render: () => <Badge variant="success">Aprobada</Badge> },
+                {
+                  key: 'actions',
+                  header: 'Acciones',
+                  render: (t) => (
+                    <Button size="sm" variant="outline" onClick={() => shipTransfer((t as { id: string }).id)}>Despachar</Button>
+                  ),
+                },
               ]}
             />
           </CardBody>
@@ -157,15 +245,22 @@ export function Transfers() {
           <CardBody className="!p-0">
             <Table
               keyField="id"
-              data={transfers}
+              highlightId={highlightId}
+              data={inTransit as unknown as Record<string, unknown>[]}
               columns={[
-                { key: 'id', header: 'ID', render: (t) => <span className="font-mono text-xs text-corporate">{t.id}</span> },
-                { key: 'origin', header: 'Origen → Destino', render: (t) => <div className="flex items-center gap-2 text-sm"><span>{t.origin}</span><ArrowRight size={14} className="text-gold-dark" /><span className="font-medium">{t.destination}</span></div> },
+                { key: 'id', header: 'ID', render: (t) => <span className="font-mono text-xs text-corporate">{(t as { id: string }).id}</span> },
+                { key: 'origin', header: 'Origen → Destino', render: (t) => { const x = t as { origin: string; destination: string }; return <div className="flex items-center gap-2 text-sm"><span>{x.origin}</span><ArrowRight size={14} className="text-gold-dark" /><span className="font-medium">{x.destination}</span></div> } },
                 { key: 'product', header: 'Producto' },
-                { key: 'qty', header: 'Cantidad', render: (t) => <span className="font-semibold">{t.qty}</span> },
-                { key: 'status', header: 'Estado', render: (t) => { const s = statusConfig[t.status]; return <Badge variant={s.variant}>{s.label}</Badge> } },
+                { key: 'qty', header: 'Cantidad', render: (t) => <span className="font-semibold">{(t as { qty: number }).qty}</span> },
+                { key: 'status', header: 'Estado', render: (t) => { const s = (t as { status: TransferStatus }).status; return <Badge variant={statusVariants[s]}>{transferStatusLabels[s]}</Badge> } },
                 { key: 'transport', header: 'Transporte', className: 'text-xs text-gray-500' },
-                { key: 'date', header: 'Fecha', className: 'text-xs text-gray-400' },
+                {
+                  key: 'actions',
+                  header: 'Acciones',
+                  render: (t) => (
+                    <Button size="sm" onClick={() => receiveTransfer((t as { id: string }).id)}>Recibir</Button>
+                  ),
+                },
               ]}
             />
           </CardBody>
@@ -178,15 +273,21 @@ export function Transfers() {
           <CardBody className="!p-0">
             <Table
               keyField="id"
-              data={transferReceptions}
+              highlightId={highlightId}
+              data={toReceive as unknown as Record<string, unknown>[]}
               columns={[
-                { key: 'id', header: 'ID', render: (t) => <span className="font-mono text-xs text-corporate">{t.id}</span> },
-                { key: 'origin', header: 'Ruta', render: (t) => <span>{t.origin} → {t.destination}</span> },
+                { key: 'id', header: 'ID' },
+                { key: 'origin', header: 'Ruta', render: (t) => { const x = t as { origin: string; destination: string }; return <span>{x.origin} → {x.destination}</span> } },
                 { key: 'product', header: 'Producto' },
                 { key: 'qty', header: 'Cantidad' },
-                { key: 'receivedBy', header: 'Recibido por' },
                 { key: 'date', header: 'Fecha' },
-                { key: 'status', header: 'Estado', render: () => <Badge variant="success">Recibida</Badge> },
+                {
+                  key: 'actions',
+                  header: 'Acciones',
+                  render: (t) => (
+                    <Button size="sm" onClick={() => finalizeTransfer((t as { id: string }).id)}>Finalizar</Button>
+                  ),
+                },
               ]}
             />
           </CardBody>
@@ -199,13 +300,14 @@ export function Transfers() {
           <CardBody className="!p-0">
             <Table
               keyField="id"
-              data={transferHistory}
+              highlightId={highlightId}
+              data={transferHistory as unknown as Record<string, unknown>[]}
               columns={[
                 { key: 'id', header: 'ID', className: 'text-xs text-gray-400' },
-                { key: 'origin', header: 'Ruta', render: (t) => <span>{t.origin} → {t.destination}</span> },
+                { key: 'origin', header: 'Ruta', render: (t) => { const x = t as { origin: string; destination: string }; return <span>{x.origin} → {x.destination}</span> } },
                 { key: 'product', header: 'Producto' },
                 { key: 'qty', header: 'Cantidad' },
-                { key: 'status', header: 'Estado', render: () => <Badge variant="success">Completada</Badge> },
+                { key: 'status', header: 'Estado', render: () => <Badge variant="success">Finalizada</Badge> },
                 { key: 'date', header: 'Fecha', className: 'text-xs text-gray-400' },
               ]}
             />

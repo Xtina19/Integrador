@@ -41,12 +41,23 @@ export const adminBranches = [
 ]
 
 export const adminSuppliers = [
-  { id: 'PRV-01', name: 'Distribuidora Caribeña del Libro', contact: 'Jorge Ramírez', email: 'ventas@dcl.com.do', phone: '+1 809 555 6001', supplierType: 'Distribuidor', purchasesCount: 156, address: 'Zona Industrial, Santiago' },
-  { id: 'PRV-02', name: 'Papelera del Cibao SA', contact: 'Marta López', email: 'compras@papelera-cibao.do', phone: '+1 809 555 6002', supplierType: 'Material de oficina', purchasesCount: 89, address: 'Av. Máximo Gómez, Santo Domingo' },
-  { id: 'PRV-03', name: 'Transportes Joselito', contact: 'Pedro Gómez', email: 'logistica@transportes-joselito.do', phone: '+1 809 555 6003', supplierType: 'Logística', purchasesCount: 234, address: 'Carretera Duarte Km 12, Santo Domingo' },
-  { id: 'PRV-04', name: 'Editorial Porrúa RD', contact: 'Sofía Castro', email: 'distribucion@porrua.do', phone: '+1 809 555 6004', supplierType: 'Editorial', purchasesCount: 67, address: 'Calle El Conde 15, Santo Domingo' },
-  { id: 'PRV-05', name: 'Tech Solutions RD', contact: 'Diego Morales', email: 'soporte@techsolutions.do', phone: '+1 809 555 6005', supplierType: 'Tecnología', purchasesCount: 23, address: 'Piantini, Santo Domingo' },
+  { id: 'PRV-01', name: 'Distribuidora Caribeña del Libro', contact: 'Jorge Ramírez', email: 'ventas@dcl.com.do', phone: '+1 809 555 6001', supplierType: 'Distribuidor', purchasesCount: 156, address: 'Zona Industrial, Santiago', scope: 'national' as const },
+  { id: 'PRV-02', name: 'Papelera del Cibao SA', contact: 'Marta López', email: 'compras@papelera-cibao.do', phone: '+1 809 555 6002', supplierType: 'Material de oficina', purchasesCount: 89, address: 'Av. Máximo Gómez, Santo Domingo', scope: 'national' as const },
+  { id: 'PRV-03', name: 'Transportes Joselito', contact: 'Pedro Gómez', email: 'logistica@transportes-joselito.do', phone: '+1 809 555 6003', supplierType: 'Logística', purchasesCount: 234, address: 'Carretera Duarte Km 12, Santo Domingo', scope: 'national' as const },
+  { id: 'PRV-04', name: 'Editorial Porrúa RD', contact: 'Sofía Castro', email: 'distribucion@porrua.do', phone: '+1 809 555 6004', supplierType: 'Editorial', purchasesCount: 67, address: 'Calle El Conde 15, Santo Domingo', scope: 'national' as const },
+  { id: 'PRV-05', name: 'Tech Solutions RD', contact: 'Diego Morales', email: 'soporte@techsolutions.do', phone: '+1 809 555 6005', supplierType: 'Tecnología', purchasesCount: 23, address: 'Piantini, Santo Domingo', scope: 'national' as const },
+  { id: 'PRV-INT-01', name: 'Planeta Internacional', contact: 'Laura Vega', email: 'export@planeta-int.com', phone: '+34 91 555 7001', supplierType: 'Editorial', purchasesCount: 42, address: 'Barcelona, España', scope: 'international' as const, country: 'España' },
+  { id: 'PRV-INT-02', name: 'Alfaguara Export', contact: 'Miguel Santos', email: 'export@alfaguara.es', phone: '+34 91 555 7002', supplierType: 'Editorial', purchasesCount: 38, address: 'Madrid, España', scope: 'international' as const, country: 'España' },
+  { id: 'PRV-INT-03', name: 'Penguin Random House', contact: 'John Smith', email: 'intl@penguinrandom.com', phone: '+1 212 555 7003', supplierType: 'Editorial', purchasesCount: 55, address: 'New York, USA', scope: 'international' as const, country: 'Estados Unidos' },
 ]
+
+export const internationalSupplierNames = adminSuppliers
+  .filter((s) => s.scope === 'international')
+  .map((s) => s.name)
+
+export const nationalSupplierNames = adminSuppliers
+  .filter((s) => s.scope === 'national')
+  .map((s) => s.name)
 
 export const adminCurrencies = [
   { id: 'CUR-01', code: 'DOP', name: 'Peso Dominicano', symbol: 'RD$', status: 'active', isDefault: true, decimalPlaces: 2 },

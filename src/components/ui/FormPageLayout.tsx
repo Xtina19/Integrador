@@ -10,7 +10,7 @@ interface FormPageLayoutProps {
   subtitle?: string
   listPath: string
   children: React.ReactNode
-  onSave?: () => void
+  onSave?: () => void | boolean
 }
 
 export function FormPageLayout({
@@ -24,7 +24,8 @@ export function FormPageLayout({
   const navigate = useNavigate()
 
   const handleSave = () => {
-    onSave?.()
+    const result = onSave?.()
+    if (result === false) return
     navigate(listPath)
   }
 

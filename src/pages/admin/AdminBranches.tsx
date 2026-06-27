@@ -1,21 +1,62 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, MapPin, Phone, User } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Card, CardHeader, CardBody } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
+import { Input, Select } from '../../components/ui/Input'
 import { Badge } from '../../components/ui/Badge'
 import { Table } from '../../components/ui/Table'
 import { TableActions } from '../../components/ui/TableActions'
-import { adminBranches } from '../../data/adminMockData'
+import { FormDialog, DetailRow } from '../../components/ui/FormDialog'
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { adminPath } from '../../lib/adminConfig'
+import { useAdminCatalog } from '../../context/AdminCatalogContext'
 
 const statusMap: Record<string, { label: string; variant: 'success' | 'neutral' }> = {
   active: { label: 'Activo', variant: 'success' },
   inactive: { label: 'Inactivo', variant: 'neutral' },
 }
 
+const statusOptions = [
+  { value: 'active', label: 'Activo' },
+  { value: 'inactive', label: 'Inactivo' },
+]
+
 export function AdminBranches() {
   const navigate = useNavigate()
+  const { branches, updateBranch, deleteBranch } = useAdminCatalog()
+  const [dialog, setDialog] = useState<{ id: string; mode: 'view' | 'edit' } | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [form, setForm] = useState({ name: '', address: '', city: '', phone: '', manager: '', status: 'active' })
+
+  const selected = dialog ? branches.find((b) => b.id === dialog.id) ?? null : null
+
+  useEffect(() => {
+    if (selected && dialog?.mode === 'edit') {
+      setForm({
+        name: selected.name,
+        address: selected.address,
+        city: selected.city,
+        phone: selected.phone,
+        manager: selected.manager,
+        status: selected.status,
+      })
+    }
+  }, [selected, dialog?.mode, dialog?.id])
+
+  function handleSave() {
+    if (!selected) return
+    updateBranch(selected.id, {
+      name: form.name,
+      address: form.address,
+      city: form.city,
+      phone: form.phone,
+      manager: form.manager,
+      status: form.status as 'active' | 'inactive',
+    })
+    setDialog(null)
+  }
 
   return (
     <div className="space-y-6">
@@ -24,7 +65,7 @@ export function AdminBranches() {
           <Link to="/administracion" className="text-corporate hover:underline">Administración</Link>
           <span>/</span>
           <span>Sucursales</span>
-          <span className="ml-2">— {adminBranches.length} registros</span>
+          <span className="ml-2">— {branches.length} registros</span>
         </div>
         <Button icon={Plus} onClick={() => navigate(adminPath('sucursales', 'nuevo'))}>
           Registrar Sucursal
@@ -36,7 +77,7 @@ export function AdminBranches() {
         <CardBody className="!p-0">
           <Table
             keyField="id"
-            data={adminBranches}
+            data={branches}
             columns={[
               { key: 'name', header: 'Nombre', render: (b) => <span className="font-medium text-gray-900">{b.name}</span> },
               {
@@ -87,9 +128,9 @@ export function AdminBranches() {
                 header: 'Acciones',
                 render: (b) => (
                   <TableActions
-                    onView={() => navigate(adminPath('sucursales', 'ver', b.id))}
-                    onEdit={() => navigate(adminPath('sucursales', 'editar', b.id))}
-                    onDelete={() => navigate(adminPath('sucursales', 'eliminar', b.id))}
+                    onView={() => setDialog({ id: b.id, mode: 'view' })}
+                    onEdit={() => setDialog({ id: b.id, mode: 'edit' })}
+                    onDelete={() => setDeleteId(b.id)}
                   />
                 ),
               },
@@ -97,6 +138,48 @@ export function AdminBranches() {
           />
         </CardBody>
       </Card>
+
+      <FormDialog
+        open={Boolean(dialog && selected)}
+        onClose={() => setDialog(null)}
+        title={dialog?.mode === 'edit' ? 'Editar Sucursal' : 'Detalle de Sucursal'}
+        subtitle={selected?.city}
+        mode={dialog?.mode ?? 'view'}
+        onEdit={() => setDialog((d) => (d ? { ...d, mode: 'edit' } : null))}
+        onSave={handleSave}
+      >
+        {selected && dialog?.mode === 'view' ? (
+          <>
+            <DetailRow label="Nombre" value={selected.name} />
+            <DetailRow label="Ciudad" value={selected.city} />
+            <DetailRow label="Dirección" value={selected.address} />
+            <DetailRow label="Teléfono" value={selected.phone} />
+            <DetailRow label="Encargado" value={selected.manager} />
+            <DetailRow label="Inventario" value={<span className="font-semibold text-corporate">{selected.inventory.toLocaleString()} uds.</span>} />
+            <DetailRow label="Estado" value={<Badge variant={statusMap[selected.status].variant}>{statusMap[selected.status].label}</Badge>} />
+          </>
+        ) : selected ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="md:col-span-2" />
+            <Input label="Dirección" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="md:col-span-2" />
+            <Input label="Ciudad" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+            <Input label="Teléfono" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            <Input label="Encargado" value={form.manager} onChange={(e) => setForm({ ...form, manager: e.target.value })} />
+            <Select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={statusOptions} />
+          </div>
+        ) : null}
+      </FormDialog>
+
+      <ConfirmDialog
+        open={Boolean(deleteId)}
+        onClose={() => setDeleteId(null)}
+        onConfirm={() => {
+          if (!deleteId) return
+          deleteBranch(deleteId)
+          setDeleteId(null)
+        }}
+        message="¿Está seguro de eliminar esta sucursal del catálogo?"
+      />
     </div>
   )
 }
