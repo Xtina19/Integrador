@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -13,6 +13,8 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { exchangeRateHistory, currencyCodes } from '../../data/adminMockData'
 import { adminPath } from '../../lib/adminConfig'
 import { useAdminCatalog } from '../../context/AdminCatalogContext'
+import { validateAdminExchangeRate } from '../../business-rules/adminValidators'
+import { trim } from '../../utils/formValidation'
 
 export function AdminExchangeRates() {
   const navigate = useNavigate()
@@ -42,14 +44,25 @@ export function AdminExchangeRates() {
     }
   }, [selected, dialog?.mode, dialog?.id])
 
+  const validation = useMemo(
+    () =>
+      validateAdminExchangeRate({
+        fromCurrency: form.fromCurrency,
+        toCurrency: form.toCurrency,
+        rate: form.value,
+        date: form.date,
+      }),
+    [form]
+  )
+
   function handleSave() {
-    if (!selected) return
+    if (!selected || !validation.valid) return false
     updateExchangeRate(selected.id, {
       fromCurrency: form.fromCurrency,
       toCurrency: form.toCurrency,
       value: Number(form.value) || 0,
-      date: form.date,
-      notes: form.notes,
+      date: trim(form.date),
+      notes: trim(form.notes),
     })
     setDialog(null)
   }
@@ -151,6 +164,7 @@ export function AdminExchangeRates() {
         mode={dialog?.mode ?? 'view'}
         onEdit={() => setDialog((d) => (d ? { ...d, mode: 'edit' } : null))}
         onSave={handleSave}
+        saveDisabled={!validation.valid}
       >
         {selected && dialog?.mode === 'view' ? (
           <>
@@ -162,6 +176,12 @@ export function AdminExchangeRates() {
             <DetailRow label="Notas" value={selected.notes || '—'} />
           </>
         ) : selected ? (
+          <>
+          {!validation.valid && (
+            <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+              {validation.errors[0]}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
             <Select label="Moneda Origen" value={form.fromCurrency} onChange={(e) => setForm({ ...form, fromCurrency: e.target.value })} options={currencyOptions} />
             <Select label="Moneda Destino" value={form.toCurrency} onChange={(e) => setForm({ ...form, toCurrency: e.target.value })} options={currencyOptions} />
@@ -169,6 +189,7 @@ export function AdminExchangeRates() {
             <Input label="Fecha" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
             <Textarea label="Notas" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="md:col-span-2" rows={3} />
           </div>
+          </>
         ) : null}
       </FormDialog>
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdminFormLayout } from '../../../components/admin/AdminFormLayout'
 import { AdminDetailLayout, AdminDeleteLayout } from '../../../components/admin/AdminDetailLayout'
@@ -8,7 +8,9 @@ import { Badge } from '../../../components/ui/Badge'
 import { Table } from '../../../components/ui/Table'
 import { RecordNotFound } from '../../../components/admin/RecordNotFound'
 import { ADMIN_MODULES } from '../../../lib/adminConfig'
-import { getProductById, getProductHistory, publisherNames, categoryNames, currencyCodes } from '../../../data/adminMockData'
+import { getProductById, getProductHistory, publisherNames, categoryNames, currencyCodes, adminProducts } from '../../../data/adminMockData'
+import { validateAdminProduct } from '../../../business-rules/adminValidators'
+import { trim } from '../../../utils/formValidation'
 
 const config = ADMIN_MODULES.productos
 const statusOptions = [
@@ -57,6 +59,31 @@ export function ProductFormPage() {
 
   const update = (field: string, value: string) => setForm((f) => ({ ...f, [field]: value }))
 
+  const validation = useMemo(
+    () =>
+      validateAdminProduct(
+        form,
+        adminProducts.map((p) => p.code),
+        adminProducts.map((p) => p.isbn),
+        existing?.code,
+        existing?.isbn
+      ),
+    [form, existing]
+  )
+
+  const saveForm = () => {
+    if (!validation.valid) return false
+    setForm((f) => ({
+      ...f,
+      code: trim(f.code),
+      isbn: trim(f.isbn),
+      title: trim(f.title),
+      author: trim(f.author),
+      notes: trim(f.notes),
+    }))
+    return true
+  }
+
   return (
     <AdminFormLayout
       breadcrumbs={[
@@ -66,8 +93,23 @@ export function ProductFormPage() {
       title={isEdit ? config.editTitle : config.createTitle}
       subtitle={isEdit ? `Modificando ${existing!.code}` : 'Registro en catálogo maestro'}
       listPath={config.basePath}
-      onSaveContinue={!isEdit ? () => setForm(emptyForm) : undefined}
+      saveDisabled={!validation.valid}
+      onSave={saveForm}
+      onSaveContinue={
+        !isEdit
+          ? () => {
+              if (!validation.valid) return false
+              setForm(emptyForm)
+              return true
+            }
+          : undefined
+      }
     >
+      {!validation.valid && (
+        <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+          {validation.errors[0]}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Input label="Código Interno *" value={form.code} onChange={(e) => update('code', e.target.value)} placeholder="LJS-011" />
         <Input label="ISBN *" value={form.isbn} onChange={(e) => update('isbn', e.target.value)} placeholder="978-XXXXXXXXXX" />

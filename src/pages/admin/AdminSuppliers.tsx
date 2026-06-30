@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Mail, Phone, User } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -12,6 +12,8 @@ import { FormDialog, DetailRow } from '../../components/ui/FormDialog'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { adminPath } from '../../lib/adminConfig'
 import { useAdminCatalog } from '../../context/AdminCatalogContext'
+import { validateAdminSupplier } from '../../business-rules/adminValidators'
+import { trim } from '../../utils/formValidation'
 
 const supplierTypes = ['Distribuidor', 'Editorial', 'Logística', 'Material de oficina', 'Tecnología']
 
@@ -44,14 +46,34 @@ export function AdminSuppliers() {
     }
   }, [selected, dialog?.mode, dialog?.id])
 
+  const validation = useMemo(
+    () =>
+      validateAdminSupplier(
+        {
+          name: form.name,
+          code: selected?.id ?? '',
+          type: form.supplierType,
+          country: 'country' in (selected ?? {}) ? (selected as { country?: string }).country ?? 'República Dominicana' : 'República Dominicana',
+          contact: form.contact,
+          phone: form.phone,
+          email: form.email,
+        },
+        suppliers.map((s) => s.id),
+        suppliers.map((s) => s.name),
+        selected?.id,
+        selected?.name
+      ),
+    [form, suppliers, selected]
+  )
+
   function handleSave() {
-    if (!selected) return
+    if (!selected || !validation.valid) return false
     updateSupplier(selected.id, {
-      name: form.name,
-      contact: form.contact,
-      email: form.email,
-      phone: form.phone,
-      address: form.address,
+      name: trim(form.name),
+      contact: trim(form.contact),
+      email: trim(form.email),
+      phone: trim(form.phone),
+      address: trim(form.address),
       supplierType: form.supplierType,
     })
     setDialog(null)
@@ -139,6 +161,7 @@ export function AdminSuppliers() {
         mode={dialog?.mode ?? 'view'}
         onEdit={() => setDialog((d) => (d ? { ...d, mode: 'edit' } : null))}
         onSave={handleSave}
+        saveDisabled={!validation.valid}
       >
         {selected && dialog?.mode === 'view' ? (
           <>
@@ -151,6 +174,12 @@ export function AdminSuppliers() {
             <DetailRow label="Compras" value={<span className="font-semibold text-corporate">{selected.purchasesCount}</span>} />
           </>
         ) : selected ? (
+          <>
+          {!validation.valid && (
+            <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+              {validation.errors[0]}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="md:col-span-2" />
             <Input label="Contacto" value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
@@ -159,6 +188,7 @@ export function AdminSuppliers() {
             <Input label="Dirección" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="md:col-span-2" />
             <Select label="Tipo de Proveedor" value={form.supplierType} onChange={(e) => setForm({ ...form, supplierType: e.target.value })} options={supplierTypes.map((t) => ({ value: t, label: t }))} />
           </div>
+          </>
         ) : null}
       </FormDialog>
 

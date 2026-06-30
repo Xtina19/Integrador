@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Product } from '../../types/domain'
 import { FormDialog, DetailRow } from '../ui/FormDialog'
 import { Input, Select } from '../ui/Input'
 import { Badge } from '../ui/Badge'
 import { categories } from '../../data/mockData'
 import { publisherNames } from '../../data/adminMockData'
+import { validateProduct } from '../../business-rules/validators'
+import { trim } from '../../utils/formValidation'
 import { useERP } from '../../store/ERPProvider'
 
 interface ProductRecordDialogProps {
@@ -22,7 +24,7 @@ const statusMap: Record<string, { label: string; variant: 'success' | 'warning' 
 }
 
 export function ProductRecordDialog({ product, mode, open, onClose, onEdit }: ProductRecordDialogProps) {
-  const { updateProduct } = useERP()
+  const { state, updateProduct } = useERP()
   const [error, setError] = useState('')
   const [form, setForm] = useState({
     isbn: '',
@@ -52,19 +54,33 @@ export function ProductRecordDialog({ product, mode, open, onClose, onEdit }: Pr
     setError('')
   }, [product, mode, open])
 
+  const validation = useMemo(
+    () =>
+      product && mode === 'edit'
+        ? validateProduct(
+            { code: product.id, ...form },
+            state.products.map((p) => p.id),
+            state.products.map((p) => p.isbn),
+            product.id,
+            product.isbn
+          )
+        : { valid: true, errors: [] },
+    [form, mode, product, state.products]
+  )
+
   if (!product) return null
 
   function handleSave() {
     const result = updateProduct({
       productId: product!.id,
       code: product!.id,
-      isbn: form.isbn,
-      name: form.name,
+      isbn: trim(form.isbn),
+      name: trim(form.name),
       category: form.category,
       publisher: form.publisher,
       stock: Number(form.stock) || 0,
       minStock: Number(form.minStock) || 0,
-      location: form.location,
+      location: trim(form.location),
       cost: Number(form.cost) || 0,
       price: Number(form.price) || 0,
     })
@@ -86,6 +102,7 @@ export function ProductRecordDialog({ product, mode, open, onClose, onEdit }: Pr
       mode={mode}
       onEdit={onEdit}
       onSave={handleSave}
+      saveDisabled={mode === 'edit' && !validation.valid}
       maxWidth="3xl"
     >
       {error && (

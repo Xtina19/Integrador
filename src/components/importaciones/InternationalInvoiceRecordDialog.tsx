@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { InternationalInvoice } from '../../types/domain'
 import { FormDialog, DetailRow } from '../ui/FormDialog'
 import { Input, Select } from '../ui/Input'
 import { Badge } from '../ui/Badge'
 import { Table } from '../ui/Table'
 import { importPipelineLabels } from '../../business-rules/internationalPurchaseFlow'
+import { validateInternationalInvoiceUpdate } from '../../business-rules/validators'
+import { trim } from '../../utils/formValidation'
 import { getInvoiceProducts } from '../../lib/importSearchUtils'
 import { currencyCodes } from '../../data/adminMockData'
 import { useERP } from '../../store/ERPProvider'
@@ -51,6 +53,19 @@ export function InternationalInvoiceRecordDialog({
     setError('')
   }, [invoice, mode, open])
 
+  const validation = useMemo(
+    () =>
+      invoice && mode === 'edit'
+        ? validateInternationalInvoiceUpdate({
+            supplier: form.supplier,
+            date: form.date,
+            currency: form.currency,
+            amount: form.amount,
+          })
+        : { valid: true, errors: [] },
+    [form, mode, invoice]
+  )
+
   if (!invoice) return null
 
   const products = getInvoiceProducts(state, invoice.orderId)
@@ -58,7 +73,7 @@ export function InternationalInvoiceRecordDialog({
   function handleSave() {
     const result = updateInternationalInvoice({
       invoiceId: invoice!.id,
-      supplier: form.supplier,
+      supplier: trim(form.supplier),
       date: form.date,
       currency: form.currency,
       amount: Number(form.amount) || 0,
@@ -80,6 +95,7 @@ export function InternationalInvoiceRecordDialog({
       mode={mode}
       onEdit={onEdit}
       onSave={handleSave}
+      saveDisabled={mode === 'edit' && !validation.valid}
       maxWidth="3xl"
     >
       {error && (

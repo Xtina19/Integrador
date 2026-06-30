@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdminFormLayout } from '../../../components/admin/AdminFormLayout'
 import { AdminDetailLayout, AdminDeleteLayout } from '../../../components/admin/AdminDetailLayout'
@@ -9,6 +9,8 @@ import { Table } from '../../../components/ui/Table'
 import { RecordNotFound } from '../../../components/admin/RecordNotFound'
 import { ADMIN_MODULES } from '../../../lib/adminConfig'
 import { getExchangeRateById, getRateHistory, currencyCodes } from '../../../data/adminMockData'
+import { validateAdminExchangeRate } from '../../../business-rules/adminValidators'
+import { trim } from '../../../utils/formValidation'
 
 const config = ADMIN_MODULES['tasas-cambio']
 
@@ -30,14 +32,46 @@ export function ExchangeRateFormPage() {
   const empty = { fromCurrency: 'USD', toCurrency: 'DOP', value: '', date: new Date().toISOString().slice(0, 10), notes: '' }
   const currencyOptions = currencyCodes.map((c) => ({ value: c, label: c }))
 
+  const validation = useMemo(
+    () =>
+      validateAdminExchangeRate({
+        fromCurrency: form.fromCurrency,
+        toCurrency: form.toCurrency,
+        rate: form.value,
+        date: form.date,
+      }),
+    [form]
+  )
+
+  const saveForm = () => {
+    if (!validation.valid) return false
+    setForm((f) => ({ ...f, date: trim(f.date), notes: trim(f.notes) }))
+    return true
+  }
+
   return (
     <AdminFormLayout
       breadcrumbs={[{ label: config.label, to: config.basePath }, { label: isEdit ? config.editTitle : config.createTitle }]}
       title={isEdit ? config.editTitle : config.createTitle}
       subtitle={isEdit ? `Modificando ${existing!.fromCurrency}/${existing!.toCurrency}` : 'Nueva tasa de conversión'}
       listPath={config.basePath}
-      onSaveContinue={!isEdit ? () => setForm(empty) : undefined}
+      saveDisabled={!validation.valid}
+      onSave={saveForm}
+      onSaveContinue={
+        !isEdit
+          ? () => {
+              if (!validation.valid) return false
+              setForm(empty)
+              return true
+            }
+          : undefined
+      }
     >
+      {!validation.valid && (
+        <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+          {validation.errors[0]}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl">
         <Select label="Moneda Origen *" value={form.fromCurrency} onChange={(e) => setForm({ ...form, fromCurrency: e.target.value })} options={currencyOptions} />
         <Select label="Moneda Destino *" value={form.toCurrency} onChange={(e) => setForm({ ...form, toCurrency: e.target.value })} options={currencyOptions} />

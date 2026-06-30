@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Globe, Mail } from 'lucide-react'
 import { AdminFormLayout } from '../../../components/admin/AdminFormLayout'
@@ -9,8 +9,10 @@ import { Badge } from '../../../components/ui/Badge'
 import { Table } from '../../../components/ui/Table'
 import { RecordNotFound } from '../../../components/admin/RecordNotFound'
 import { ADMIN_MODULES } from '../../../lib/adminConfig'
-import { getPublisherById, getPublisherContracts, getPublisherProducts } from '../../../data/adminMockData'
+import { getPublisherById, getPublisherContracts, getPublisherProducts, adminPublishers } from '../../../data/adminMockData'
 import { contractStatusConfig, getContractVisualStatus } from '../../../lib/publisherContractStatus'
+import { validateAdminPublisher } from '../../../business-rules/adminValidators'
+import { trim } from '../../../utils/formValidation'
 
 const config = ADMIN_MODULES.editoriales
 const statusOptions = [
@@ -53,6 +55,24 @@ export function PublisherFormPage() {
 
   const empty = { name: '', country: '', contact: '', phone: '', address: '', contractType: contractTypes[0], contractExpiry: '', status: 'active' }
 
+  const validation = useMemo(
+    () => validateAdminPublisher(form, adminPublishers.map((p) => p.name), existing?.name),
+    [form, existing]
+  )
+
+  const saveForm = () => {
+    if (!validation.valid) return false
+    setForm((f) => ({
+      ...f,
+      name: trim(f.name),
+      country: trim(f.country),
+      contact: trim(f.contact),
+      phone: trim(f.phone),
+      address: trim(f.address),
+    }))
+    return true
+  }
+
   return (
     <AdminFormLayout
       breadcrumbs={[
@@ -62,8 +82,23 @@ export function PublisherFormPage() {
       title={isEdit ? config.editTitle : config.createTitle}
       subtitle={isEdit ? `Modificando ${existing!.name}` : 'Nueva editorial en catálogo maestro'}
       listPath={config.basePath}
-      onSaveContinue={!isEdit ? () => setForm(empty) : undefined}
+      saveDisabled={!validation.valid}
+      onSave={saveForm}
+      onSaveContinue={
+        !isEdit
+          ? () => {
+              if (!validation.valid) return false
+              setForm(empty)
+              return true
+            }
+          : undefined
+      }
     >
+      {!validation.valid && (
+        <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+          {validation.errors[0]}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Input label="Nombre *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="md:col-span-2" />
         <Input label="País *" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Save, Sparkles, RefreshCw, Users } from 'lucide-react'
 import { FormBreadcrumb } from '../../components/ui/FormBreadcrumb'
@@ -9,6 +9,8 @@ import { publisherNames } from '../../data/adminMockData'
 import { useStaffAssignment, nextEventId } from '../../context/StaffAssignmentContext'
 import { useERP } from '../../store/ERPProvider'
 import { hasAssignments } from '../../lib/staffAssignmentEngine'
+import { validateEvent } from '../../business-rules/validators'
+import { trim } from '../../utils/formValidation'
 import type { StaffArea, StaffAssignmentResult, StaffRequirements } from '../../types/staffAssignment'
 import { STAFF_AREA_LABELS, STAFF_REQUIREMENT_LABELS } from '../../types/staffAssignment'
 
@@ -62,6 +64,10 @@ export function NuevoEventoPage() {
   const [assignment, setAssignment] = useState<StaffAssignmentResult['assignments']>(emptyAssignments())
   const [warnings, setWarnings] = useState<string[]>([])
   const [generated, setGenerated] = useState(false)
+  const [error, setError] = useState('')
+
+  const validation = useMemo(() => validateEvent(form), [form])
+  const canConfirm = validation.valid && hasAssignments(assignment)
 
   function handleRequirementChange(area: keyof StaffRequirements, value: string) {
     const num = Math.max(0, parseInt(value, 10) || 0)
@@ -81,24 +87,30 @@ export function NuevoEventoPage() {
   }
 
   function handleConfirm() {
-    if (!form.name || !form.startDate || !form.endDate) return
-    if (!hasAssignments(assignment)) return
+    if (!canConfirm) {
+      setError(validation.valid ? 'Debe generar la asignación de personal antes de confirmar.' : validation.errors[0])
+      return
+    }
 
     const eventId = nextEventId()
     const staffCount = Object.values(requirements).reduce((s, n) => s + n, 0)
 
-    registerEvent({
+    const result = registerEvent({
       id: eventId,
-      name: form.name,
+      name: trim(form.name),
       type: form.type,
       startDate: form.startDate,
       endDate: form.endDate,
-      location: form.location,
+      location: trim(form.location),
       publisher: form.publisher,
       budget: Number(form.budget) || 0,
       responsible: form.responsible,
       staffCount,
     })
+    if (!result.success) {
+      setError(result.errors?.join(' ') ?? 'Error al registrar el evento')
+      return
+    }
 
     confirmAssignments({
       eventId,
@@ -132,6 +144,11 @@ export function NuevoEventoPage() {
           subtitle="Defina las necesidades del evento — el sistema asignará el personal automáticamente"
         />
         <CardBody className="space-y-8">
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2">
+              {error}
+            </div>
+          )}
           <div>
             <h3 className="text-sm font-semibold text-gray-900 mb-4">Datos del evento</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -304,7 +321,7 @@ export function NuevoEventoPage() {
         <Button
           icon={Save}
           onClick={handleConfirm}
-          disabled={!form.name || !hasAssignments(assignment)}
+          disabled={!canConfirm}
         >
           Confirmar Evento
         </Button>

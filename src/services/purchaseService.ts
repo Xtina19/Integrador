@@ -1,7 +1,8 @@
 import type { PurchaseOrder, PurchaseOrderLine, Reception, InternationalInvoice } from '../types/domain'
 import type { ERPState } from '../store/initialState'
 import { canTransitionPurchase } from '../business-rules/stateMachines'
-import { validatePurchaseOrder } from '../business-rules/validators'
+import { validatePurchaseOrder, validatePurchaseOrderCreate, validateReceptionUpdate } from '../business-rules/validators'
+import { trim } from '../utils/formValidation'
 import { isInternationalSupplier } from '../business-rules/internationalPurchaseFlow'
 import { internationalSupplierNames } from '../data/adminMockData'
 import { createActivity, createNotification } from '../services/activityService'
@@ -35,7 +36,14 @@ export interface UpdateReceptionInput {
 
 export const purchaseService = {
   createOrder(state: ERPState, input: CreatePurchaseInput) {
-    const validation = validatePurchaseOrder(input.lines, input.supplier)
+    const validation = validatePurchaseOrderCreate(
+      input.orderNumber,
+      input.supplier,
+      input.date,
+      input.currency,
+      input.lines,
+      state.purchaseOrders.map((o) => o.id)
+    )
     if (!validation.valid) return { success: false as const, errors: validation.errors }
 
     if (input.purchaseType === 'international' && !isInternationalSupplier(input.supplier, internationalSupplierNames)) {
@@ -47,8 +55,8 @@ export const purchaseService = {
 
     const total = input.lines.reduce((s, l) => s + l.qty * l.unitCost, 0)
     const order: PurchaseOrder = {
-      id: input.orderNumber || nextId('OC'),
-      supplier: input.supplier,
+      id: trim(input.orderNumber) || nextId('OC'),
+      supplier: trim(input.supplier),
       date: input.date,
       currency: input.currency,
       items: input.lines.reduce((s, l) => s + l.qty, 0),
@@ -200,13 +208,21 @@ export const purchaseService = {
     if (order.status !== 'draft' && order.status !== 'pending') {
       return { success: false as const, errors: ['Solo se pueden editar órdenes en borrador o pendientes.'] }
     }
-    const validation = validatePurchaseOrder(input.lines, input.supplier)
+    const validation = validatePurchaseOrderCreate(
+      order.id,
+      input.supplier,
+      input.date,
+      input.currency,
+      input.lines,
+      state.purchaseOrders.map((o) => o.id),
+      order.id
+    )
     if (!validation.valid) return { success: false as const, errors: validation.errors }
 
     const total = input.lines.reduce((s, l) => s + l.qty * l.unitCost, 0)
     const updated: PurchaseOrder = {
       ...order,
-      supplier: input.supplier,
+      supplier: trim(input.supplier),
       date: input.date,
       currency: input.currency,
       purchaseType: input.purchaseType,
@@ -245,6 +261,9 @@ export const purchaseService = {
     if (reception.status === 'complete') {
       return { success: false as const, errors: ['No se puede editar una recepción completada.'] }
     }
+    const validation = validateReceptionUpdate({ date: input.date, items: input.items })
+    if (!validation.valid) return { success: false as const, errors: validation.errors }
+
     const updated: Reception = {
       ...reception,
       date: input.date,

@@ -1,7 +1,8 @@
 import type { LibroSysEvent } from '../types/domain'
 import type { ERPState } from '../store/initialState'
 import { canTransitionEvent } from '../business-rules/stateMachines'
-import { validateEventDates } from '../business-rules/validators'
+import { validateEvent } from '../business-rules/validators'
+import { trim } from '../utils/formValidation'
 import { createActivity, createNotification } from '../services/activityService'
 import { nextSimpleId } from '../utils/idGenerator'
 
@@ -34,16 +35,25 @@ export interface UpdateEventInput {
 
 export const eventService = {
   registerEvent(_state: ERPState, input: CreateEventInput) {
-    const validation = validateEventDates(input.startDate, input.endDate)
-    if (!validation.valid) return { success: false as const, errors: validation.errors }
-
-    const event: LibroSysEvent = {
-      id: input.id ?? nextSimpleId('EV'),
+    const validation = validateEvent({
       name: input.name,
       type: input.type,
       startDate: input.startDate,
       endDate: input.endDate,
-      location: input.location,
+      location: trim(input.location),
+      publisher: input.publisher,
+      budget: input.budget,
+      responsible: input.responsible,
+    })
+    if (!validation.valid) return { success: false as const, errors: validation.errors }
+
+    const event: LibroSysEvent = {
+      id: input.id ?? nextSimpleId('EV'),
+      name: trim(input.name),
+      type: input.type,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      location: trim(input.location),
       publisher: input.publisher,
       budget: input.budget,
       responsible: input.responsible,
@@ -73,16 +83,25 @@ export const eventService = {
   updateEvent(state: ERPState, input: UpdateEventInput) {
     const event = state.events.find((e) => e.id === input.eventId)
     if (!event) return { success: false as const, errors: ['Evento no encontrado.'] }
-    const validation = validateEventDates(input.startDate, input.endDate)
-    if (!validation.valid) return { success: false as const, errors: validation.errors }
-
-    const updated: LibroSysEvent = {
-      ...event,
+    const validation = validateEvent({
       name: input.name,
       type: input.type,
       startDate: input.startDate,
       endDate: input.endDate,
       location: input.location,
+      publisher: input.publisher,
+      budget: input.budget,
+      responsible: input.responsible,
+    })
+    if (!validation.valid) return { success: false as const, errors: validation.errors }
+
+    const updated: LibroSysEvent = {
+      ...event,
+      name: trim(input.name),
+      type: input.type,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      location: trim(input.location),
       publisher: input.publisher,
       budget: input.budget,
       responsible: input.responsible,

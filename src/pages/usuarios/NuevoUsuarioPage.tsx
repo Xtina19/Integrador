@@ -1,10 +1,25 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { FormPageLayout } from '../../components/ui/FormPageLayout'
 import { Input, Select } from '../../components/ui/Input'
 import { roles } from '../../data/mockData'
 import { adminBranches } from '../../data/adminMockData'
+import { activeSessions, mfaSettings } from '../../data/usersMockData'
+import { validateUser } from '../../business-rules/validators'
+import { trim } from '../../utils/formValidation'
+import { useToast } from '../../context/ToastContext'
+
+const existingUsernames = [
+  ...activeSessions.map((s) => s.user.split('@')[0]),
+  ...mfaSettings.map((m) => m.user.split('@')[0]),
+]
+const existingEmails = [
+  ...activeSessions.map((s) => s.user),
+  ...mfaSettings.map((m) => m.user),
+]
 
 export function NuevoUsuarioPage() {
+  const { showSuccess } = useToast()
+  const [error, setError] = useState('')
   const [form, setForm] = useState({
     fullName: '',
     email: '',
@@ -17,6 +32,11 @@ export function NuevoUsuarioPage() {
     mfaEnabled: false,
   })
 
+  const validation = useMemo(
+    () => validateUser(form, existingUsernames, existingEmails),
+    [form]
+  )
+
   return (
     <FormPageLayout
       breadcrumbs={[
@@ -26,7 +46,22 @@ export function NuevoUsuarioPage() {
       title="Nuevo Usuario"
       subtitle="Alta de usuario del sistema"
       listPath="/usuarios"
+      saveDisabled={!validation.valid}
+      onSave={() => {
+        if (!validation.valid) {
+          setError(validation.errors.join(' '))
+          return false
+        }
+        showSuccess(`Usuario ${trim(form.username)} registrado correctamente`)
+        return true
+      }}
     >
+      {error && <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2 mb-4">{error}</div>}
+      {!validation.valid && !error && (
+        <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+          {validation.errors[0]}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Input label="Nombre completo *" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className="md:col-span-2" />
         <Input label="Correo *" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />

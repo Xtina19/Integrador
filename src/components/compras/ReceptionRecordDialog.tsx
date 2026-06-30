@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Reception } from '../../types/domain'
 import { FormDialog, DetailRow } from '../ui/FormDialog'
 import { Input } from '../ui/Input'
 import { Badge } from '../ui/Badge'
+import { validateReceptionUpdate } from '../../business-rules/validators'
 import { useERP } from '../../store/ERPProvider'
 
 interface ReceptionRecordDialogProps {
@@ -30,6 +31,14 @@ export function ReceptionRecordDialog({
     setError('')
   }, [reception, mode, open])
 
+  const validation = useMemo(
+    () =>
+      reception && mode === 'edit'
+        ? validateReceptionUpdate({ date: form.date, items: Number(form.items) || 0 })
+        : { valid: true, errors: [] },
+    [form, mode, reception]
+  )
+
   if (!reception) return null
 
   const canEdit = reception.status === 'pending'
@@ -56,6 +65,7 @@ export function ReceptionRecordDialog({
       mode={mode}
       onEdit={canEdit ? onEdit : undefined}
       onSave={handleSave}
+      saveDisabled={mode === 'edit' && !validation.valid}
     >
       {error && (
         <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2 mb-4">{error}</div>

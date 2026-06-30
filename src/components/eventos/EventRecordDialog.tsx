@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { LibroSysEvent } from '../../types/domain'
 import { FormDialog, DetailRow } from '../ui/FormDialog'
 import { Input, Select } from '../ui/Input'
 import { Badge } from '../ui/Badge'
 import { eventStatusLabels } from '../../business-rules/stateMachines'
+import { validateEvent } from '../../business-rules/validators'
+import { trim } from '../../utils/formValidation'
 import { publisherNames } from '../../data/adminMockData'
 import { useERP } from '../../store/ERPProvider'
 
@@ -60,19 +62,36 @@ export function EventRecordDialog({ event, mode, open, onClose, onEdit }: EventR
     setError('')
   }, [event, mode, open])
 
+  const validation = useMemo(
+    () =>
+      event && mode === 'edit'
+        ? validateEvent({
+            name: form.name,
+            type: form.type,
+            startDate: form.startDate,
+            endDate: form.endDate,
+            location: form.location,
+            publisher: form.publisher,
+            budget: form.budget,
+            responsible: form.responsible,
+          })
+        : { valid: true, errors: [] },
+    [form, mode, event]
+  )
+
   if (!event) return null
 
   function handleSave() {
     const result = updateEvent({
       eventId: event!.id,
-      name: form.name,
+      name: trim(form.name),
       type: form.type,
       startDate: form.startDate,
       endDate: form.endDate,
-      location: form.location,
+      location: trim(form.location),
       publisher: form.publisher,
       budget: Number(form.budget) || 0,
-      responsible: form.responsible,
+      responsible: trim(form.responsible),
       participants: Number(form.participants) || 0,
       reservations: Number(form.reservations) || 0,
     })
@@ -92,6 +111,7 @@ export function EventRecordDialog({ event, mode, open, onClose, onEdit }: EventR
       mode={mode}
       onEdit={onEdit}
       onSave={handleSave}
+      saveDisabled={mode === 'edit' && !validation.valid}
       maxWidth="3xl"
     >
       {error && (

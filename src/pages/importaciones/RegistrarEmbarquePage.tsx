@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react'
 import { FormPageLayout } from '../../components/ui/FormPageLayout'
 import { Input, Select } from '../../components/ui/Input'
 import { shipmentCostFields, emptyShipmentCosts, computeShipmentCostsTotal } from '../../business-rules/shipmentCosts'
+import { validateShipmentForm } from '../../business-rules/validators'
+import { trim } from '../../utils/formValidation'
 import type { ShipmentCosts } from '../../types/domain'
 import { useERP } from '../../store/ERPProvider'
 
@@ -29,6 +31,24 @@ export function RegistrarEmbarquePage() {
   const selectedInvoice = state.internationalInvoices.find((f) => f.id === form.invoiceId)
   const costsTotal = computeShipmentCostsTotal(costs)
 
+  const validation = useMemo(
+    () =>
+      validateShipmentForm(
+        {
+          code: form.code,
+          supplier: selectedInvoice?.supplier ?? '',
+          origin: form.origin,
+          destination: form.destination,
+          departure: form.departure,
+          arrival: form.arrival,
+          boxes: form.boxes,
+          invoiceId: form.invoiceId,
+        },
+        state.shipments.map((s) => s.code)
+      ),
+    [form, selectedInvoice, state.shipments]
+  )
+
   function updateCost(key: keyof ShipmentCosts, value: string) {
     setCosts((prev) => ({ ...prev, [key]: Number(value) || 0 }))
   }
@@ -43,23 +63,24 @@ export function RegistrarEmbarquePage() {
       title="Registrar Embarque"
       subtitle="Vincular embarque a factura internacional y registrar sus costos"
       listPath="/importaciones/embarques"
+      saveDisabled={!validation.valid || pendingInvoices.length === 0}
       onSave={() => {
         if (!form.invoiceId) {
           setError('Seleccione una factura internacional pendiente de embarque.')
           return false
         }
         const result = registerShipment({
-          code: form.code,
+          code: trim(form.code),
           type: form.type,
-          origin: form.origin,
-          destination: form.destination,
+          origin: trim(form.origin),
+          destination: trim(form.destination),
           departure: form.departure,
           arrival: form.arrival,
           boxes: Number(form.boxes) || 0,
           supplier: selectedInvoice?.supplier ?? '',
           invoiceId: form.invoiceId,
           costs,
-          notes: form.notes,
+          notes: trim(form.notes),
         })
         if (!result.success) {
           setError(result.errors?.join(' ') ?? 'Error al guardar')
@@ -69,6 +90,11 @@ export function RegistrarEmbarquePage() {
       }}
     >
       {error && <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2 mb-4">{error}</div>}
+      {!validation.valid && !error && pendingInvoices.length > 0 && (
+        <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+          {validation.errors[0]}
+        </div>
+      )}
       {pendingInvoices.length === 0 && (
         <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-3 mb-4">
           No hay facturas internacionales pendientes. Apruebe una orden de compra internacional en Compras para generar una factura.

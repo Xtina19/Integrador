@@ -9,7 +9,8 @@ import type {
 } from '../types/domain'
 import type { ERPState } from '../store/initialState'
 import { canTransitionImport } from '../business-rules/stateMachines'
-import { validateShipment } from '../business-rules/validators'
+import { validateShipmentForm, validateInternationalInvoiceUpdate, validateConsolidationUpdate } from '../business-rules/validators'
+import { trim } from '../utils/formValidation'
 import { computeShipmentCostsTotal, hasShipmentCosts } from '../business-rules/shipmentCosts'
 import { createActivity, createNotification } from '../services/activityService'
 import { nextId } from '../utils/idGenerator'
@@ -126,7 +127,19 @@ function findOrCreateConsolidation(
 
 export const importService = {
   registerShipment(state: ERPState, input: CreateShipmentInput) {
-    const validation = validateShipment(input.supplier, input.code)
+    const validation = validateShipmentForm(
+      {
+        code: input.code,
+        supplier: input.supplier,
+        origin: input.origin,
+        destination: input.destination,
+        departure: input.departure,
+        arrival: input.arrival,
+        boxes: input.boxes,
+        invoiceId: input.invoiceId,
+      },
+      state.shipments.map((s) => s.code)
+    )
     if (!validation.valid) return { success: false as const, errors: validation.errors }
 
     if (!hasShipmentCosts(input.costs)) {
@@ -152,10 +165,10 @@ export const importService = {
 
     const shipment: Shipment = {
       id: nextId('EMB'),
-      code: input.code,
+      code: trim(input.code),
       type: input.type,
-      origin: input.origin,
-      destination: input.destination,
+      origin: trim(input.origin),
+      destination: trim(input.destination),
       departure: input.departure,
       arrival: input.arrival,
       status: 'registered',
@@ -327,21 +340,32 @@ export const importService = {
   updateShipment(state: ERPState, input: UpdateShipmentInput) {
     const shipment = state.shipments.find((s) => s.id === input.shipmentId)
     if (!shipment) return { success: false as const, errors: ['Embarque no encontrado.'] }
+
+    const validation = validateShipmentForm(
+      {
+        code: input.code,
+        supplier: shipment.supplier ?? '',
+        origin: input.origin,
+        destination: input.destination,
+        departure: input.departure,
+        arrival: input.arrival,
+        boxes: input.boxes,
+      },
+      state.shipments.map((s) => s.code),
+      shipment.code
+    )
+    if (!validation.valid) return { success: false as const, errors: validation.errors }
+
     if (!hasShipmentCosts(input.costs)) {
       return { success: false as const, errors: ['Ingrese al menos un costo del embarque.'] }
     }
 
-    const duplicateCode = state.shipments.some(
-      (s) => s.id !== input.shipmentId && s.code.toLowerCase() === input.code.toLowerCase()
-    )
-    if (duplicateCode) return { success: false as const, errors: ['Ya existe un embarque con ese código.'] }
-
     const updated: Shipment = {
       ...shipment,
-      code: input.code,
+      code: trim(input.code),
       type: input.type,
-      origin: input.origin,
-      destination: input.destination,
+      origin: trim(input.origin),
+      destination: trim(input.destination),
       departure: input.departure,
       arrival: input.arrival,
       boxes: input.boxes,
@@ -366,11 +390,18 @@ export const importService = {
   updateInternationalInvoice(state: ERPState, input: UpdateInternationalInvoiceInput) {
     const invoice = state.internationalInvoices.find((f) => f.id === input.invoiceId)
     if (!invoice) return { success: false as const, errors: ['Factura no encontrada.'] }
-    if (input.amount <= 0) return { success: false as const, errors: ['El monto debe ser mayor a cero.'] }
+
+    const validation = validateInternationalInvoiceUpdate({
+      supplier: input.supplier,
+      date: input.date,
+      currency: input.currency,
+      amount: input.amount,
+    })
+    if (!validation.valid) return { success: false as const, errors: validation.errors }
 
     const updated: InternationalInvoice = {
       ...invoice,
-      supplier: input.supplier,
+      supplier: trim(input.supplier),
       date: input.date,
       currency: input.currency,
       amount: input.amount,
@@ -388,9 +419,16 @@ export const importService = {
     const consolidation = state.consolidations.find((c) => c.id === input.consolidationId)
     if (!consolidation) return { success: false as const, errors: ['Consolidación no encontrada.'] }
 
+    const validation = validateConsolidationUpdate({
+      name: input.name,
+      status: input.status,
+      notes: input.notes,
+    })
+    if (!validation.valid) return { success: false as const, errors: validation.errors }
+
     const updated: Consolidation = {
       ...consolidation,
-      name: input.name,
+      name: trim(input.name),
       status: input.status,
       notes: input.notes,
     }

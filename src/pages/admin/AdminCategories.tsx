@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -12,6 +12,8 @@ import { FormDialog, DetailRow } from '../../components/ui/FormDialog'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { adminPath } from '../../lib/adminConfig'
 import { useAdminCatalog } from '../../context/AdminCatalogContext'
+import { validateAdminCategory } from '../../business-rules/adminValidators'
+import { trim } from '../../utils/formValidation'
 
 const statusMap: Record<string, { label: string; variant: 'success' | 'neutral' }> = {
   active: { label: 'Activo', variant: 'success' },
@@ -42,11 +44,16 @@ export function AdminCategories() {
     }
   }, [selected, dialog?.mode, dialog?.id])
 
+  const validation = useMemo(
+    () => validateAdminCategory(form, categories.map((c) => c.name), selected?.name),
+    [form, categories, selected]
+  )
+
   function handleSave() {
-    if (!selected) return
+    if (!selected || !validation.valid) return false
     updateCategory(selected.id, {
-      name: form.name,
-      description: form.description,
+      name: trim(form.name),
+      description: trim(form.description),
       status: form.status as 'active' | 'inactive',
     })
     setDialog(null)
@@ -113,6 +120,7 @@ export function AdminCategories() {
         mode={dialog?.mode ?? 'view'}
         onEdit={() => setDialog((d) => (d ? { ...d, mode: 'edit' } : null))}
         onSave={handleSave}
+        saveDisabled={!validation.valid}
       >
         {selected && dialog?.mode === 'view' ? (
           <>
@@ -122,12 +130,19 @@ export function AdminCategories() {
             <DetailRow label="Productos" value={<span className="font-semibold text-corporate">{selected.productCount.toLocaleString()}</span>} />
           </>
         ) : selected ? (
+          <>
+          {!validation.valid && (
+            <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+              {validation.errors[0]}
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-4 max-w-2xl">
             <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <Textarea label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={4} />
             <Select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={statusOptions} />
             <DetailRow label="Productos" value={<span className="font-semibold text-corporate">{selected.productCount.toLocaleString()}</span>} />
           </div>
+          </>
         ) : null}
       </FormDialog>
 

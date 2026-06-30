@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { FormPageLayout } from '../../components/ui/FormPageLayout'
 import { Input, Select } from '../../components/ui/Input'
+import { validateInventoryAdjustment } from '../../business-rules/validators'
+import { trim } from '../../utils/formValidation'
 import { useERP } from '../../store/ERPProvider'
 
 export function NuevoAjustePage() {
@@ -15,6 +17,11 @@ export function NuevoAjustePage() {
     notes: '',
   })
 
+  const validation = useMemo(
+    () => validateInventoryAdjustment(Number(form.qty) || 0, form.reason, form.product),
+    [form.qty, form.reason, form.product]
+  )
+
   return (
     <FormPageLayout
       breadcrumbs={[
@@ -24,13 +31,14 @@ export function NuevoAjustePage() {
       title="Nuevo Ajuste de Inventario"
       subtitle="Entrada, salida o corrección de stock"
       listPath="/inventario"
+      saveDisabled={!validation.valid}
       onSave={() => {
         const result = createAdjustment({
-          productTitle: form.product,
+          productTitle: trim(form.product),
           type: form.type,
           qty: Number(form.qty),
-          reason: form.reason,
-          notes: form.notes,
+          reason: trim(form.reason),
+          notes: trim(form.notes),
         })
         if (!result.success) {
           setError(result.errors?.join(' ') ?? 'Error al guardar')
@@ -40,6 +48,11 @@ export function NuevoAjustePage() {
       }}
     >
       {error && <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2 mb-4">{error}</div>}
+      {!validation.valid && !error && (
+        <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+          {validation.errors[0]}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Select
           label="Producto *"

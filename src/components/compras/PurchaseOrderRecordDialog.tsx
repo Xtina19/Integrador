@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { PurchaseOrder, PurchaseOrderLine, PurchaseType } from '../../types/domain'
 import { FormDialog, DetailRow } from '../ui/FormDialog'
@@ -7,6 +7,8 @@ import { Badge } from '../ui/Badge'
 import { Table } from '../ui/Table'
 import { Button } from '../ui/Button'
 import { purchaseStatusLabels } from '../../business-rules/stateMachines'
+import { validatePurchaseOrderCreate } from '../../business-rules/validators'
+import { trim } from '../../utils/formValidation'
 import { nationalSupplierNames, internationalSupplierNames, currencyCodes } from '../../data/adminMockData'
 import { posProducts } from '../../data/salesMockData'
 import { useERP } from '../../store/ERPProvider'
@@ -36,7 +38,7 @@ export function PurchaseOrderRecordDialog({
   onClose,
   onEdit,
 }: PurchaseOrderRecordDialogProps) {
-  const { updatePurchaseOrder } = useERP()
+  const { state, updatePurchaseOrder } = useERP()
   const { showSuccess } = useToast()
   const [error, setError] = useState('')
   const [form, setForm] = useState({
@@ -62,6 +64,22 @@ export function PurchaseOrderRecordDialog({
   const supplierOptions =
     form.purchaseType === 'international' ? internationalSupplierNames : nationalSupplierNames
 
+  const validation = useMemo(
+    () =>
+      order && mode === 'edit' && (order.status === 'draft' || order.status === 'pending')
+        ? validatePurchaseOrderCreate(
+            order.id,
+            form.supplier,
+            form.date,
+            form.currency,
+            lines,
+            state.purchaseOrders.map((o) => o.id),
+            order.id
+          )
+        : { valid: true, errors: [] },
+    [mode, order, form, lines, state.purchaseOrders]
+  )
+
   if (!order) return null
 
   const total = lines.reduce((s, l) => s + l.qty * l.unitCost, 0)
@@ -70,7 +88,7 @@ export function PurchaseOrderRecordDialog({
   function handleSave() {
     const result = updatePurchaseOrder({
       orderId: order!.id,
-      supplier: form.supplier,
+      supplier: trim(form.supplier),
       date: form.date,
       currency: form.currency,
       purchaseType: form.purchaseType,
@@ -93,6 +111,7 @@ export function PurchaseOrderRecordDialog({
       mode={mode}
       onEdit={canEdit ? onEdit : undefined}
       onSave={handleSave}
+      saveDisabled={mode === 'edit' && !validation.valid}
       maxWidth="3xl"
     >
       {error && (

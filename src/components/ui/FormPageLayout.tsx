@@ -11,6 +11,7 @@ interface FormPageLayoutProps {
   listPath: string
   children: React.ReactNode
   onSave?: () => void | boolean
+  saveDisabled?: boolean
 }
 
 export function FormPageLayout({
@@ -20,6 +21,7 @@ export function FormPageLayout({
   listPath,
   children,
   onSave,
+  saveDisabled = false,
 }: FormPageLayoutProps) {
   const navigate = useNavigate()
 
@@ -47,7 +49,7 @@ export function FormPageLayout({
         <Button variant="outline" onClick={() => navigate(listPath)}>
           Cancelar
         </Button>
-        <Button icon={Save} onClick={handleSave}>
+        <Button icon={Save} onClick={handleSave} disabled={saveDisabled}>
           Guardar
         </Button>
       </div>

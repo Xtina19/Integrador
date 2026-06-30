@@ -13,6 +13,8 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { categoryNames, publisherNames, currencyCodes } from '../../data/adminMockData'
 import { adminPath } from '../../lib/adminConfig'
 import { useAdminCatalog } from '../../context/AdminCatalogContext'
+import { validateAdminProduct } from '../../business-rules/adminValidators'
+import { trim } from '../../utils/formValidation'
 
 const statusMap: Record<string, { label: string; variant: 'success' | 'neutral' }> = {
   active: { label: 'Activo', variant: 'success' },
@@ -77,13 +79,25 @@ export function AdminProducts() {
     })
   }, [products, search, category, publisher, status])
 
+  const validation = useMemo(
+    () =>
+      validateAdminProduct(
+        form,
+        products.map((p) => p.code),
+        products.map((p) => p.isbn),
+        selected?.code,
+        selected?.isbn
+      ),
+    [form, products, selected]
+  )
+
   function handleSave() {
-    if (!selected) return
+    if (!selected || !validation.valid) return false
     updateProduct(selected.id, {
-      code: form.code,
-      isbn: form.isbn,
-      title: form.title,
-      author: form.author,
+      code: trim(form.code),
+      isbn: trim(form.isbn),
+      title: trim(form.title),
+      author: trim(form.author),
       category: form.category,
       publisher: form.publisher,
       price: Number(form.price) || 0,
@@ -208,6 +222,7 @@ export function AdminProducts() {
         mode={dialog?.mode ?? 'view'}
         onEdit={() => setDialog((d) => (d ? { ...d, mode: 'edit' } : null))}
         onSave={handleSave}
+        saveDisabled={!validation.valid}
       >
         {selected && dialog?.mode === 'view' ? (
           <>
@@ -222,6 +237,12 @@ export function AdminProducts() {
             <DetailRow label="Estado" value={<Badge variant={statusMap[selected.status].variant}>{statusMap[selected.status].label}</Badge>} />
           </>
         ) : selected ? (
+          <>
+          {!validation.valid && (
+            <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+              {validation.errors[0]}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="Código Interno" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
             <Input label="ISBN" value={form.isbn} onChange={(e) => setForm({ ...form, isbn: e.target.value })} />
@@ -233,6 +254,7 @@ export function AdminProducts() {
             <Select label="Moneda" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} options={currencyCodes.map((c) => ({ value: c, label: c }))} />
             <Select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={statusOptions} />
           </div>
+          </>
         ) : null}
       </FormDialog>
 

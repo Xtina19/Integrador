@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdminFormLayout } from '../../../components/admin/AdminFormLayout'
 import { AdminDetailLayout, AdminDeleteLayout } from '../../../components/admin/AdminDetailLayout'
@@ -7,7 +7,9 @@ import { Input, Select } from '../../../components/ui/Input'
 import { Badge } from '../../../components/ui/Badge'
 import { RecordNotFound } from '../../../components/admin/RecordNotFound'
 import { ADMIN_MODULES } from '../../../lib/adminConfig'
-import { getBranchById } from '../../../data/adminMockData'
+import { getBranchById, adminBranches } from '../../../data/adminMockData'
+import { validateAdminBranch } from '../../../business-rules/adminValidators'
+import { trim } from '../../../utils/formValidation'
 
 const config = ADMIN_MODULES.sucursales
 const statusOptions = [
@@ -33,14 +35,54 @@ export function BranchFormPage() {
 
   const empty = { name: '', address: '', city: '', phone: '', manager: '', status: 'active' }
 
+  const validation = useMemo(
+    () =>
+      validateAdminBranch(
+        { ...form, code: existing?.id ?? trim(form.name).replace(/\s+/g, '-') },
+        adminBranches.map((b) => b.id),
+        adminBranches.map((b) => b.name),
+        existing?.id,
+        existing?.name
+      ),
+    [form, existing]
+  )
+
+  const saveForm = () => {
+    if (!validation.valid) return false
+    setForm((f) => ({
+      ...f,
+      name: trim(f.name),
+      address: trim(f.address),
+      city: trim(f.city),
+      phone: trim(f.phone),
+      manager: trim(f.manager),
+    }))
+    return true
+  }
+
   return (
     <AdminFormLayout
       breadcrumbs={[{ label: config.label, to: config.basePath }, { label: isEdit ? config.editTitle : config.createTitle }]}
       title={isEdit ? config.editTitle : config.createTitle}
       subtitle={isEdit ? `Modificando ${existing!.name}` : 'Nueva ubicación de Librería Joselito'}
       listPath={config.basePath}
-      onSaveContinue={!isEdit ? () => setForm(empty) : undefined}
+      saveDisabled={!validation.valid}
+      onSave={saveForm}
+      onSaveContinue={
+        !isEdit
+          ? () => {
+              if (!validation.valid) return false
+              setForm(empty)
+              return true
+            }
+          : undefined
+      }
     >
+      {!validation.valid && (
+        <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+          {validation.errors[0]}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Input label="Nombre *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="md:col-span-2" />
         <Input label="Dirección *" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="md:col-span-2" />

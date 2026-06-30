@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Consolidation } from '../../types/domain'
 import { FormDialog, DetailRow } from '../ui/FormDialog'
 import { Input, Select } from '../ui/Input'
 import { Badge } from '../ui/Badge'
+import { validateConsolidationUpdate } from '../../business-rules/validators'
+import { trim } from '../../utils/formValidation'
 import { useERP } from '../../store/ERPProvider'
 
 interface ConsolidationRecordDialogProps {
@@ -45,12 +47,20 @@ export function ConsolidationRecordDialog({
     setError('')
   }, [consolidation, mode, open])
 
+  const validation = useMemo(
+    () =>
+      consolidation && mode === 'edit'
+        ? validateConsolidationUpdate({ name: form.name, status: form.status, notes: form.notes })
+        : { valid: true, errors: [] },
+    [form, mode, consolidation]
+  )
+
   if (!consolidation) return null
 
   function handleSave() {
     const result = updateConsolidation({
       consolidationId: consolidation!.id,
-      name: form.name,
+      name: trim(form.name),
       status: form.status,
       notes: form.notes,
     })
@@ -70,6 +80,7 @@ export function ConsolidationRecordDialog({
       mode={mode}
       onEdit={onEdit}
       onSave={handleSave}
+      saveDisabled={mode === 'edit' && !validation.valid}
     >
       {error && (
         <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2 mb-4">

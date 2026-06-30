@@ -14,6 +14,8 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { adminPath } from '../../lib/adminConfig'
 import { contractStatusConfig, getContractVisualStatus } from '../../lib/publisherContractStatus'
 import { useAdminCatalog } from '../../context/AdminCatalogContext'
+import { validateAdminPublisher } from '../../business-rules/adminValidators'
+import { trim } from '../../utils/formValidation'
 
 const PAGE_SIZE = 5
 
@@ -77,14 +79,19 @@ export function EditorialesLista() {
     }
   }, [selected, dialog?.mode, dialog?.id])
 
+  const validation = useMemo(
+    () => validateAdminPublisher(form, publishers.map((p) => p.name), selected?.name),
+    [form, publishers, selected]
+  )
+
   function handleSave() {
-    if (!selected) return
+    if (!selected || !validation.valid) return false
     updatePublisher(selected.id, {
-      name: form.name,
-      country: form.country,
-      contact: form.contact,
-      phone: form.phone,
-      address: form.address,
+      name: trim(form.name),
+      country: trim(form.country),
+      contact: trim(form.contact),
+      phone: trim(form.phone),
+      address: trim(form.address),
       contractType: form.contractType,
       contractExpiry: form.contractExpiry,
       status: form.status,
@@ -179,6 +186,7 @@ export function EditorialesLista() {
         mode={dialog?.mode ?? 'view'}
         onEdit={() => setDialog((d) => (d ? { ...d, mode: 'edit' } : null))}
         onSave={handleSave}
+        saveDisabled={!validation.valid}
       >
         {selected && dialog?.mode === 'view' ? (
           <>
@@ -201,6 +209,12 @@ export function EditorialesLista() {
             <DetailRow label="Estado" value={<Badge variant={selected.status === 'active' ? 'success' : 'neutral'}>{selected.status === 'active' ? 'Activo' : 'Inactivo'}</Badge>} />
           </>
         ) : selected ? (
+          <>
+          {!validation.valid && (
+            <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+              {validation.errors[0]}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="md:col-span-2" />
             <Input label="País" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
@@ -211,6 +225,7 @@ export function EditorialesLista() {
             <Input label="Vencimiento contrato" type="date" value={form.contractExpiry} onChange={(e) => setForm({ ...form, contractExpiry: e.target.value })} />
             <Select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={statusOptions} />
           </div>
+          </>
         ) : null}
       </FormDialog>
 

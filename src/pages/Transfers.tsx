@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Plus, ArrowRight, Truck, Clock, CheckCircle } from 'lucide-react'
 import { Card, CardHeader, CardBody } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -9,6 +9,8 @@ import { branches } from '../data/mockData'
 import { transferStatusLabels } from '../business-rules/stateMachines'
 import type { TransferStatus } from '../types/domain'
 import { useERP } from '../store/ERPProvider'
+import { validateTransfer } from '../business-rules/validators'
+import { trim } from '../utils/formValidation'
 import { useGlobalSearchRecordEffect, useRecordHighlightScroll } from '../context/GlobalSearchNavigationContext'
 
 type Tab = 'solicitudes' | 'aprobaciones' | 'transito' | 'recepcion' | 'historial'
@@ -65,6 +67,9 @@ export function Transfers() {
     qty: '1',
     transport: 'Distribución interna',
   })
+  const [formError, setFormError] = useState('')
+
+  const transferValidation = useMemo(() => validateTransfer(form), [form])
 
   const requested = transfers.filter((t) => t.status === 'requested')
   const approved = transfers.filter((t) => t.status === 'approved')
@@ -72,16 +77,23 @@ export function Transfers() {
   const toReceive = transfers.filter((t) => t.status === 'received')
 
   function handleCreate() {
+    if (!transferValidation.valid) {
+      setFormError(transferValidation.errors[0])
+      return
+    }
     const result = createTransfer({
-      origin: form.origin,
-      destination: form.destination,
-      product: form.product,
+      origin: trim(form.origin),
+      destination: trim(form.destination),
+      product: trim(form.product),
       qty: Number(form.qty) || 1,
-      transport: form.transport,
+      transport: trim(form.transport),
     })
     if (result.success) {
       setShowForm(false)
       setActiveTab('solicitudes')
+      setFormError('')
+    } else {
+      setFormError(result.errors?.[0] ?? 'Error al crear la solicitud')
     }
   }
 
@@ -150,6 +162,11 @@ export function Transfers() {
         <Card>
           <CardHeader title="Nueva Solicitud de Transferencia" subtitle="Distribución interna entre sucursales" />
           <CardBody>
+            {formError && (
+              <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2 mb-4">
+                {formError}
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <Select
                 label="Sucursal origen"
@@ -179,7 +196,7 @@ export function Transfers() {
                   { value: 'Transporte propio', label: 'Transporte propio' },
                 ]}
               />
-              <div className="flex items-end"><Button className="w-full" onClick={handleCreate}>Crear Solicitud</Button></div>
+              <div className="flex items-end"><Button className="w-full" onClick={handleCreate} disabled={!transferValidation.valid}>Crear Solicitud</Button></div>
             </div>
           </CardBody>
         </Card>

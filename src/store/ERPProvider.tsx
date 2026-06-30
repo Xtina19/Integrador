@@ -196,6 +196,7 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
 
   const createProduct = useCallback((input: CreateProductInput) => {
     const result = inventoryService.createProduct(state, input)
+    if (!result.success) return { success: false, errors: result.errors }
     setState((s) => ({
       ...s,
       products: result.products,

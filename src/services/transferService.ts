@@ -1,7 +1,8 @@
 import type { Transfer } from '../types/domain'
 import type { ERPState } from '../store/initialState'
 import { canTransitionTransfer } from '../business-rules/stateMachines'
-import { validateTransferFinalize } from '../business-rules/validators'
+import { validateTransferFinalize, validateTransfer } from '../business-rules/validators'
+import { trim } from '../utils/formValidation'
 import { createActivity, createNotification } from '../services/activityService'
 import { nextId } from '../utils/idGenerator'
 import { nowFormatted } from '../utils/timeUtils'
@@ -16,18 +17,20 @@ export interface CreateTransferInput {
 
 export const transferService = {
   createRequest(_state: ERPState, input: CreateTransferInput) {
-    if (!input.origin || !input.destination || !input.product || input.qty < 1) {
-      return { success: false as const, errors: ['Complete todos los campos de la solicitud.'] }
-    }
-    if (input.origin === input.destination) {
-      return { success: false as const, errors: ['Origen y destino deben ser diferentes.'] }
-    }
-
-    const transfer: Transfer = {
-      id: nextId('TR'),
+    const validation = validateTransfer({
       origin: input.origin,
       destination: input.destination,
       product: input.product,
+      qty: input.qty,
+      transport: input.transport,
+    })
+    if (!validation.valid) return { success: false as const, errors: validation.errors }
+
+    const transfer: Transfer = {
+      id: nextId('TR'),
+      origin: trim(input.origin),
+      destination: trim(input.destination),
+      product: trim(input.product),
       qty: input.qty,
       status: 'requested',
       date: nowFormatted().slice(0, 10),

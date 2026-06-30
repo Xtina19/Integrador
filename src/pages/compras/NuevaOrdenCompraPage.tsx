@@ -6,6 +6,8 @@ import { Button } from '../../components/ui/Button'
 import { nationalSupplierNames, internationalSupplierNames, currencyCodes } from '../../data/adminMockData'
 import { posProducts } from '../../data/salesMockData'
 import { purchaseStatusLabels } from '../../business-rules/stateMachines'
+import { validatePurchaseOrderCreate } from '../../business-rules/validators'
+import { trim } from '../../utils/formValidation'
 import type { PurchaseStatus, PurchaseType } from '../../types/domain'
 import { useERP } from '../../store/ERPProvider'
 
@@ -17,7 +19,7 @@ interface OrderLine {
 }
 
 export function NuevaOrdenCompraPage() {
-  const { createPurchaseOrder } = useERP()
+  const { state, createPurchaseOrder } = useERP()
   const [error, setError] = useState('')
   const [form, setForm] = useState({
     orderNumber: '',
@@ -43,6 +45,19 @@ export function NuevaOrdenCompraPage() {
   const total = useMemo(
     () => lines.reduce((sum, line) => sum + line.qty * line.unitCost, 0),
     [lines]
+  )
+
+  const validation = useMemo(
+    () =>
+      validatePurchaseOrderCreate(
+        form.orderNumber,
+        form.supplier,
+        form.date,
+        form.currency,
+        lines.map((l) => ({ product: l.product, qty: l.qty, unitCost: l.unitCost })),
+        state.purchaseOrders.map((o) => o.id)
+      ),
+    [form, lines, state.purchaseOrders]
   )
 
   function handlePurchaseTypeChange(purchaseType: PurchaseType) {
@@ -82,15 +97,16 @@ export function NuevaOrdenCompraPage() {
       title="Nueva Orden de Compra"
       subtitle="Registro de orden con detalle de productos"
       listPath="/compras/ordenes"
+      saveDisabled={!validation.valid}
       onSave={() => {
         const result = createPurchaseOrder({
-          orderNumber: form.orderNumber,
-          supplier: form.supplier,
+          orderNumber: trim(form.orderNumber),
+          supplier: trim(form.supplier),
           date: form.date,
           currency: form.currency,
           status: form.status,
           purchaseType: form.purchaseType,
-          lines: lines.map((l) => ({ product: l.product, qty: l.qty, unitCost: l.unitCost })),
+          lines: lines.map((l) => ({ product: trim(l.product), qty: l.qty, unitCost: l.unitCost })),
         })
         if (!result.success) {
           setError(result.errors?.join(' ') ?? 'Error al guardar')
@@ -100,6 +116,11 @@ export function NuevaOrdenCompraPage() {
       }}
     >
       {error && <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2 mb-4">{error}</div>}
+      {!validation.valid && !error && (
+        <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+          {validation.errors[0]}
+        </div>
+      )}
       <div className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Input label="Número OC *" value={form.orderNumber} onChange={(e) => setForm({ ...form, orderNumber: e.target.value })} />

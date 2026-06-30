@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdminFormLayout } from '../../../components/admin/AdminFormLayout'
 import { AdminDetailLayout, AdminDeleteLayout } from '../../../components/admin/AdminDetailLayout'
@@ -7,7 +7,9 @@ import { Input, Select } from '../../../components/ui/Input'
 import { Badge } from '../../../components/ui/Badge'
 import { RecordNotFound } from '../../../components/admin/RecordNotFound'
 import { ADMIN_MODULES } from '../../../lib/adminConfig'
-import { getCurrencyById, adminExchangeRates } from '../../../data/adminMockData'
+import { getCurrencyById, adminExchangeRates, adminCurrencies } from '../../../data/adminMockData'
+import { validateAdminCurrency } from '../../../business-rules/adminValidators'
+import { trim } from '../../../utils/formValidation'
 
 const config = ADMIN_MODULES.monedas
 const statusOptions = [
@@ -32,14 +34,45 @@ export function CurrencyFormPage() {
 
   const empty = { code: '', name: '', symbol: '', decimalPlaces: '2', status: 'active' }
 
+  const validation = useMemo(
+    () => validateAdminCurrency(form, adminCurrencies.map((c) => c.code), existing?.code),
+    [form, existing]
+  )
+
+  const saveForm = () => {
+    if (!validation.valid) return false
+    setForm((f) => ({
+      ...f,
+      code: trim(f.code),
+      name: trim(f.name),
+      symbol: trim(f.symbol),
+    }))
+    return true
+  }
+
   return (
     <AdminFormLayout
       breadcrumbs={[{ label: config.label, to: config.basePath }, { label: isEdit ? config.editTitle : config.createTitle }]}
       title={isEdit ? config.editTitle : config.createTitle}
       subtitle={isEdit ? `Modificando ${existing!.code}` : 'Nueva moneda del sistema'}
       listPath={config.basePath}
-      onSaveContinue={!isEdit ? () => setForm(empty) : undefined}
+      saveDisabled={!validation.valid}
+      onSave={saveForm}
+      onSaveContinue={
+        !isEdit
+          ? () => {
+              if (!validation.valid) return false
+              setForm(empty)
+              return true
+            }
+          : undefined
+      }
     >
+      {!validation.valid && (
+        <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+          {validation.errors[0]}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl">
         <Input label="Código ISO *" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="DOP" maxLength={3} />
         <Input label="Símbolo *" value={form.symbol} onChange={(e) => setForm({ ...form, symbol: e.target.value })} placeholder="RD$" />

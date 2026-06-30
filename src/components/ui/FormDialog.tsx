@@ -10,9 +10,10 @@ interface FormDialogProps {
   subtitle?: string
   children: React.ReactNode
   mode?: 'view' | 'edit'
-  onSave?: () => void
+  onSave?: () => void | boolean
   onEdit?: () => void
   saveLabel?: string
+  saveDisabled?: boolean
   maxWidth?: 'md' | 'lg' | 'xl' | '2xl' | '3xl'
 }
 
@@ -34,6 +35,7 @@ export function FormDialog({
   onSave,
   onEdit,
   saveLabel = 'Guardar',
+  saveDisabled = false,
   maxWidth = '3xl',
 }: FormDialogProps) {
   if (!open) return null
@@ -80,7 +82,7 @@ export function FormDialog({
             </Button>
           )}
           {mode === 'edit' && onSave && (
-            <Button icon={Save} onClick={onSave}>
+            <Button icon={Save} onClick={onSave} disabled={saveDisabled}>
               {saveLabel}
             </Button>
           )}

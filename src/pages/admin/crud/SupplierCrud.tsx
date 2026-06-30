@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdminFormLayout } from '../../../components/admin/AdminFormLayout'
 import { AdminDetailLayout, AdminDeleteLayout } from '../../../components/admin/AdminDetailLayout'
@@ -8,7 +8,9 @@ import { Badge } from '../../../components/ui/Badge'
 import { Table } from '../../../components/ui/Table'
 import { RecordNotFound } from '../../../components/admin/RecordNotFound'
 import { ADMIN_MODULES } from '../../../lib/adminConfig'
-import { getSupplierById, getSupplierPurchases } from '../../../data/adminMockData'
+import { getSupplierById, getSupplierPurchases, adminSuppliers } from '../../../data/adminMockData'
+import { validateAdminSupplier } from '../../../business-rules/adminValidators'
+import { trim } from '../../../utils/formValidation'
 
 const config = ADMIN_MODULES.proveedores
 const supplierTypes = ['Distribuidor', 'Editorial', 'Logística', 'Material de oficina', 'Tecnología']
@@ -32,14 +34,62 @@ export function SupplierFormPage() {
 
   const empty = { name: '', contact: '', email: '', phone: '', address: '', supplierType: supplierTypes[0], status: 'active' }
 
+  const validation = useMemo(
+    () =>
+      validateAdminSupplier(
+        {
+          name: form.name,
+          code: existing?.id ?? trim(form.name).replace(/\s+/g, '-'),
+          type: form.supplierType,
+          country: existing && 'country' in existing ? (existing.country as string) : 'República Dominicana',
+          contact: form.contact,
+          phone: form.phone,
+          email: form.email,
+        },
+        adminSuppliers.map((s) => s.id),
+        adminSuppliers.map((s) => s.name),
+        existing?.id,
+        existing?.name
+      ),
+    [form, existing]
+  )
+
+  const saveForm = () => {
+    if (!validation.valid) return false
+    setForm((f) => ({
+      ...f,
+      name: trim(f.name),
+      contact: trim(f.contact),
+      email: trim(f.email),
+      phone: trim(f.phone),
+      address: trim(f.address),
+    }))
+    return true
+  }
+
   return (
     <AdminFormLayout
       breadcrumbs={[{ label: config.label, to: config.basePath }, { label: isEdit ? config.editTitle : config.createTitle }]}
       title={isEdit ? config.editTitle : config.createTitle}
       subtitle={isEdit ? `Modificando ${existing!.name}` : 'Nuevo proveedor comercial'}
       listPath={config.basePath}
-      onSaveContinue={!isEdit ? () => setForm(empty) : undefined}
+      saveDisabled={!validation.valid}
+      onSave={saveForm}
+      onSaveContinue={
+        !isEdit
+          ? () => {
+              if (!validation.valid) return false
+              setForm(empty)
+              return true
+            }
+          : undefined
+      }
     >
+      {!validation.valid && (
+        <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+          {validation.errors[0]}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Input label="Nombre *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="md:col-span-2" />
         <Input label="Contacto *" value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />

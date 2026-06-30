@@ -1,6 +1,7 @@
 import type { Product, InventoryAdjustment, KardexMovement } from '../types/domain'
 import type { ERPState } from '../store/initialState'
-import { validateInventoryAdjustment } from '../business-rules/validators'
+import { validateInventoryAdjustment, validateProduct } from '../business-rules/validators'
+import { trim } from '../utils/formValidation'
 import { createActivity, createNotification } from '../services/activityService'
 import { dashboardService } from '../services/dashboardService'
 import { nextId, nextSimpleId } from '../utils/idGenerator'
@@ -33,16 +34,35 @@ export interface CreateAdjustmentInput {
 
 export const inventoryService = {
   createProduct(state: ERPState, input: CreateProductInput) {
+    const validation = validateProduct(
+      {
+        code: input.code,
+        isbn: input.isbn,
+        name: input.name,
+        category: input.category,
+        publisher: input.publisher,
+        cost: input.cost,
+        price: input.price,
+        stock: input.stock,
+        minStock: input.minStock,
+        location: trim(input.location),
+      },
+      state.products.map((p) => p.id),
+      state.products.map((p) => p.isbn)
+    )
+    if (!validation.valid) return { success: false as const, errors: validation.errors }
+
+    const code = trim(input.code)
     const product: Product = {
-      id: input.code || nextSimpleId('P'),
-      isbn: input.isbn,
-      title: input.name,
+      id: code || nextSimpleId('P'),
+      isbn: trim(input.isbn),
+      title: trim(input.name),
       author: '',
       category: input.category,
       publisher: input.publisher,
       stock: input.stock,
       minStock: input.minStock,
-      location: input.location,
+      location: trim(input.location),
       status: input.stock <= input.minStock ? 'low' : 'normal',
       cost: input.cost,
       price: input.price,
@@ -61,7 +81,7 @@ export const inventoryService = {
   },
 
   createAdjustment(state: ERPState, input: CreateAdjustmentInput) {
-    const validation = validateInventoryAdjustment(input.qty)
+    const validation = validateInventoryAdjustment(input.qty, input.reason, input.productTitle)
     if (!validation.valid) return { success: false as const, errors: validation.errors }
 
     const product = state.products.find((p) => p.title === input.productTitle)
@@ -77,7 +97,7 @@ export const inventoryService = {
       product: product.title,
       type: input.type,
       qty: input.qty,
-      reason: input.reason,
+      reason: trim(input.reason),
       user: 'admin@joselito.com',
       status: 'approved',
       notes: input.notes,
@@ -163,15 +183,35 @@ export const inventoryService = {
     const product = state.products.find((p) => p.id === input.productId)
     if (!product) return { success: false as const, errors: ['Producto no encontrado.'] }
 
+    const validation = validateProduct(
+      {
+        code: input.code || product.id,
+        isbn: input.isbn,
+        name: input.name,
+        category: input.category,
+        publisher: input.publisher,
+        cost: input.cost,
+        price: input.price,
+        stock: input.stock,
+        minStock: input.minStock,
+        location: trim(input.location),
+      },
+      state.products.map((p) => p.id),
+      state.products.map((p) => p.isbn),
+      product.id,
+      product.isbn
+    )
+    if (!validation.valid) return { success: false as const, errors: validation.errors }
+
     const updated: Product = {
       ...product,
-      isbn: input.isbn,
-      title: input.name,
+      isbn: trim(input.isbn),
+      title: trim(input.name),
       category: input.category,
       publisher: input.publisher,
       stock: input.stock,
       minStock: input.minStock,
-      location: input.location,
+      location: trim(input.location),
       cost: input.cost,
       price: input.price,
       status: (input.stock === 0 ? 'out' : input.stock <= input.minStock ? 'low' : 'normal') as Product['status'],

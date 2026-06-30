@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AdminFormLayout } from '../../../components/admin/AdminFormLayout'
 import { AdminDetailLayout, AdminDeleteLayout } from '../../../components/admin/AdminDetailLayout'
@@ -8,7 +8,9 @@ import { Badge } from '../../../components/ui/Badge'
 import { Table } from '../../../components/ui/Table'
 import { RecordNotFound } from '../../../components/admin/RecordNotFound'
 import { ADMIN_MODULES } from '../../../lib/adminConfig'
-import { getCategoryById, getCategoryProducts } from '../../../data/adminMockData'
+import { getCategoryById, getCategoryProducts, adminCategories } from '../../../data/adminMockData'
+import { validateAdminCategory } from '../../../business-rules/adminValidators'
+import { trim } from '../../../utils/formValidation'
 
 const config = ADMIN_MODULES.categorias
 const statusOptions = [
@@ -31,6 +33,17 @@ export function CategoryFormPage() {
 
   const empty = { name: '', description: '', status: 'active' }
 
+  const validation = useMemo(
+    () => validateAdminCategory(form, adminCategories.map((c) => c.name), existing?.name),
+    [form, existing]
+  )
+
+  const saveForm = () => {
+    if (!validation.valid) return false
+    setForm((f) => ({ ...f, name: trim(f.name), description: trim(f.description) }))
+    return true
+  }
+
   return (
     <AdminFormLayout
       breadcrumbs={[
@@ -40,8 +53,23 @@ export function CategoryFormPage() {
       title={isEdit ? config.editTitle : config.createTitle}
       subtitle={isEdit ? `Modificando ${existing!.name}` : 'Nueva clasificación de productos'}
       listPath={config.basePath}
-      onSaveContinue={!isEdit ? () => setForm(empty) : undefined}
+      saveDisabled={!validation.valid}
+      onSave={saveForm}
+      onSaveContinue={
+        !isEdit
+          ? () => {
+              if (!validation.valid) return false
+              setForm(empty)
+              return true
+            }
+          : undefined
+      }
     >
+      {!validation.valid && (
+        <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+          {validation.errors[0]}
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-6 max-w-2xl">
         <Input label="Nombre *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ej. Literatura" />
         <Textarea label="Descripción *" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={4} placeholder="Descripción de la categoría..." />

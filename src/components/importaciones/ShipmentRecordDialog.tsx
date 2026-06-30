@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Shipment, ShipmentCosts } from '../../types/domain'
 import { FormDialog, DetailRow } from '../ui/FormDialog'
 import { Input, Select } from '../ui/Input'
 import { Badge } from '../ui/Badge'
 import { importStatusLabels } from '../../business-rules/stateMachines'
+import { validateShipmentForm } from '../../business-rules/validators'
+import { trim } from '../../utils/formValidation'
 import {
   shipmentCostFields,
   emptyShipmentCosts,
@@ -35,7 +37,7 @@ function formatCurrency(value: number) {
 }
 
 export function ShipmentRecordDialog({ shipment, mode, open, onClose, onEdit }: ShipmentRecordDialogProps) {
-  const { updateShipment } = useERP()
+  const { state, updateShipment } = useERP()
   const [error, setError] = useState('')
   const [form, setForm] = useState({
     code: '',
@@ -65,15 +67,35 @@ export function ShipmentRecordDialog({ shipment, mode, open, onClose, onEdit }: 
     setError('')
   }, [shipment, mode, open])
 
+  const validation = useMemo(
+    () =>
+      shipment && mode === 'edit'
+        ? validateShipmentForm(
+            {
+              code: form.code,
+              supplier: shipment.supplier ?? '',
+              origin: form.origin,
+              destination: form.destination,
+              departure: form.departure,
+              arrival: form.arrival,
+              boxes: form.boxes,
+            },
+            state.shipments.map((s) => s.code),
+            shipment.code
+          )
+        : { valid: true, errors: [] },
+    [form, mode, shipment, state.shipments]
+  )
+
   if (!shipment) return null
 
   function handleSave() {
     const result = updateShipment({
       shipmentId: shipment!.id,
-      code: form.code,
+      code: trim(form.code),
       type: form.type,
-      origin: form.origin,
-      destination: form.destination,
+      origin: trim(form.origin),
+      destination: trim(form.destination),
       departure: form.departure,
       arrival: form.arrival,
       boxes: Number(form.boxes) || 0,
@@ -100,6 +122,7 @@ export function ShipmentRecordDialog({ shipment, mode, open, onClose, onEdit }: 
       mode={mode}
       onEdit={onEdit}
       onSave={handleSave}
+      saveDisabled={mode === 'edit' && (!validation.valid || !hasShipmentCosts(costs))}
     >
       {error && (
         <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2 mb-4">

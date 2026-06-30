@@ -1,9 +1,14 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { FormPageLayout } from '../../components/ui/FormPageLayout'
 import { Input, Select } from '../../components/ui/Input'
 import { products } from '../../data/mockData'
+import { validateCosting } from '../../business-rules/validators'
+import { trim } from '../../utils/formValidation'
+import { useToast } from '../../context/ToastContext'
 
 export function NuevoCosteoPage() {
+  const { showSuccess } = useToast()
+  const [error, setError] = useState('')
   const [form, setForm] = useState({
     product: products[0]?.title ?? '',
     previousCost: '320',
@@ -11,6 +16,8 @@ export function NuevoCosteoPage() {
     costType: 'Actualización de costo',
     notes: '',
   })
+
+  const validation = useMemo(() => validateCosting(form), [form])
 
   return (
     <FormPageLayout
@@ -21,7 +28,22 @@ export function NuevoCosteoPage() {
       title="Nuevo Costeo"
       subtitle="Actualización de costo de producto"
       listPath="/inventario"
+      saveDisabled={!validation.valid}
+      onSave={() => {
+        if (!validation.valid) {
+          setError(validation.errors.join(' '))
+          return false
+        }
+        showSuccess(`Costeo registrado para ${trim(form.product)}`)
+        return true
+      }}
     >
+      {error && <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2 mb-4">{error}</div>}
+      {!validation.valid && !error && (
+        <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+          {validation.errors[0]}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Select
           label="Producto *"
@@ -31,7 +53,7 @@ export function NuevoCosteoPage() {
           className="md:col-span-2"
         />
         <Input label="Costo anterior" type="number" value={form.previousCost} readOnly className="bg-gray-50" />
-        <Input label="Nuevo costo *" type="number" value={form.newCost} onChange={(e) => setForm({ ...form, newCost: e.target.value })} />
+        <Input label="Nuevo costo *" type="number" min={0} step="0.01" value={form.newCost} onChange={(e) => setForm({ ...form, newCost: e.target.value })} />
         <Select
           label="Tipo de costeo *"
           value={form.costType}

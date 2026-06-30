@@ -15,8 +15,9 @@ interface AdminFormLayoutProps {
   subtitle?: string
   listPath: string
   children: React.ReactNode
-  onSave?: () => void
-  onSaveContinue?: () => void
+  onSave?: () => void | boolean
+  onSaveContinue?: () => void | boolean
+  saveDisabled?: boolean
 }
 
 export function AdminFormLayout({
@@ -27,16 +28,19 @@ export function AdminFormLayout({
   children,
   onSave,
   onSaveContinue,
+  saveDisabled = false,
 }: AdminFormLayoutProps) {
   const navigate = useNavigate()
 
   const handleSave = () => {
-    onSave?.()
+    const result = onSave?.()
+    if (result === false) return
     navigate(listPath)
   }
 
   const handleSaveContinue = () => {
-    onSaveContinue?.()
+    const result = onSaveContinue?.()
+    if (result === false) return
   }
 
   const handleCancel = () => navigate(listPath)
@@ -60,11 +64,11 @@ export function AdminFormLayout({
           Cancelar
         </Button>
         {onSaveContinue && (
-          <Button variant="secondary" icon={Save} onClick={handleSaveContinue}>
+          <Button variant="secondary" icon={Save} onClick={handleSaveContinue} disabled={saveDisabled}>
             Guardar y continuar
           </Button>
         )}
-        <Button icon={Save} onClick={handleSave}>
+        <Button icon={Save} onClick={handleSave} disabled={saveDisabled}>
           Guardar
         </Button>
       </div>

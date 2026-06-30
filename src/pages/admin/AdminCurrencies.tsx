@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -12,6 +12,8 @@ import { FormDialog, DetailRow } from '../../components/ui/FormDialog'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { adminPath } from '../../lib/adminConfig'
 import { useAdminCatalog } from '../../context/AdminCatalogContext'
+import { validateAdminCurrency } from '../../business-rules/adminValidators'
+import { trim } from '../../utils/formValidation'
 
 const statusMap: Record<string, { label: string; variant: 'success' | 'neutral' }> = {
   active: { label: 'Activa', variant: 'success' },
@@ -44,12 +46,17 @@ export function AdminCurrencies() {
     }
   }, [selected, dialog?.mode, dialog?.id])
 
+  const validation = useMemo(
+    () => validateAdminCurrency(form, currencies.map((c) => c.code), selected?.code),
+    [form, currencies, selected]
+  )
+
   function handleSave() {
-    if (!selected) return
+    if (!selected || !validation.valid) return false
     updateCurrency(selected.id, {
-      code: form.code,
-      name: form.name,
-      symbol: form.symbol,
+      code: trim(form.code),
+      name: trim(form.name),
+      symbol: trim(form.symbol),
       decimalPlaces: Number(form.decimalPlaces) || 2,
       status: form.status as 'active' | 'inactive',
     })
@@ -120,6 +127,7 @@ export function AdminCurrencies() {
         mode={dialog?.mode ?? 'view'}
         onEdit={() => setDialog((d) => (d ? { ...d, mode: 'edit' } : null))}
         onSave={handleSave}
+        saveDisabled={!validation.valid}
       >
         {selected && dialog?.mode === 'view' ? (
           <>
@@ -131,6 +139,12 @@ export function AdminCurrencies() {
             <DetailRow label="Estado" value={<Badge variant={statusMap[selected.status].variant}>{statusMap[selected.status].label}</Badge>} />
           </>
         ) : selected ? (
+          <>
+          {!validation.valid && (
+            <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+              {validation.errors[0]}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
             <Input label="Código ISO" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} maxLength={3} />
             <Input label="Símbolo" value={form.symbol} onChange={(e) => setForm({ ...form, symbol: e.target.value })} />
@@ -138,6 +152,7 @@ export function AdminCurrencies() {
             <Input label="Decimales" type="number" value={form.decimalPlaces} onChange={(e) => setForm({ ...form, decimalPlaces: e.target.value })} min={0} max={4} />
             <Select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={statusOptions} />
           </div>
+          </>
         ) : null}
       </FormDialog>
 

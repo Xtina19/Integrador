@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, MapPin, Phone, User } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -12,6 +12,8 @@ import { FormDialog, DetailRow } from '../../components/ui/FormDialog'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { adminPath } from '../../lib/adminConfig'
 import { useAdminCatalog } from '../../context/AdminCatalogContext'
+import { validateAdminBranch } from '../../business-rules/adminValidators'
+import { trim } from '../../utils/formValidation'
 
 const statusMap: Record<string, { label: string; variant: 'success' | 'neutral' }> = {
   active: { label: 'Activo', variant: 'success' },
@@ -45,14 +47,26 @@ export function AdminBranches() {
     }
   }, [selected, dialog?.mode, dialog?.id])
 
+  const validation = useMemo(
+    () =>
+      validateAdminBranch(
+        { ...form, code: selected?.id ?? '' },
+        branches.map((b) => b.id),
+        branches.map((b) => b.name),
+        selected?.id,
+        selected?.name
+      ),
+    [form, branches, selected]
+  )
+
   function handleSave() {
-    if (!selected) return
+    if (!selected || !validation.valid) return false
     updateBranch(selected.id, {
-      name: form.name,
-      address: form.address,
-      city: form.city,
-      phone: form.phone,
-      manager: form.manager,
+      name: trim(form.name),
+      address: trim(form.address),
+      city: trim(form.city),
+      phone: trim(form.phone),
+      manager: trim(form.manager),
       status: form.status as 'active' | 'inactive',
     })
     setDialog(null)
@@ -147,6 +161,7 @@ export function AdminBranches() {
         mode={dialog?.mode ?? 'view'}
         onEdit={() => setDialog((d) => (d ? { ...d, mode: 'edit' } : null))}
         onSave={handleSave}
+        saveDisabled={!validation.valid}
       >
         {selected && dialog?.mode === 'view' ? (
           <>
@@ -159,6 +174,12 @@ export function AdminBranches() {
             <DetailRow label="Estado" value={<Badge variant={statusMap[selected.status].variant}>{statusMap[selected.status].label}</Badge>} />
           </>
         ) : selected ? (
+          <>
+          {!validation.valid && (
+            <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+              {validation.errors[0]}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="md:col-span-2" />
             <Input label="Dirección" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="md:col-span-2" />
@@ -167,6 +188,7 @@ export function AdminBranches() {
             <Input label="Encargado" value={form.manager} onChange={(e) => setForm({ ...form, manager: e.target.value })} />
             <Select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={statusOptions} />
           </div>
+          </>
         ) : null}
       </FormDialog>
 
