@@ -1,0 +1,25 @@
+# Dependencias (solo dentro de frontend/ y backend/)
+node_modules/
+
+# Artefactos obsoletos en la raíz — eliminar manualmente si persisten
+/node_modules/
+
+# No instalar dependencias en la raíz del monorepo
+/package.json
+/package-lock.json
+
+# Build
+dist/
+.vite/
+*.tsbuildinfo
+
+# Variables de entorno (no commitear secretos)
+.env
+.env.local
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
