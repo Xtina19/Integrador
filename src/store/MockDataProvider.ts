@@ -1,4 +1,4 @@
-import type { ERPState } from '../store/initialState'
+import type { ERPState } from '@/store/initialState'
 import type { IDataProvider } from '../interfaces/IDataProvider'
 import type {
   Product,
@@ -15,7 +15,7 @@ import type {
   InternationalInvoice,
   Consolidation,
   BookCostingEntry,
-} from '../types/domain'
+} from '@/types/domain'
 
 /** Implementación en memoria — sustituible por MySQL sin cambiar servicios */
 export class MockDataProvider implements IDataProvider {

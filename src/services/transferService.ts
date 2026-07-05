@@ -1,11 +1,11 @@
-import type { Transfer } from '../types/domain'
-import type { ERPState } from '../store/initialState'
-import { canTransitionTransfer } from '../business-rules/stateMachines'
-import { validateTransferFinalize, validateTransfer } from '../business-rules/validators'
-import { trim } from '../utils/formValidation'
-import { createActivity, createNotification } from '../services/activityService'
-import { nextId } from '../utils/idGenerator'
-import { nowFormatted } from '../utils/timeUtils'
+import type { Transfer } from '@/types/domain'
+import type { ERPState } from '@/store/initialState'
+import { canTransitionTransfer } from '@/constants/stateMachines'
+import { validateTransferFinalize, validateTransfer } from '@/business-rules/validators'
+import { trim } from '@/utils/formValidation'
+import { createActivity, createNotification } from '@/services/activityService'
+import { nextId } from '@/utils/idGenerator'
+import { nowFormatted } from '@/utils/timeUtils'
 
 export interface CreateTransferInput {
   origin: string

@@ -1,13 +1,13 @@
-import type { PurchaseOrder, PurchaseOrderLine, Reception, InternationalInvoice } from '../types/domain'
-import type { ERPState } from '../store/initialState'
-import { canTransitionPurchase } from '../business-rules/stateMachines'
-import { validatePurchaseOrder, validatePurchaseOrderCreate, validateReceptionUpdate } from '../business-rules/validators'
-import { trim } from '../utils/formValidation'
-import { isInternationalSupplier } from '../business-rules/internationalPurchaseFlow'
-import { internationalSupplierNames } from '../data/adminMockData'
-import { createActivity, createNotification } from '../services/activityService'
-import { nextId } from '../utils/idGenerator'
-import { nowFormatted } from '../utils/timeUtils'
+import type { PurchaseOrder, PurchaseOrderLine, Reception, InternationalInvoice } from '@/types/domain'
+import type { ERPState } from '@/store/initialState'
+import { canTransitionPurchase } from '@/constants/stateMachines'
+import { validatePurchaseOrder, validatePurchaseOrderCreate, validateReceptionUpdate } from '@/business-rules/validators'
+import { trim } from '@/utils/formValidation'
+import { isInternationalSupplier } from '@/business-rules/internationalPurchaseFlow'
+import { internationalSupplierNames } from '@/mocks/mockAdmin'
+import { createActivity, createNotification } from '@/services/activityService'
+import { nextId } from '@/utils/idGenerator'
+import { nowFormatted } from '@/utils/timeUtils'
 
 export interface CreatePurchaseInput {
   orderNumber: string

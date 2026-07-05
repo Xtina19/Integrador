@@ -1,6 +1,6 @@
-import type { DashboardMetrics, InventoryChartPoint, Product, StockCategory } from '../types/domain'
-import type { ERPState } from '../store/initialState'
-import { computeDashboardMetrics, computeLowStockProducts } from '../store/initialState'
+import type { DashboardMetrics, InventoryChartPoint, Product, StockCategory } from '@/types/domain'
+import type { ERPState } from '@/store/initialState'
+import { computeDashboardMetrics, computeLowStockProducts } from '@/store/initialState'
 
 export const dashboardService = {
   getMetrics(state: ERPState): DashboardMetrics {

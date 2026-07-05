@@ -1,10 +1,10 @@
-import type { ERPState } from '../store/initialState'
-import { adminProducts, adminCategories, adminPublishers, adminSuppliers, adminBranches, adminCurrencies, publisherContracts } from '../data/adminMockData'
-import { salesHistory } from '../data/salesMockData'
-import { supplierInvoices } from '../data/purchasesMockData'
-import { auditActivities, auditChanges, auditAccess, auditDeletions } from '../data/auditMockData'
-import { configSections } from '../data/configMockData'
-import { mfaSettings, activeSessions } from '../data/usersMockData'
+import type { ERPState } from '@/store/initialState'
+import { adminProducts, adminCategories, adminPublishers, adminSuppliers, adminBranches, adminCurrencies, publisherContracts } from '@/mocks/mockAdmin'
+import { salesHistory } from '@/mocks/mockVentas'
+import { supplierInvoices } from '@/mocks/mockCompras'
+import { auditActivities, auditChanges, auditAccess, auditDeletions } from '@/mocks/mockAuditoria'
+import { configSections } from '@/mocks/mockConfiguracion'
+import { mfaSettings, activeSessions } from '@/mocks/mockUsuarios'
 import { extractCountry } from '../lib/importSearchUtils'
 
 export type GlobalSearchRecordType =

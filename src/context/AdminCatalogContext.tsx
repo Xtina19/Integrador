@@ -7,7 +7,7 @@ import {
   adminSuppliers as seedSuppliers,
   adminCurrencies as seedCurrencies,
   adminExchangeRates as seedExchangeRates,
-} from '../data/adminMockData'
+} from '@/mocks/mockAdmin'
 import { useToast } from './ToastContext'
 
 type Product = (typeof seedProducts)[number]

@@ -1,10 +1,10 @@
-import type { LibroSysEvent } from '../types/domain'
-import type { ERPState } from '../store/initialState'
-import { canTransitionEvent } from '../business-rules/stateMachines'
-import { validateEvent } from '../business-rules/validators'
-import { trim } from '../utils/formValidation'
-import { createActivity, createNotification } from '../services/activityService'
-import { nextSimpleId } from '../utils/idGenerator'
+import type { LibroSysEvent } from '@/types/domain'
+import type { ERPState } from '@/store/initialState'
+import { canTransitionEvent } from '@/constants/stateMachines'
+import { validateEvent } from '@/business-rules/validators'
+import { trim } from '@/utils/formValidation'
+import { createActivity, createNotification } from '@/services/activityService'
+import { nextSimpleId } from '@/utils/idGenerator'
 
 export interface CreateEventInput {
   id?: string

@@ -1,6 +1,6 @@
 import { Search, Filter, Download } from 'lucide-react'
 import { Input } from './Input'
-import { Button } from './Button'
+import { Button } from '@/components/ui/Button'
 import { Badge } from './Badge'
 
 interface ToolbarProps {

@@ -1,8 +1,8 @@
 import { ArrowLeft, Save } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { FormBreadcrumb, type BreadcrumbItem } from './FormBreadcrumb'
-import { Button } from './Button'
-import { Card, CardHeader, CardBody } from './Card'
+import { Button } from '@/components/ui/Button'
+import { Card, CardHeader, CardBody } from '@/components/cards/Card'
 
 interface FormPageLayoutProps {
   breadcrumbs: BreadcrumbItem[]

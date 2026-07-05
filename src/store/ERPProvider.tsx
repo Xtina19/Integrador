@@ -1,14 +1,14 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import type { ERPState } from './initialState'
 import { createInitialERPState } from './initialState'
-import { purchaseService, type CreatePurchaseInput, type UpdatePurchaseInput, type UpdateReceptionInput } from '../services/purchaseService'
-import { inventoryService, type CreateProductInput, type CreateAdjustmentInput, type UpdateProductInput } from '../services/inventoryService'
-import { transferService, type CreateTransferInput } from '../services/transferService'
-import { importService, type CreateShipmentInput, type UpdateShipmentInput, type UpdateInternationalInvoiceInput, type UpdateConsolidationInput } from '../services/importService'
-import { eventService, type CreateEventInput, type UpdateEventInput } from '../services/eventService'
-import { dashboardService } from '../services/dashboardService'
-import { prependActivity, prependNotification } from '../services/activityService'
-import type { Activity, Notification, InternationalInvoice } from '../types/domain'
+import { purchaseService, type CreatePurchaseInput, type UpdatePurchaseInput, type UpdateReceptionInput } from '@/services/purchaseService'
+import { inventoryService, type CreateProductInput, type CreateAdjustmentInput, type UpdateProductInput } from '@/services/inventoryService'
+import { transferService, type CreateTransferInput } from '@/services/transferService'
+import { importService, type CreateShipmentInput, type UpdateShipmentInput, type UpdateInternationalInvoiceInput, type UpdateConsolidationInput } from '@/services/importService'
+import { eventService, type CreateEventInput, type UpdateEventInput } from '@/services/eventService'
+import { dashboardService } from '@/services/dashboardService'
+import { prependActivity, prependNotification } from '@/services/activityService'
+import type { Activity, Notification, InternationalInvoice } from '@/types/domain'
 
 interface ERPContextValue {
   state: ERPState

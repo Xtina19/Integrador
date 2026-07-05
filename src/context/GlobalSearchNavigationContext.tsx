@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import type { GlobalSearchRecordType, GlobalSearchResult } from '../services/globalSearchService'
+import type { GlobalSearchRecordType, GlobalSearchResult } from '@/services/globalSearchService'
 
 export interface GlobalSearchTarget {
   recordId: string

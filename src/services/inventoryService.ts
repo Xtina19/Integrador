@@ -1,11 +1,11 @@
-import type { Product, InventoryAdjustment, KardexMovement } from '../types/domain'
-import type { ERPState } from '../store/initialState'
-import { validateInventoryAdjustment, validateProduct } from '../business-rules/validators'
-import { trim } from '../utils/formValidation'
-import { createActivity, createNotification } from '../services/activityService'
-import { dashboardService } from '../services/dashboardService'
-import { nextId, nextSimpleId } from '../utils/idGenerator'
-import { nowFormatted } from '../utils/timeUtils'
+import type { Product, InventoryAdjustment, KardexMovement } from '@/types/domain'
+import type { ERPState } from '@/store/initialState'
+import { validateInventoryAdjustment, validateProduct } from '@/business-rules/validators'
+import { trim } from '@/utils/formValidation'
+import { createActivity, createNotification } from '@/services/activityService'
+import { dashboardService } from '@/services/dashboardService'
+import { nextId, nextSimpleId } from '@/utils/idGenerator'
+import { nowFormatted } from '@/utils/timeUtils'
 
 export interface CreateProductInput {
   code: string

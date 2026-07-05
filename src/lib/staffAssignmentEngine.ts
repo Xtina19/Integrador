@@ -5,8 +5,8 @@ import type {
   StaffAssignmentResult,
   AssignedStaffMember,
   StaffAssignmentRecord,
-} from '../types/staffAssignment'
-import { STAFF_AREA_LABELS } from '../types/staffAssignment'
+} from '@/types/staffAssignment'
+import { STAFF_AREA_LABELS } from '@/types/staffAssignment'
 
 const AREAS: StaffArea[] = ['ventas', 'inventario', 'logistica', 'caja']
 

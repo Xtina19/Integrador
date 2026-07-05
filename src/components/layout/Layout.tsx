@@ -15,7 +15,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/ventas': { title: 'Ventas', subtitle: 'Dashboard de ventas y punto de venta' },
   '/ventas/pos': { title: 'Punto de Venta', subtitle: 'POS — Cobro y facturación' },
   '/ventas/historial': { title: 'Historial de Ventas', subtitle: 'Facturas y transacciones' },
-  '/ventas/devoluciones': { title: 'Devoluciones', subtitle: 'Gestión de devoluciones' },
+  '/ventas/cambios-notas': { title: 'Cambios y Notas de Crédito', subtitle: 'Cambios de productos y notas de crédito' },
   '/compras': { title: 'Compras', subtitle: 'Órdenes de compra y recepciones' },
   '/importaciones': { title: 'Importaciones', subtitle: 'Embarques y costeo internacional' },
   '/transferencias': { title: 'Transferencias', subtitle: 'Movimientos entre sucursales' },

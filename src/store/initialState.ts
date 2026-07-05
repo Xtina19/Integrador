@@ -15,21 +15,21 @@ import type {
   InternationalInvoice,
   Consolidation,
   BookCostingEntry,
-} from '../types/domain'
-import { products as seedProducts, events as seedEvents, stockByCategory, inventoryChartData, lowStockProducts } from '../data/mockData'
-import { purchaseOrders as seedOrders, receptions as seedReceptions } from '../data/purchasesMockData'
+} from '@/types/domain'
+import { products as seedProducts, events as seedEvents, stockByCategory, inventoryChartData, lowStockProducts } from '@/mocks/mockCore'
+import { purchaseOrders as seedOrders, receptions as seedReceptions } from '@/mocks/mockCompras'
 import {
   shipments as seedShipments,
   internationalInvoices as seedInvoices,
   consolidations as seedConsolidations,
   shipmentCostsByCode,
   bookCosting as seedBookCosting,
-} from '../data/importsMockData'
-import { kardexMovements as seedKardex, inventoryAdjustments as seedAdjustments } from '../data/inventoryMockData'
-import { createNotification, createActivity } from '../services/activityService'
-import { salesStats } from '../data/salesMockData'
-import { transfers as seedTransfers, transferHistory as seedTransferHistory } from '../data/mockData'
-import type { PurchaseStatus, TransferStatus, ImportStatus, EventStatus } from '../types/domain'
+} from '@/mocks/mockImportaciones'
+import { kardexMovements as seedKardex, inventoryAdjustments as seedAdjustments } from '@/mocks/mockInventario'
+import { createNotification, createActivity } from '@/services/activityService'
+import { salesStats } from '@/mocks/mockVentas'
+import { transfers as seedTransfers, transferHistory as seedTransferHistory } from '@/mocks/mockCore'
+import type { PurchaseStatus, TransferStatus, ImportStatus, EventStatus } from '@/types/domain'
 
 export interface ERPState {
   products: Product[]
@@ -218,6 +218,9 @@ export function createInitialERPState(): ERPState {
       startDate: e.startDate,
       endDate: e.endDate,
       location: e.location,
+      publisher: 'publisher' in e ? (e as { publisher?: string }).publisher : undefined,
+      budget: 'budget' in e ? (e as { budget?: number }).budget : undefined,
+      responsible: 'responsible' in e ? (e as { responsible?: string }).responsible : undefined,
       status: mapLegacyEventStatus(e.status),
       participants: e.participants,
       reservations: e.reservations,

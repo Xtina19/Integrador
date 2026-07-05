@@ -2,17 +2,17 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 import {
   assignmentHistorySeed,
   employeesSeed,
-} from '../data/staffAssignmentData'
+} from '@/mocks/mockStaff'
 import {
   flattenAssignments,
   generateStaffAssignment,
   type GenerateAssignmentParams,
-} from '../lib/staffAssignmentEngine'
+} from '@/lib/staffAssignmentEngine'
 import type {
   Employee,
   StaffAssignmentRecord,
   StaffAssignmentResult,
-} from '../types/staffAssignment'
+} from '@/types/staffAssignment'
 
 interface StaffAssignmentContextValue {
   employees: Employee[]

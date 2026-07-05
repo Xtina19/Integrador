@@ -6,15 +6,15 @@ import type {
   Reception,
   PurchaseOrder,
   ShipmentCosts,
-} from '../types/domain'
-import type { ERPState } from '../store/initialState'
-import { canTransitionImport } from '../business-rules/stateMachines'
-import { validateShipmentForm, validateInternationalInvoiceUpdate, validateConsolidationUpdate } from '../business-rules/validators'
-import { trim } from '../utils/formValidation'
-import { computeShipmentCostsTotal, hasShipmentCosts } from '../business-rules/shipmentCosts'
-import { createActivity, createNotification } from '../services/activityService'
-import { nextId } from '../utils/idGenerator'
-import { nowFormatted } from '../utils/timeUtils'
+} from '@/types/domain'
+import type { ERPState } from '@/store/initialState'
+import { canTransitionImport } from '@/constants/stateMachines'
+import { validateShipmentForm, validateInternationalInvoiceUpdate, validateConsolidationUpdate } from '@/business-rules/validators'
+import { trim } from '@/utils/formValidation'
+import { computeShipmentCostsTotal, hasShipmentCosts } from '@/business-rules/shipmentCosts'
+import { createActivity, createNotification } from '@/services/activityService'
+import { nextId } from '@/utils/idGenerator'
+import { nowFormatted } from '@/utils/timeUtils'
 
 export interface CreateShipmentInput {
   code: string

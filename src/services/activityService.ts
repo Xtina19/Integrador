@@ -1,6 +1,6 @@
-import type { Activity, Notification } from '../types/domain'
-import { nextSimpleId } from '../utils/idGenerator'
-import { nowISO, relativeTime } from '../utils/timeUtils'
+import type { Activity, Notification } from '@/types/domain'
+import { nextSimpleId } from '@/utils/idGenerator'
+import { nowISO, relativeTime } from '@/utils/timeUtils'
 
 export function createActivity(message: string, module: string): Activity {
   const createdAt = nowISO()
