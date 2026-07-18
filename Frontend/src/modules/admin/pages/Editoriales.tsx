@@ -158,7 +158,7 @@ export function Editoriales() {
       </div>
 
       <Card>
-        <CardHeader title="Listado de Editoriales" subtitle="Catálogo maestro de editoriales y contratos" />
+        <CardHeader title="Listado de Editoriales" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

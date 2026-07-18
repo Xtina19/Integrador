@@ -37,7 +37,7 @@ export function CorreosPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Correos de Notificación" subtitle="Destinatarios por tipo de evento" />
+        <CardHeader title="Correos de Notificación" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

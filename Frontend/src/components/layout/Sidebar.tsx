@@ -3,7 +3,6 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   Package,
-  ArrowLeftRight,
   Building2,
   CalendarDays,
   Users,
@@ -31,7 +30,6 @@ const navItems = [
   { to: '/ventas', icon: TrendingUp, label: 'Ventas' },
   { to: '/compras', icon: ShoppingCart, label: 'Compras' },
   { to: '/importaciones', icon: Globe, label: 'Importaciones' },
-  { to: '/transferencias', icon: ArrowLeftRight, label: 'Transferencias' },
   { to: '/editoriales', icon: Building2, label: 'Editoriales' },
   { to: '/eventos', icon: CalendarDays, label: 'Eventos y Ferias' },
   { to: '/reportes', icon: FileText, label: 'Reportes' },

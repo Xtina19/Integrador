@@ -71,7 +71,7 @@ export function FacturasProveedoresPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Facturas de Proveedores" subtitle={`${filtered.length} facturas registradas`} />
+        <CardHeader title="Facturas de Proveedores" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

@@ -43,8 +43,7 @@ export function NuevoUsuarioPage() {
         { label: 'Usuarios y Permisos', to: '/usuarios' },
         { label: 'Nuevo Usuario' },
       ]}
-      title="Nuevo Usuario"
-      subtitle="Alta de usuario del sistema"
+      title="Nuevo Usuario"
       listPath="/usuarios"
       saveDisabled={!validation.valid}
       onSave={() => {

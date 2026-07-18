@@ -57,8 +57,7 @@ export function VentasDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader
-            title="Ventas por Sucursal"
-            subtitle="Acumulado del mes actual"
+            title="Ventas por Sucursal"
           />
           <CardBody>
             <ResponsiveContainer width="100%" height={280}>
@@ -120,7 +119,7 @@ export function VentasDashboard() {
       </div>
 
       <Card>
-        <CardHeader title="Productos Más Vendidos" subtitle="Top del mes" />
+        <CardHeader title="Productos Más Vendidos" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

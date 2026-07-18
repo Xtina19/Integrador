@@ -130,7 +130,7 @@ export function EditorialesLista() {
       </Card>
 
       <Card>
-        <CardHeader title="Editoriales" subtitle={`${filtered.length} registros`} />
+        <CardHeader title="Editoriales" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

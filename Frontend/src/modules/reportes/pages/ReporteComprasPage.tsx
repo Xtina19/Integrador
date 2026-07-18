@@ -44,7 +44,7 @@ export function ReporteComprasPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Reporte de Compras" subtitle="Órdenes de compra registradas" />
+        <CardHeader title="Reporte de Compras" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

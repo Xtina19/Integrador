@@ -6,6 +6,34 @@ import { validateCosting } from '@/business-rules/validators'
 import { trim } from '@/utils/formValidation'
 import { useToast } from '@/context/ToastContext'
 
+const STORAGE_KEY = 'inventario_costeos'
+
+interface CosteoRegistro {
+  id: string
+  fecha: string
+  producto: string
+  previousCost: number
+  newCost: number
+  costType: string
+  notes: string
+}
+
+/**
+ * Provisional: no existe endpoint backend para costeo aún.
+ * Se persiste localmente en localStorage (clave `inventario_costeos`) hasta que
+ * el backend expone POST /api/inventario/costeos.
+ */
+function saveCosteoLocal(registro: CosteoRegistro) {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    const list: CosteoRegistro[] = raw ? JSON.parse(raw) : []
+    list.unshift(registro)
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
+  } catch {
+    /* localStorage no disponible */
+  }
+}
+
 export function NuevoCosteoPage() {
   const { showSuccess } = useToast()
   const [error, setError] = useState('')
@@ -25,8 +53,7 @@ export function NuevoCosteoPage() {
         { label: 'Inventario', to: '/inventario' },
         { label: 'Nuevo Costeo' },
       ]}
-      title="Nuevo Costeo"
-      subtitle="Actualización de costo de producto"
+      title="Nuevo Costeo"
       listPath="/inventario"
       saveDisabled={!validation.valid}
       onSave={() => {
@@ -34,7 +61,16 @@ export function NuevoCosteoPage() {
           setError(validation.errors.join(' '))
           return false
         }
-        showSuccess(`Costeo registrado para ${trim(form.product)}`)
+        saveCosteoLocal({
+          id: `CST-${Date.now()}`,
+          fecha: new Date().toISOString(),
+          producto: trim(form.product),
+          previousCost: Number(form.previousCost) || 0,
+          newCost: Number(form.newCost) || 0,
+          costType: form.costType,
+          notes: trim(form.notes),
+        })
+        showSuccess(`Costeo registrado para ${trim(form.product)} (provisional, guardado localmente)`)
         return true
       }}
     >

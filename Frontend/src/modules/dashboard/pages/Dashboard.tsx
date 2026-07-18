@@ -124,7 +124,7 @@ export function Dashboard() {
         <Card className="lg:col-span-2">
           <CardHeader
             title="Evolución de Inventario"
-            subtitle="Almacén Central vs Sucursales — Últimos 6 meses"
+            subtitle="Últimos 6 meses"
           />
           <CardBody className="pt-2 pb-6">
             <ResponsiveContainer width="100%" height={320}>
@@ -182,7 +182,7 @@ export function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader title="Stock por Categoría" subtitle="Distribución actual del inventario" />
+          <CardHeader title="Stock por Categoría" />
           <CardBody className="pt-2">
             <div className="flex flex-col gap-6">
               <ResponsiveContainer width="100%" height={200}>
@@ -232,7 +232,7 @@ export function Dashboard() {
       </div>
 
       <Card>
-        <CardHeader title="Productos con Stock Crítico" subtitle="Requieren reposición inmediata" />
+        <CardHeader title="Productos con Stock Crítico" />
         <CardBody className="!p-0">
           <Table
             keyField="id"
@@ -248,7 +248,7 @@ export function Dashboard() {
       </Card>
 
       <Card>
-        <CardHeader title="Centro de Actividad" subtitle="Acciones recientes del sistema" />
+        <CardHeader title="Centro de Actividad" />
         <CardBody>
           {recentActivities.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-6">Las acciones del sistema aparecerán aquí.</p>

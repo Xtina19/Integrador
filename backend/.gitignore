@@ -1,2 +1,7 @@
 node_modules/
+dist/
 .env
+coverage/
+data/
+src/modules/inventario/docs/QUALITY_REPORT.json
+

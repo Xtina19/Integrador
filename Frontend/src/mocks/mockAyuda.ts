@@ -14,7 +14,7 @@ export const helpSections = [
     id: 'faq',
     title: 'Preguntas Frecuentes',
     articles: [
-      { title: '¿Cómo crear una transferencia entre sucursales?', content: 'Vaya a Transferencias > Solicitudes > Nueva solicitud.' },
+      { title: '¿Cómo crear una transferencia entre sucursales?', content: 'Vaya a Inventario > Transferencias > Nueva transferencia.' },
       { title: '¿Cómo renovar un contrato editorial?', content: 'En Editoriales > Contratos, seleccione Renovar en la acción correspondiente.' },
       { title: '¿Cómo exportar reportes?', content: 'En el módulo Reportes, seleccione el reporte y use Exportar PDF o Excel.' },
       { title: '¿Cómo configurar stock mínimo?', content: 'Vaya a Configuración > Inventario y ajuste el parámetro Stock mínimo global.' },

@@ -83,7 +83,7 @@ export function EmbarquesPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Embarques Internacionales" subtitle={`${filtered.length} embarques registrados`} />
+        <CardHeader title="Embarques Internacionales" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

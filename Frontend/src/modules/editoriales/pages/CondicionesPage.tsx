@@ -6,7 +6,7 @@ import { commercialConditions } from '@/mocks/mockAdmin'
 export function CondicionesPage() {
   return (
     <Card>
-      <CardHeader title="Condiciones Comerciales" subtitle="Descuentos, crédito y contactos por editorial" />
+      <CardHeader title="Condiciones Comerciales" />
       <CardBody className="!p-0">
         <Table
           keyField="publisherId"

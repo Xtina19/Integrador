@@ -49,7 +49,7 @@ export function ReporteEditorialesPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Reporte de Editoriales" subtitle="Contratos y vigencia" />
+        <CardHeader title="Reporte de Editoriales" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

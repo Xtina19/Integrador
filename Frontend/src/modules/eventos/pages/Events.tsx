@@ -190,7 +190,7 @@ export function Events() {
             </Card>
 
             <Card className="lg:col-span-2">
-              <CardHeader title="Eventos y Ferias" subtitle="Programación actual" />
+              <CardHeader title="Eventos y Ferias" />
               <CardBody className="!p-0">
                 <Table
                   keyField="id"
@@ -274,7 +274,7 @@ export function Events() {
           </div>
 
           <Card>
-            <CardHeader title="Reservaciones Recientes" subtitle="Últimas inscripciones a eventos" />
+            <CardHeader title="Reservaciones Recientes" />
             <CardBody>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {events
@@ -299,7 +299,7 @@ export function Events() {
 
       {activeTab === 'presupuestos' && (
         <Card>
-          <CardHeader title="Presupuestos por Evento" subtitle="Control presupuestario" />
+          <CardHeader title="Presupuestos por Evento" />
           <CardBody className="!p-0">
             <Table
               keyField="eventId"
@@ -317,7 +317,7 @@ export function Events() {
 
       {activeTab === 'costos' && (
         <Card>
-          <CardHeader title="Costos de Eventos" subtitle="Gastos registrados" />
+          <CardHeader title="Costos de Eventos" />
           <CardBody className="!p-0">
             <Table
               keyField="id"
@@ -335,7 +335,7 @@ export function Events() {
 
       {activeTab === 'ingresos' && (
         <Card>
-          <CardHeader title="Ingresos de Eventos" subtitle="Ventas y entradas" />
+          <CardHeader title="Ingresos de Eventos" />
           <CardBody className="!p-0">
             <Table
               keyField="id"
@@ -353,7 +353,7 @@ export function Events() {
 
       {activeTab === 'editoriales' && (
         <Card>
-          <CardHeader title="Editoriales Participantes" subtitle="Stands y productos por feria" />
+          <CardHeader title="Editoriales Participantes" />
           <CardBody className="!p-0">
             <Table
               keyField="eventId"
@@ -371,7 +371,7 @@ export function Events() {
 
       {activeTab === 'asignaciones' && (
         <Card>
-          <CardHeader title="Asignaciones de Personal" subtitle={`${history.length} registros en el historial de rotación`} />
+          <CardHeader title="Asignaciones de Personal" />
           <CardBody className="space-y-4">
             <Toolbar search={assignmentSearch} onSearchChange={setAssignmentSearch} searchPlaceholder="Buscar por evento, empleado o área..." />
             <div className="!p-0 border border-gray-100 rounded-lg overflow-hidden">

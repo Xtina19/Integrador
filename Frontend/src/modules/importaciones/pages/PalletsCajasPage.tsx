@@ -57,7 +57,7 @@ export function PalletsCajasPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Pallets y Cajas" subtitle={`${filtered.length} unidades registradas`} />
+        <CardHeader title="Pallets y Cajas" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

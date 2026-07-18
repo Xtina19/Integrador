@@ -7,14 +7,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const { sql, getConnection } = require('./db');
+const { getConnection } = require('./db');
 
-// Endpoint de prueba para verificar que el servidor responde
 app.get('/', (req, res) => {
   res.send('Backend funcionando 🚀');
 });
 
-// Endpoint de prueba para verificar la conexión a SQL Server
 app.get('/api/test-db', async (req, res) => {
   try {
     const pool = await getConnection();
@@ -27,6 +25,13 @@ app.get('/api/test-db', async (req, res) => {
 
 app.use('/api/productos', productosRoutes);
 
+// Módulo Inventario (DDD / TypeScript) — conteos, transferencias, descartes, ajustes
+const { register } = require('tsx/cjs/api');
+register();
+const {
+  mountInventarioModule,
+} = require('./src/modules/inventario/infrastructure/bootstrap/mountInventarioModule.ts');
+mountInventarioModule(app);
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));
-

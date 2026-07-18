@@ -43,7 +43,7 @@ export function ActividadesPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Registro de Actividades" subtitle="Acciones recientes en el sistema" />
+        <CardHeader title="Registro de Actividades" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

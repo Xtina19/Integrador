@@ -82,7 +82,7 @@ export function AdminExchangeRates() {
       </div>
 
       <Card>
-        <CardHeader title="Tasas de Cambio Vigentes" subtitle="Tipos de cambio activos del sistema" />
+        <CardHeader title="Tasas de Cambio Vigentes" />
         <CardBody className="!p-0">
           <Table
             keyField="id"
@@ -128,7 +128,7 @@ export function AdminExchangeRates() {
       </Card>
 
       <Card>
-        <CardHeader title="Historial de Cambios" subtitle="Registro de actualizaciones de tasas de cambio" />
+        <CardHeader title="Historial de Cambios" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

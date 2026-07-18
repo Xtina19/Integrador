@@ -75,7 +75,7 @@ export function RecepcionesPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Recepciones de Mercancía" subtitle={`${filtered.length} recepciones registradas`} />
+        <CardHeader title="Recepciones de Mercancía" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

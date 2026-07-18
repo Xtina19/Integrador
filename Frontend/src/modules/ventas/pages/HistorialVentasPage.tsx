@@ -82,7 +82,7 @@ export function HistorialVentasPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Historial de Ventas" subtitle={`${filtered.length} facturas`} />
+        <CardHeader title="Historial de Ventas" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

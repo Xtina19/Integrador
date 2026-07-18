@@ -5,7 +5,23 @@ import { Inventory } from '@/pages/Inventory'
 import { NuevoProductoPage } from '@/pages/inventario/NuevoProductoPage'
 import { NuevoAjustePage } from '@/pages/inventario/NuevoAjustePage'
 import { NuevoCosteoPage } from '@/pages/inventario/NuevoCosteoPage'
-import { Transfers } from '@/pages/Transfers'
+import { NuevoConteoPage } from '@/pages/inventario/NuevoConteoPage'
+import { NuevoDescartePage } from '@/pages/inventario/NuevoDescartePage'
+import { NuevaTransferenciaPage } from '@/pages/inventario/NuevaTransferenciaPage'
+import { DetalleTransferenciaPage } from '@/pages/inventario/DetalleTransferenciaPage'
+import { RecepcionTransferenciaPage } from '@/pages/inventario/RecepcionTransferenciaPage'
+import { DetalleConteoPage } from '@/pages/inventario/DetalleConteoPage'
+import { CapturaConteoPage } from '@/pages/inventario/CapturaConteoPage'
+import { ReconteoConteoPage } from '@/pages/inventario/ReconteoConteoPage'
+import { RevisionConteoPage } from '@/pages/inventario/RevisionConteoPage'
+import { ClasificacionConteoPage } from '@/pages/inventario/ClasificacionConteoPage'
+import { RegularizacionConteoPage } from '@/pages/inventario/RegularizacionConteoPage'
+import { DetalleAjustePage } from '@/pages/inventario/DetalleAjustePage'
+import { DetalleDescartePage } from '@/pages/inventario/DetalleDescartePage'
+import { FichaProductoPage } from '@/pages/inventario/FichaProductoPage'
+import { DetalleMovimientoPage } from '@/pages/inventario/DetalleMovimientoPage'
+import { DetalleKardexPage } from '@/pages/inventario/DetalleKardexPage'
+import { DetalleAuditoriaPage } from '@/pages/inventario/DetalleAuditoriaPage'
 import { Events } from '@/pages/Events'
 import { NuevoEventoPage } from '@/pages/eventos/NuevoEventoPage'
 import { Users } from '@/pages/Users'
@@ -79,8 +95,24 @@ export function AppRoutes() {
         <Route path="inventario" element={<Inventory />} />
         <Route path="inventario/nuevo" element={<NuevoProductoPage />} />
         <Route path="inventario/ajustes/nuevo" element={<NuevoAjustePage />} />
+        <Route path="inventario/conteos/nuevo" element={<NuevoConteoPage />} />
+        <Route path="inventario/descartes/nuevo" element={<NuevoDescartePage />} />
         <Route path="inventario/costeo/nuevo" element={<NuevoCosteoPage />} />
-        <Route path="transferencias" element={<Transfers />} />
+        <Route path="inventario/transferencias/nuevo" element={<NuevaTransferenciaPage />} />
+        <Route path="inventario/transferencias/:id" element={<DetalleTransferenciaPage />} />
+        <Route path="inventario/transferencias/:id/recepcion" element={<RecepcionTransferenciaPage />} />
+        <Route path="inventario/conteos/:id" element={<DetalleConteoPage />} />
+        <Route path="inventario/conteos/:id/captura" element={<CapturaConteoPage />} />
+        <Route path="inventario/conteos/:id/reconteo" element={<ReconteoConteoPage />} />
+        <Route path="inventario/conteos/:id/revision" element={<RevisionConteoPage />} />
+        <Route path="inventario/conteos/:id/clasificacion" element={<ClasificacionConteoPage />} />
+        <Route path="inventario/conteos/:id/regularizacion" element={<RegularizacionConteoPage />} />
+        <Route path="inventario/ajustes/:id" element={<DetalleAjustePage />} />
+        <Route path="inventario/descartes/:id" element={<DetalleDescartePage />} />
+        <Route path="inventario/productos/:id" element={<FichaProductoPage />} />
+        <Route path="inventario/movimientos/:id" element={<DetalleMovimientoPage />} />
+        <Route path="inventario/kardex/:productoId" element={<DetalleKardexPage />} />
+        <Route path="inventario/auditoria/:id" element={<DetalleAuditoriaPage />} />
         <Route path="editoriales" element={<EditorialesLayout />}>
           <Route index element={<EditorialesDashboard />} />
           <Route path="lista" element={<EditorialesLista />} />

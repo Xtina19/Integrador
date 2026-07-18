@@ -50,7 +50,7 @@ export function AyudaPage() {
       })}
 
       <Card className="border-corporate/20">
-        <CardHeader title="Contacto de Soporte" subtitle="Estamos disponibles para ayudarle" />
+        <CardHeader title="Contacto de Soporte" />
         <CardBody>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex items-start gap-3">

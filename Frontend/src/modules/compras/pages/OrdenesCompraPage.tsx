@@ -92,7 +92,7 @@ export function OrdenesCompraPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Órdenes de Compra" subtitle={`${filtered.length} órdenes registradas`} />
+        <CardHeader title="Órdenes de Compra" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

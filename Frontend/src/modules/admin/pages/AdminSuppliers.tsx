@@ -94,7 +94,7 @@ export function AdminSuppliers() {
       </div>
 
       <Card>
-        <CardHeader title="Catálogo de Proveedores" subtitle="Proveedores, distribuidores y servicios" />
+        <CardHeader title="Catálogo de Proveedores" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

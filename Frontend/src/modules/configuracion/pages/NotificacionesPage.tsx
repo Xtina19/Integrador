@@ -17,8 +17,7 @@ export function NotificacionesPage() {
     <div className="space-y-6">
       <Card>
         <CardHeader
-          title="Configuración de Notificaciones"
-          subtitle="Parámetros de alertas del sistema"
+          title="Configuración de Notificaciones"
           action={
             <Button
               size="sm"

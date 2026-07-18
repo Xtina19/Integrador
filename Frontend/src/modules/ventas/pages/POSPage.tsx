@@ -122,7 +122,7 @@ export function POSPage() {
         </Card>
 
         <Card className="flex-1">
-          <CardHeader title="Catálogo" subtitle={`${filteredProducts.length} productos disponibles`} />
+          <CardHeader title="Catálogo" />
           <CardBody>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[calc(100vh-22rem)] overflow-y-auto scrollbar-thin pr-1">
               {filteredProducts.map((product) => (
@@ -157,7 +157,7 @@ export function POSPage() {
 
       <div className="xl:col-span-2">
         <Card className="h-full flex flex-col">
-          <CardHeader title="Carrito de Venta" subtitle={`${cartDetails.length} artículos`} />
+          <CardHeader title="Carrito de Venta" />
           <CardBody className="flex-1 flex flex-col">
             <div className="mb-4">
               <Select

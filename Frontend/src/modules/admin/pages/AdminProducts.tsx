@@ -173,7 +173,7 @@ export function AdminProducts() {
       </Card>
 
       <Card>
-        <CardHeader title="Catálogo Maestro de Productos" subtitle="Mantenimiento de productos del sistema" />
+        <CardHeader title="Catálogo Maestro de Productos" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

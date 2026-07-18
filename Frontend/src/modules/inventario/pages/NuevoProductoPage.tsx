@@ -42,7 +42,6 @@ export function NuevoProductoPage() {
         { label: 'Nuevo Producto' },
       ]}
       title="Nuevo Producto"
-      subtitle="Registro de producto en inventario"
       listPath="/inventario"
       saveDisabled={!validation.valid}
       onSave={() => {

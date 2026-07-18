@@ -77,7 +77,7 @@ export function ConsolidacionesPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Consolidaciones" subtitle={`${filtered.length} consolidaciones vinculadas a importaciones`} />
+        <CardHeader title="Consolidaciones" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

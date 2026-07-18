@@ -74,7 +74,7 @@ export function AdminCategories() {
       </div>
 
       <Card>
-        <CardHeader title="Catálogo de Categorías" subtitle="Clasificación maestra de productos" />
+        <CardHeader title="Catálogo de Categorías" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

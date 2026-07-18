@@ -126,7 +126,7 @@ export function CambiosNotasCreditoPage() {
 
       {activeTab === 'cambios' && (
         <Card>
-          <CardHeader title="Cambios de Productos" subtitle={`${filteredExchanges.length} registros`} />
+          <CardHeader title="Cambios de Productos" />
           <CardBody className="!p-0">
             <Table
               keyField="id"
@@ -158,7 +158,7 @@ export function CambiosNotasCreditoPage() {
 
       {activeTab === 'notas' && (
         <Card>
-          <CardHeader title="Notas de Crédito" subtitle={`${filteredNotes.length} notas emitidas`} />
+          <CardHeader title="Notas de Crédito" />
           <CardBody className="!p-0">
             <Table
               keyField="id"

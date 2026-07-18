@@ -71,7 +71,7 @@ export function FacturasInternacionalesPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Facturas Internacionales" subtitle={`${filtered.length} facturas vinculadas a órdenes de compra`} />
+        <CardHeader title="Facturas Internacionales" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

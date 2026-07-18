@@ -99,7 +99,7 @@ export function ContratosPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Contratos Editoriales" subtitle={`${filtered.length} contratos registrados`} />
+        <CardHeader title="Contratos Editoriales" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

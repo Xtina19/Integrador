@@ -5,7 +5,7 @@ import { contractRenewals } from '@/mocks/mockAdmin'
 export function RenovacionesPage() {
   return (
     <Card>
-      <CardHeader title="Historial de Renovaciones" subtitle="Registro completo de renovaciones de contratos" />
+      <CardHeader title="Historial de Renovaciones" />
       <CardBody className="!p-0">
         <Table
           keyField="id"

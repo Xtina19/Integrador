@@ -40,7 +40,7 @@ export function ProductosAsociadosPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Productos Asociados" subtitle={`${filtered.length} libros por editorial`} />
+        <CardHeader title="Productos Asociados" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

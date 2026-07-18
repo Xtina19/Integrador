@@ -78,7 +78,7 @@ export function AdminCurrencies() {
       </div>
 
       <Card>
-        <CardHeader title="Catálogo de Monedas" subtitle="Monedas habilitadas en el sistema" />
+        <CardHeader title="Catálogo de Monedas" />
         <CardBody className="!p-0">
           <Table
             keyField="id"

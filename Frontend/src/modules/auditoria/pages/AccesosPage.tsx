@@ -44,7 +44,7 @@ export function AccesosPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Registro de Accesos" subtitle="Inicios de sesión y eventos de autenticación" />
+        <CardHeader title="Registro de Accesos" />
         <CardBody className="!p-0">
           <Table
             keyField="id"
