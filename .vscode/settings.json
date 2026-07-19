@@ -1,5 +1,7 @@
 {
   "typescript.tsdk": "frontend/node_modules/typescript/lib",
+  "files.encoding": "utf8",
+  "files.autoGuessEncoding": false,
   "files.exclude": {
     "**/node_modules": true
   }

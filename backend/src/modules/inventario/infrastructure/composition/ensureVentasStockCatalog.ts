@@ -1,23 +1,30 @@
 import type { InMemoryDatabaseAdapter } from '../persistence/InMemoryDatabaseAdapter'
 
-/** Catálogo vendible del POS / seed Ventas — debe existir en el Engine. */
+/**
+ * Catálogo vendible POS / Ventas — alineado al Master Data (`productos`).
+ * Mismos títulos/precios; sin papelería.
+ */
 const PRODUCTOS_VENTAS = [
-  { id: 'prod-cien', titulo: 'Cien años de soledad', costoReferencia: 1200 },
-  { id: 'prod-1984', titulo: '1984', costoReferencia: 895 },
-  { id: 'prod-dune', titulo: 'Dune', costoReferencia: 1500 },
-  { id: 'prod-principito', titulo: 'El principito', costoReferencia: 650 },
-  { id: 'prod-mate5', titulo: 'Manual de Matemática 5to Primaria', costoReferencia: 450 },
-  { id: 'prod-cuaderno', titulo: 'Cuaderno cuadriculado 100 hojas', costoReferencia: 120 },
-  { id: 'prod-naruto-5', titulo: 'Naruto Tomo 5', costoReferencia: 900 },
-  { id: 'prod-onepiece-109', titulo: 'One Piece Vol.109', costoReferencia: 1200 },
+  { id: 'prod-cien', titulo: 'Cien años de soledad', costoReferencia: 895 },
+  { id: 'prod-sombra', titulo: 'La sombra del viento', costoReferencia: 780 },
+  { id: 'prod-quijote', titulo: 'Don Quijote de la Mancha', costoReferencia: 950 },
+  { id: 'prod-principito', titulo: 'El Principito', costoReferencia: 550 },
+  { id: 'prod-habitos', titulo: 'Hábitos Atómicos', costoReferencia: 1150 },
+  { id: 'prod-padre', titulo: 'Padre Rico Padre Pobre', costoReferencia: 990 },
+  { id: 'prod-cleancode', titulo: 'Clean Code', costoReferencia: 1850 },
+  { id: 'prod-hp', titulo: 'Harry Potter y la piedra filosofal', costoReferencia: 850 },
+  { id: 'prod-onepiece', titulo: 'One Piece Vol. 1', costoReferencia: 425 },
+  { id: 'prod-naruto', titulo: 'Naruto Vol. 1', costoReferencia: 425 },
+  { id: 'prod-jujutsu', titulo: 'Jujutsu Kaisen Vol. 1', costoReferencia: 450 },
+  { id: 'prod-1984', titulo: '1984', costoReferencia: 595 },
+  { id: 'prod-spiderman', titulo: 'Amazing Spider-Man Vol. 1', costoReferencia: 720 },
+  { id: 'prod-batman', titulo: 'Batman: Año Uno', costoReferencia: 760 },
+  { id: 'prod-matilda', titulo: 'Matilda', costoReferencia: 650 },
+  { id: 'prod-booklight', titulo: 'Book light LED clip', costoReferencia: 450 },
 ] as const
 
-const ALMACENES_VENTAS = ['alm-central', 'alm-polanco'] as const
+const ALMACENES_VENTAS = ['alm-central', 'alm-polanco', 'alm-santiago'] as const
 
-/**
- * Garantiza productos/almacenes/existencias del canal Ventas en el DB del Engine.
- * Idempotente: no sobrescribe saldos ya existentes.
- */
 export function ensureVentasStockCatalog(db: InMemoryDatabaseAdapter): void {
   for (const id of ALMACENES_VENTAS) {
     if (!db.tables.almacenes.has(id)) {

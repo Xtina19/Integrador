@@ -6,6 +6,7 @@ import { validateShipmentForm } from '@/business-rules/validators'
 import { trim } from '@/utils/formValidation'
 import type { ShipmentCosts } from '@/types/domain'
 import { useERP } from '@/store/ERPProvider'
+import { formatDop, formatMoney } from '@/lib/money'
 
 export function RegistrarEmbarquePage() {
   const { state, registerShipment } = useERP()
@@ -119,8 +120,8 @@ export function RegistrarEmbarquePage() {
           {selectedInvoice && (
             <div className="md:col-span-2 text-sm text-gray-600 bg-surface border border-gray-100 rounded-lg px-4 py-3">
               Orden vinculada: <span className="font-mono text-corporate">{selectedInvoice.orderId}</span> — Proveedor:{' '}
-              <span className="font-medium">{selectedInvoice.supplier}</span> — Monto: {selectedInvoice.currency}{' '}
-              {selectedInvoice.amount.toLocaleString()}
+              <span className="font-medium">{selectedInvoice.supplier}</span> — Monto:{' '}
+              {formatMoney(selectedInvoice.amount, selectedInvoice.currency)}
             </div>
           )}
           <Input label="Código embarque *" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
@@ -165,7 +166,7 @@ export function RegistrarEmbarquePage() {
               </p>
             </div>
             <p className="text-sm text-gray-500">
-              Total: <span className="font-bold text-corporate">RD${costsTotal.toLocaleString()}</span>
+              Total: <span className="font-bold text-corporate tabular-nums">{formatDop(costsTotal)}</span>
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

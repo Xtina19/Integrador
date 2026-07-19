@@ -35,7 +35,7 @@ function withAuth(userId?: VentasUserId) {
 function unwrap<T>(res: ApiEnvelope<T>, fallbackStatus = 500): T {
   if (res.success && res.data !== undefined) return res.data
   const code = res.error?.code ?? 'UNEXPECTED'
-  const message = res.error?.message ?? 'Error en API de ventas.'
+  const message = res.error?.message ?? 'No se pudo completar la operación de ventas.'
   const status =
     code === 'VALIDATION'
       ? 400

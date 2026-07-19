@@ -5,6 +5,7 @@ import { Table } from '@/components/ui/Table'
 import { Toolbar } from '@/components/ui/Toolbar'
 import { purchaseOrders, purchaseStatusMap } from '@/mocks/mockCompras'
 import { useTableExport } from '@/hooks/useTableExport'
+import { formatDop } from '@/lib/money'
 
 export function ReporteComprasPage() {
   const { onExportPdf, onExportExcel } = useTableExport('Reporte Compras')
@@ -34,7 +35,7 @@ export function ReporteComprasPage() {
                   o.supplier,
                   o.date,
                   String(o.items),
-                  `RD$${o.total.toLocaleString()}`,
+                  formatDop(o.total),
                   purchaseStatusMap[o.status].label,
                 ])
               )
@@ -57,8 +58,8 @@ export function ReporteComprasPage() {
               {
                 key: 'total',
                 header: 'Total',
-                className: 'text-right font-mono',
-                render: (o) => `RD$${o.total.toLocaleString()}`,
+                className: 'text-right font-mono tabular-nums',
+                render: (o) => formatDop(o.total),
               },
               {
                 key: 'status',

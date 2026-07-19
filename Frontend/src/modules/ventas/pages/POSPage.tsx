@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Search, Plus, Minus, Trash2, CreditCard, BookOpen, User, UserPlus } from 'lucide-react'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
@@ -17,6 +17,7 @@ import {
   type TipoVentaDto,
 } from '@/services/api/ventasApi'
 import { formatDop, newIdempotencyKey } from '../utils/ventasUi'
+import { roundMoney } from '@/lib/money'
 import { getFriendlyErrorMessage } from '@/services/http'
 
 interface CartLine {
@@ -43,11 +44,11 @@ function buildNcAplicadas(
   total: number,
   ncs: NotaCreditoDisponibleDto[],
 ): NcAplicadaLine[] {
-  let restante = Math.max(0, Math.round(total))
+  let restante = Math.max(0, roundMoney(total))
   const lines: NcAplicadaLine[] = []
   for (const nc of ncs) {
     if (restante <= 0) break
-    const usar = Math.min(Math.round(nc.saldoPendiente), restante)
+    const usar = Math.min(roundMoney(nc.saldoPendiente), restante)
     if (usar <= 0) continue
     lines.push({ nc, montoAplicado: usar })
     restante -= usar
@@ -124,7 +125,7 @@ export function POSPage() {
         const product = POS_CATALOG.find((p) => p.id === line.productId)
         if (!product) return null
         const bruto = product.precioSugerido * line.qty
-        const desc = Math.round((bruto * line.discountPct) / 100)
+        const desc = roundMoney((bruto * line.discountPct) / 100)
         return {
           ...line,
           product,
@@ -156,7 +157,7 @@ export function POSPage() {
   )
 
   const totalNcAplicado = ncAplicadas.reduce((s, l) => s + l.montoAplicado, 0)
-  const saldoPendientePago = Math.max(0, Math.round(totalEstimado) - totalNcAplicado)
+  const saldoPendientePago = Math.max(0, roundMoney(totalEstimado) - totalNcAplicado)
   const totalPagos = pagos.reduce((s, p) => s + (Number(p.monto) || 0), 0)
 
   useEffect(() => {
@@ -227,7 +228,7 @@ export function POSPage() {
   function rechazarAplicarNc() {
     setNcSeleccionIds([])
     setNcDialog(false)
-    setPagos([{ formaPago: 'efectivo', monto: Math.round(totalEstimado) || 0 }])
+    setPagos([{ formaPago: 'efectivo', monto: roundMoney(totalEstimado) || 0 }])
   }
 
   async function emitir(mode: 'auto' | 'pago' | 'mixto') {
@@ -254,8 +255,8 @@ export function POSPage() {
       return
     }
 
-    const sumaCubre = activePagos.reduce((s, p) => s + Math.round(p.monto), 0)
-    if (sumaCubre !== Math.round(totalEstimado)) {
+    const sumaCubre = activePagos.reduce((s, p) => s + roundMoney(p.monto), 0)
+    if (sumaCubre !== roundMoney(totalEstimado)) {
       showError(
         `La suma de crédito aplicado y pagos (${formatDop(sumaCubre)}) debe igualar el total (${formatDop(totalEstimado)}).`,
       )
@@ -306,14 +307,14 @@ export function POSPage() {
         p.formaPago === 'nota_credito'
           ? {
               formaPago: p.formaPago,
-              monto: Math.round(p.monto),
+              monto: roundMoney(p.monto),
               notaCreditoId: p.notaCreditoId.trim(),
             }
           : {
               formaPago: p.formaPago,
-              monto: Math.round(p.monto),
+              monto: roundMoney(p.monto),
               montoEntregadoEfectivo:
-                p.formaPago === 'efectivo' ? Math.round(p.monto) : undefined,
+                p.formaPago === 'efectivo' ? roundMoney(p.monto) : undefined,
             },
       ),
       idempotencyKey: newIdempotencyKey('pos'),
@@ -562,7 +563,7 @@ export function POSPage() {
                 ) : (
                   <ul className="space-y-2">
                     {ncAplicadas.map(({ nc, montoAplicado }) => {
-                      const saldoDisp = Math.round(nc.saldoPendiente)
+                      const saldoDisp = roundMoney(nc.saldoPendiente)
                       const saldoRestanteNc = Math.max(0, saldoDisp - montoAplicado)
                       return (
                         <li
@@ -664,6 +665,7 @@ export function POSPage() {
                     label="Monto"
                     type="number"
                     min={0}
+                    step="0.01"
                     value={p.monto || ''}
                     onChange={(e) => {
                       const v = Number(e.target.value) || 0

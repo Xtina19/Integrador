@@ -15,15 +15,8 @@ import type { PurchaseOrder, PurchaseStatus } from '@/types/domain'
 import { useERP } from '@/store/ERPProvider'
 import { useToast } from '@/context/ToastContext'
 import { useGlobalSearchRecordEffect, useRecordHighlightScroll } from '@/context/GlobalSearchNavigationContext'
-
-const purchaseStatusVariants: Record<PurchaseStatus, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
-  draft: 'neutral',
-  pending: 'warning',
-  approved: 'info',
-  received: 'success',
-  finalized: 'success',
-  cancelled: 'danger',
-}
+import { purchaseStatusMap, purchaseStatusVariants } from '@/modules/compras/constants/comprasUi'
+import { formatMoney } from '@/lib/money'
 
 export function OrdenesCompraPage() {
   const navigate = useNavigate()
@@ -55,9 +48,9 @@ export function OrdenesCompraPage() {
     })
   }, [search, statusFilter, purchaseOrders])
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!deleteId) return
-    const result = deletePurchaseOrder(deleteId)
+    const result = await deletePurchaseOrder(deleteId)
     if (!result.success) return
     showSuccess('Orden de compra eliminada correctamente')
     setDeleteId(null)
@@ -126,10 +119,10 @@ export function OrdenesCompraPage() {
               {
                 key: 'total',
                 header: 'Total',
+                className: 'text-right',
                 render: (o) => (
-                  <span className="font-semibold text-corporate">
-                    {o.currency === 'DOP' ? 'RD$' : o.currency === 'EUR' ? '€' : '$'}
-                    {o.total.toLocaleString()}
+                  <span className="font-semibold text-corporate tabular-nums">
+                    {formatMoney(o.total, o.currency)}
                   </span>
                 ),
               },
@@ -137,8 +130,11 @@ export function OrdenesCompraPage() {
                 key: 'status',
                 header: 'Estado',
                 render: (o) => {
-                  const cfg = purchaseStatusVariants[o.status]
-                  return <Badge variant={cfg}>{purchaseStatusLabels[o.status]}</Badge>
+                  const meta = purchaseStatusMap[o.status] ?? {
+                    label: purchaseStatusLabels[o.status],
+                    variant: purchaseStatusVariants[o.status],
+                  }
+                  return <Badge variant={meta.variant}>{meta.label}</Badge>
                 },
               },
               {
@@ -146,8 +142,8 @@ export function OrdenesCompraPage() {
                 header: 'Acciones',
                 render: (o) => (
                   <div className="flex items-center gap-2">
-                    {o.status === 'pending' && (
-                      <Button size="sm" variant="outline" onClick={() => approvePurchaseOrder(o.id)}>
+                    {(o.status === 'pending' || o.status === 'draft') && (
+                      <Button size="sm" variant="outline" onClick={() => void approvePurchaseOrder(o.id)}>
                         Aprobar
                       </Button>
                     )}

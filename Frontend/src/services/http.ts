@@ -15,41 +15,108 @@ export class ApiError extends Error {
   }
 }
 
+const USER_MSG = {
+  network:
+    'No fue posible cargar la información en este momento. Intente nuevamente o contacte al administrador del sistema.',
+  timeout:
+    'La operación está tardando más de lo esperado. Intente nuevamente en unos momentos.',
+  unauthorized: 'Su sesión no es válida o ha expirado. Vuelva a iniciar sesión.',
+  forbidden: 'No tiene permiso para realizar esta operación.',
+  notFound: 'No se encontró la información solicitada.',
+  conflict: 'No fue posible completar la operación por un conflicto de estado. Actualice e intente de nuevo.',
+  validation: 'Revise los datos ingresados e intente nuevamente.',
+  server:
+    'No fue posible completar la operación en este momento. Intente nuevamente o contacte al administrador del sistema.',
+  unexpected: 'Ocurrió un error inesperado. Intente nuevamente o contacte al administrador del sistema.',
+} as const
+
+function logTechnicalError(error: unknown, userMessage: string): void {
+  if (typeof console === 'undefined' || typeof console.error !== 'function') return
+  if (axios.isAxiosError(error)) {
+    const ax = error as AxiosError
+    console.error('[LibroSys API]', {
+      userMessage,
+      code: ax.code,
+      status: ax.response?.status,
+      url: ax.config?.url,
+      method: ax.config?.method,
+      responseData: ax.response?.data,
+      message: ax.message,
+    })
+    return
+  }
+  console.error('[LibroSys]', userMessage, error)
+}
+
+/**
+ * Mensaje orientado a usuario final (producción).
+ * Los detalles técnicos se registran en consola, no en la UI.
+ */
 export function getFriendlyErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message
+  if (error instanceof ApiError) {
+    // ApiError ya fue normalizado; no re-loguear en cadena.
+    return error.message
+  }
+
   if (axios.isAxiosError(error)) {
     const ax = error as AxiosError<{
       error?: string | { code?: string; message?: string }
       message?: string
       success?: boolean
     }>
-    if (ax.code === 'ECONNABORTED') return 'La solicitud tardó demasiado. Intente de nuevo.'
-    if (!ax.response) return 'No se pudo conectar con el servidor. Verifique que el backend esté activo.'
-    const body = ax.response.data
-    const nested =
-      body?.error && typeof body.error === 'object' ? body.error.message : undefined
-    const flat = typeof body?.error === 'string' ? body.error : undefined
-    const status = ax.response.status
-    const statusHint =
-      status === 401
-        ? 'No autenticado (401).'
-        : status === 403
-          ? 'No tiene permiso para esta operación (403).'
-          : status === 404
-            ? 'Recurso no encontrado (404).'
-            : status === 409
-              ? 'Conflicto de versión o estado (409).'
-              : status === 422
-                ? 'Regla de dominio rechazada (422).'
-                : status === 502
-                  ? 'Fallo de inventario (502).'
-                  : status === 400
-                    ? 'Solicitud inválida (400).'
-                    : undefined
-    return nested || flat || body?.message || statusHint || `Error del servidor (${status}).`
+
+    let userMessage: string = USER_MSG.server
+
+    if (ax.code === 'ECONNABORTED') {
+      userMessage = USER_MSG.timeout
+    } else if (!ax.response) {
+      userMessage = USER_MSG.network
+    } else {
+      const status = ax.response.status
+      const body = ax.response.data
+      const nested =
+        body?.error && typeof body.error === 'object' ? body.error.message : undefined
+      const flat = typeof body?.error === 'string' ? body.error : undefined
+      const domainMsg = nested || flat || body?.message
+
+      // Mensajes de dominio (validación de negocio) sí pueden mostrarse si son claros.
+      const looksTechnical =
+        !domainMsg ||
+        /\b(ECONN|SQL|stack|Exception|TypeError|at\s+\S+\s+\()/i.test(String(domainMsg)) ||
+        /backend|servidor|localhost|:\d{2,5}/i.test(String(domainMsg))
+
+      if (domainMsg && !looksTechnical) {
+        userMessage = String(domainMsg)
+      } else if (status === 401) {
+        userMessage = USER_MSG.unauthorized
+      } else if (status === 403) {
+        userMessage = USER_MSG.forbidden
+      } else if (status === 404) {
+        userMessage = USER_MSG.notFound
+      } else if (status === 409) {
+        userMessage = USER_MSG.conflict
+      } else if (status === 400 || status === 422) {
+        userMessage = USER_MSG.validation
+      } else {
+        userMessage = USER_MSG.server
+      }
+    }
+
+    logTechnicalError(error, userMessage)
+    return userMessage
   }
-  if (error instanceof Error) return error.message
-  return 'Ocurrió un error inesperado.'
+
+  if (error instanceof Error) {
+    const looksTechnical =
+      /\b(ECONN|SQL|stack|Exception|TypeError)\b/i.test(error.message) ||
+      /backend|servidor|localhost/i.test(error.message)
+    const userMessage = looksTechnical ? USER_MSG.unexpected : error.message || USER_MSG.unexpected
+    logTechnicalError(error, userMessage)
+    return userMessage
+  }
+
+  logTechnicalError(error, USER_MSG.unexpected)
+  return USER_MSG.unexpected
 }
 
 const http = axios.create({

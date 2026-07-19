@@ -4,6 +4,7 @@ import { Table } from '@/components/ui/Table'
 import { Toolbar } from '@/components/ui/Toolbar'
 import { eventBudgets } from '@/mocks/mockEventos'
 import { useTableExport } from '@/hooks/useTableExport'
+import { formatDop } from '@/lib/money'
 
 export function ReporteEventosPage() {
   const { onExportPdf, onExportExcel } = useTableExport('Reporte Eventos')
@@ -28,9 +29,9 @@ export function ReporteEventosPage() {
                 filtered.map((e) => [
                   e.eventId,
                   e.eventName,
-                  `RD$${e.budget.toLocaleString()}`,
-                  `RD$${e.spent.toLocaleString()}`,
-                  `RD$${e.remaining.toLocaleString()}`,
+                  formatDop(e.budget),
+                  formatDop(e.spent),
+                  formatDop(e.remaining),
                 ])
               )
             }
@@ -50,20 +51,20 @@ export function ReporteEventosPage() {
               {
                 key: 'budget',
                 header: 'Presupuesto',
-                className: 'text-right font-mono',
-                render: (e) => `RD$${e.budget.toLocaleString()}`,
+                className: 'text-right font-mono tabular-nums',
+                render: (e) => formatDop(e.budget),
               },
               {
                 key: 'spent',
                 header: 'Gastado',
-                className: 'text-right font-mono',
-                render: (e) => `RD$${e.spent.toLocaleString()}`,
+                className: 'text-right font-mono tabular-nums',
+                render: (e) => formatDop(e.spent),
               },
               {
                 key: 'remaining',
                 header: 'Disponible',
-                className: 'text-right font-mono',
-                render: (e) => `RD$${e.remaining.toLocaleString()}`,
+                className: 'text-right font-mono tabular-nums',
+                render: (e) => formatDop(e.remaining),
               },
             ]}
           />

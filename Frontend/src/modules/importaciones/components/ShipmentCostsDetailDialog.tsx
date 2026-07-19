@@ -1,6 +1,7 @@
 import { X } from 'lucide-react'
 import type { ShipmentCosts } from '@/types/domain'
 import { shipmentCostFields, computeShipmentCostsTotal } from '@/business-rules/shipmentCosts'
+import { formatDop } from '@/lib/money'
 
 interface ShipmentCostsDetailDialogProps {
   open: boolean
@@ -8,10 +9,6 @@ interface ShipmentCostsDetailDialogProps {
   shipmentCode: string
   invoiceId?: string
   costs: ShipmentCosts
-}
-
-function formatCurrency(value: number) {
-  return `RD$${value.toLocaleString()}`
 }
 
 export function ShipmentCostsDetailDialog({
@@ -55,12 +52,12 @@ export function ShipmentCostsDetailDialog({
           {shipmentCostFields.map(({ key, label }) => (
             <div key={key} className="flex items-center justify-between text-sm">
               <span className="text-gray-600">{label}</span>
-              <span className="font-medium tabular-nums">{formatCurrency(costs[key])}</span>
+              <span className="font-medium tabular-nums">{formatDop(costs[key])}</span>
             </div>
           ))}
           <div className="pt-3 mt-3 border-t border-gray-200 flex items-center justify-between">
             <span className="font-semibold text-gray-900">Total</span>
-            <span className="text-lg font-bold text-corporate tabular-nums">{formatCurrency(total)}</span>
+            <span className="text-lg font-bold text-corporate tabular-nums">{formatDop(total)}</span>
           </div>
         </div>
       </div>

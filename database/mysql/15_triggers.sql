@@ -95,40 +95,10 @@ END$$
 -- =============================================================================
 
 DROP TRIGGER IF EXISTS trg_inventario_despues_recepcion$$
-CREATE TRIGGER trg_inventario_despues_recepcion
-AFTER UPDATE ON detalle_recepcion
-FOR EACH ROW
-BEGIN
-  DECLARE v_delta        INT;
-  DECLARE v_almacen_id   INT UNSIGNED DEFAULT 1;
-  DECLARE v_usuario_id   INT UNSIGNED;
-  DECLARE v_codigo       VARCHAR(30);
-
-  IF NEW.cantidad_recibida > OLD.cantidad_recibida AND @librosys_from_proc IS NULL THEN
-    SET v_delta = NEW.cantidad_recibida - OLD.cantidad_recibida;
-
-    SELECT r.usuario_id, r.codigo
-    INTO v_usuario_id, v_codigo
-    FROM recepcion r WHERE r.id = NEW.recepcion_id;
-
-    CALL sp_actualizar_inventario(
-      NEW.producto_id, v_almacen_id, v_delta, 'recepcion',
-      v_codigo, 'recepcion', v_usuario_id, 'Entrada por recepción (trigger)'
-    );
-
-    UPDATE recepcion r
-    SET r.total_items_recibidos = (
-          SELECT COALESCE(SUM(dr.cantidad_recibida), 0)
-          FROM detalle_recepcion dr WHERE dr.recepcion_id = r.id
-        ),
-        r.estado = CASE
-          WHEN (SELECT SUM(dr.cantidad_recibida) FROM detalle_recepcion dr WHERE dr.recepcion_id = r.id) = 0 THEN 'pendiente'
-          WHEN (SELECT SUM(dr.cantidad_recibida) FROM detalle_recepcion dr WHERE dr.recepcion_id = r.id) < r.total_items_esperados THEN 'parcial'
-          ELSE 'completa'
-        END
-    WHERE r.id = NEW.recepcion_id;
-  END IF;
-END$$
+-- COM-DB-1.0.0 (2026-07-19):
+-- Inventario por recepción lo gestiona backend/services/compras/_inventoryPort.js
+-- al confirmar la recepción. No recrear trigger sobre columnas legacy
+-- (usuario_id, total_items_esperados, estados pendiente/parcial/completa).
 
 -- =============================================================================
 -- IMPORTACIONES — ESTADOS DE EMBARQUE

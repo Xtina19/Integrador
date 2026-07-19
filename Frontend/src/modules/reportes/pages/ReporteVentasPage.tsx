@@ -5,6 +5,7 @@ import { Table } from '@/components/ui/Table'
 import { Toolbar } from '@/components/ui/Toolbar'
 import { salesHistory } from '@/mocks/mockVentas'
 import { useTableExport } from '@/hooks/useTableExport'
+import { formatDop } from '@/lib/money'
 
 const statusMap = {
   paid: { label: 'Pagada', variant: 'success' as const },
@@ -39,7 +40,7 @@ export function ReporteVentasPage() {
                   s.date,
                   s.customer,
                   s.branch,
-                  `RD$${s.total.toLocaleString()}`,
+                  formatDop(s.total),
                   statusMap[s.status].label,
                 ])
               )
@@ -62,8 +63,8 @@ export function ReporteVentasPage() {
               {
                 key: 'total',
                 header: 'Total',
-                className: 'text-right font-mono',
-                render: (s) => `RD$${s.total.toLocaleString()}`,
+                className: 'text-right font-mono tabular-nums',
+                render: (s) => formatDop(s.total),
               },
               {
                 key: 'status',

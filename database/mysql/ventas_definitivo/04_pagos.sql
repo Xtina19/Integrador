@@ -1,4 +1,4 @@
--- =============================================================================
+﻿-- =============================================================================
 -- LibroSys — Ventas DEFINITIVO
 -- Archivo: 04_pagos.sql
 -- Tabla de pagos de la factura (nombre conceptual: "pagos").
@@ -11,10 +11,10 @@ CREATE TABLE IF NOT EXISTS pagos (
   dominio_id            CHAR(36)     NOT NULL,
   venta_id              INT UNSIGNED NOT NULL,
   forma_pago            ENUM('efectivo','tarjeta','transferencia','nota_credito') NOT NULL,
-  monto                 DECIMAL(18,0) NOT NULL,
+  monto                 DECIMAL(18,2) NOT NULL,
   moneda_codigo         ENUM('DOP','USD','COP') NOT NULL DEFAULT 'DOP',
   nota_credito_id       VARCHAR(64)  NULL COMMENT 'dominio_id de la NC aplicada (solo forma_pago=nota_credito)',
-  vuelto                DECIMAL(18,0) NULL,
+  vuelto                DECIMAL(18,2) NULL,
   created_at            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uk_pagos_dominio (dominio_id),

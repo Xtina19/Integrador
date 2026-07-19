@@ -1,4 +1,4 @@
--- =============================================================================
+﻿-- =============================================================================
 -- LibroSys — Inventario DEFINITIVO
 -- Archivo: 09_funciones.sql
 -- Versión: INV-DB-1.0.0  |  Fecha: 2026-07-18
@@ -58,16 +58,16 @@ END$$
 -- -----------------------------------------------------------------------------
 -- fn_inv_valor_existencia
 -- Valor monetario de la existencia de un producto en un almacén
--- (stock * costo unitario, en DOP sin centavos).
+-- (stock * costo unitario, estándar DECIMAL(18,2)).
 -- -----------------------------------------------------------------------------
 DROP FUNCTION IF EXISTS fn_inv_valor_existencia$$
 CREATE FUNCTION fn_inv_valor_existencia(
   p_producto_id INT UNSIGNED,
   p_almacen_id  INT UNSIGNED
-) RETURNS DECIMAL(18,0)
+) RETURNS DECIMAL(18,2)
     READS SQL DATA
 BEGIN
-  DECLARE v_valor DECIMAL(18,0) DEFAULT 0;
+  DECLARE v_valor DECIMAL(18,2) DEFAULT 0;
 
   SELECT COALESCE(i.stock * p.costo, 0) INTO v_valor
   FROM inventario i

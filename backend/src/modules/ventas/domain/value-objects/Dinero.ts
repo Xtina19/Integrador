@@ -1,9 +1,14 @@
 import type { MonedaCodigo } from '../enums'
 import { VentasDomainError } from '../errors/VentasDomainError'
 
+/** Redondeo bancario a 2 decimales (estándar monetario ERP: DECIMAL(18,2)). */
+export function roundMoney(monto: number): number {
+  return Math.round((monto + Number.EPSILON) * 100) / 100
+}
+
 /**
  * Dinero del documento.
- * Operación diaria DOP: montos enteros (VEN-DATA). Centavos solo con justificación (p. ej. conversión).
+ * Estándar global: importes con hasta 2 decimales (centavos).
  */
 export class Dinero {
   private constructor(
@@ -11,22 +16,23 @@ export class Dinero {
     readonly moneda: MonedaCodigo,
   ) {}
 
-  static of(monto: number, moneda: MonedaCodigo, opts?: { permitirDecimales?: boolean }): Dinero {
+  static of(monto: number, moneda: MonedaCodigo, _opts?: { permitirDecimales?: boolean }): Dinero {
     if (!Number.isFinite(monto)) {
       throw new VentasDomainError('INVALID_MONEY', 'El monto no es un número válido.', { monto, moneda })
     }
     if (monto < 0) {
       throw new VentasDomainError('INVALID_MONEY', 'El monto no puede ser negativo.', { monto, moneda })
     }
-    const permitirDecimales = opts?.permitirDecimales === true
-    if (moneda === 'DOP' && !permitirDecimales && !Number.isInteger(monto)) {
+    const scaled = roundMoney(monto)
+    // Rechaza más de 2 decimales de precisión efectiva (ruido float)
+    if (Math.abs(monto - scaled) > 0.001) {
       throw new VentasDomainError(
         'INVALID_MONEY',
-        'En DOP de operación diaria el monto debe ser entero (sin centavos).',
+        'El monto no puede tener más de 2 decimales.',
         { monto, moneda },
       )
     }
-    return new Dinero(monto, moneda)
+    return new Dinero(scaled, moneda)
   }
 
   static cero(moneda: MonedaCodigo): Dinero {
@@ -35,7 +41,7 @@ export class Dinero {
 
   add(other: Dinero): Dinero {
     this.assertSameCurrency(other)
-    return Dinero.of(this.monto + other.monto, this.moneda, { permitirDecimales: !Number.isInteger(this.monto) || !Number.isInteger(other.monto) })
+    return Dinero.of(this.monto + other.monto, this.moneda)
   }
 
   subtract(other: Dinero): Dinero {
@@ -47,9 +53,7 @@ export class Dinero {
         right: other.monto,
       })
     }
-    return Dinero.of(result, this.moneda, {
-      permitirDecimales: !Number.isInteger(this.monto) || !Number.isInteger(other.monto),
-    })
+    return Dinero.of(result, this.moneda)
   }
 
   equals(other: Dinero): boolean {

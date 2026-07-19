@@ -9,10 +9,11 @@ import { Button } from '@/components/ui/Button'
 import { purchaseStatusLabels } from '@/constants/stateMachines'
 import { validatePurchaseOrderCreate } from '@/business-rules/validators'
 import { trim } from '@/utils/formValidation'
-import { nationalSupplierNames, internationalSupplierNames, currencyCodes } from '@/mocks/mockAdmin'
-import { posProducts } from '@/mocks/mockVentas'
 import { useERP } from '@/store/ERPProvider'
 import { useToast } from '@/context/ToastContext'
+import { useComprasCatalogos } from '@/modules/compras/hooks/useComprasCatalogos'
+import { purchaseStatusVariants } from '@/modules/compras/constants/comprasUi'
+import { formatMoney } from '@/lib/money'
 
 interface PurchaseOrderRecordDialogProps {
   order: PurchaseOrder | null
@@ -20,15 +21,6 @@ interface PurchaseOrderRecordDialogProps {
   open: boolean
   onClose: () => void
   onEdit: () => void
-}
-
-const purchaseStatusVariants: Record<string, 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
-  draft: 'neutral',
-  pending: 'warning',
-  approved: 'info',
-  received: 'success',
-  finalized: 'success',
-  cancelled: 'danger',
 }
 
 export function PurchaseOrderRecordDialog({
@@ -40,6 +32,7 @@ export function PurchaseOrderRecordDialog({
 }: PurchaseOrderRecordDialogProps) {
   const { state, updatePurchaseOrder } = useERP()
   const { showSuccess } = useToast()
+  const catalog = useComprasCatalogos()
   const [error, setError] = useState('')
   const [form, setForm] = useState({
     supplier: '',
@@ -61,8 +54,9 @@ export function PurchaseOrderRecordDialog({
     setError('')
   }, [order, mode, open])
 
-  const supplierOptions =
-    form.purchaseType === 'international' ? internationalSupplierNames : nationalSupplierNames
+  const supplierOptions = catalog.suppliersForType(form.purchaseType).map((p) => p.nombre)
+  const productOptions = catalog.productos.map((p) => ({ value: p.titulo, label: p.titulo }))
+  const currencyOptions = catalog.currencyCodes
 
   const validation = useMemo(
     () =>
@@ -85,8 +79,8 @@ export function PurchaseOrderRecordDialog({
   const total = lines.reduce((s, l) => s + l.qty * l.unitCost, 0)
   const canEdit = order.status === 'draft' || order.status === 'pending'
 
-  function handleSave() {
-    const result = updatePurchaseOrder({
+  async function handleSave() {
+    const result = await updatePurchaseOrder({
       orderId: order!.id,
       supplier: trim(form.supplier),
       date: form.date,
@@ -137,9 +131,8 @@ export function PurchaseOrderRecordDialog({
             <DetailRow
               label="Total"
               value={
-                <span className="font-semibold text-corporate">
-                  {order.currency === 'DOP' ? 'RD$' : order.currency === 'EUR' ? '€' : '$'}
-                  {order.total.toLocaleString()}
+                <span className="font-semibold text-corporate tabular-nums">
+                  {formatMoney(order.total, order.currency)}
                 </span>
               }
             />
@@ -161,14 +154,16 @@ export function PurchaseOrderRecordDialog({
                 columns={[
                   { key: 'product', header: 'Producto', render: (l) => <span className="font-medium">{(l as unknown as PurchaseOrderLine).product}</span> },
                   { key: 'qty', header: 'Cantidad', render: (l) => (l as unknown as PurchaseOrderLine).qty },
-                  { key: 'unitCost', header: 'Costo unit.', render: (l) => (l as unknown as PurchaseOrderLine).unitCost.toLocaleString() },
+                  { key: 'unitCost', header: 'Costo unit.', render: (l) => formatMoney((l as unknown as PurchaseOrderLine).unitCost, order.currency) },
                   {
                     key: 'subtotal',
                     header: 'Subtotal',
                     render: (l) => {
                       const line = l as unknown as PurchaseOrderLine
                       return (
-                        <span className="font-semibold text-corporate">{(line.qty * line.unitCost).toLocaleString()}</span>
+                        <span className="font-semibold text-corporate tabular-nums">
+                          {formatMoney(line.qty * line.unitCost, order.currency)}
+                        </span>
                       )
                     },
                   },
@@ -191,11 +186,11 @@ export function PurchaseOrderRecordDialog({
               value={form.purchaseType}
               onChange={(e) => {
                 const purchaseType = e.target.value as PurchaseType
-                const names = purchaseType === 'international' ? internationalSupplierNames : nationalSupplierNames
+                const names = catalog.suppliersForType(purchaseType)
                 setForm({
                   ...form,
                   purchaseType,
-                  supplier: names[0] ?? '',
+                  supplier: names[0]?.nombre ?? '',
                   currency: purchaseType === 'international' ? 'EUR' : 'DOP',
                 })
               }}
@@ -215,7 +210,7 @@ export function PurchaseOrderRecordDialog({
               label="Moneda *"
               value={form.currency}
               onChange={(e) => setForm({ ...form, currency: e.target.value })}
-              options={currencyCodes.map((c) => ({ value: c, label: c }))}
+              options={currencyOptions.map((c) => ({ value: c, label: c }))}
             />
           </div>
           <div>
@@ -224,9 +219,18 @@ export function PurchaseOrderRecordDialog({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() =>
-                  setLines((prev) => [...prev, { product: posProducts[0]?.title ?? '', qty: 1, unitCost: 0 }])
-                }
+                onClick={() => {
+                  const p = catalog.productos[0]
+                  setLines((prev) => [
+                    ...prev,
+                    {
+                      product: p?.titulo ?? '',
+                      qty: 1,
+                      unitCost: p ? Number(p.costo.toFixed(2)) : 0,
+                      productoId: p?.id,
+                    },
+                  ])
+                }}
               >
                 Agregar línea
               </Button>
@@ -238,10 +242,22 @@ export function PurchaseOrderRecordDialog({
                     <Select
                       label="Producto"
                       value={line.product}
-                      onChange={(e) =>
-                        setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, product: e.target.value } : l)))
-                      }
-                      options={posProducts.map((p) => ({ value: p.title, label: p.title }))}
+                      onChange={(e) => {
+                        const prod = catalog.productos.find((p) => p.titulo === e.target.value)
+                        setLines((prev) =>
+                          prev.map((l, i) =>
+                            i === idx
+                              ? {
+                                  ...l,
+                                  product: e.target.value,
+                                  productoId: prod?.id,
+                                  unitCost: prod ? Number(prod.costo.toFixed(2)) : l.unitCost,
+                                }
+                              : l
+                          )
+                        )
+                      }}
+                      options={productOptions}
                     />
                   </div>
                   <div className="md:col-span-2">
@@ -249,10 +265,13 @@ export function PurchaseOrderRecordDialog({
                       label="Cantidad"
                       type="number"
                       min={1}
+                      step={1}
                       value={line.qty}
                       onChange={(e) =>
                         setLines((prev) =>
-                          prev.map((l, i) => (i === idx ? { ...l, qty: Number(e.target.value) || 0 } : l))
+                          prev.map((l, i) =>
+                            i === idx ? { ...l, qty: Math.round(Number(e.target.value) || 0) } : l
+                          )
                         )
                       }
                     />
@@ -262,10 +281,15 @@ export function PurchaseOrderRecordDialog({
                       label="Costo unit."
                       type="number"
                       min={0}
+                      step={0.01}
                       value={line.unitCost}
                       onChange={(e) =>
                         setLines((prev) =>
-                          prev.map((l, i) => (i === idx ? { ...l, unitCost: Number(e.target.value) || 0 } : l))
+                          prev.map((l, i) =>
+                            i === idx
+                              ? { ...l, unitCost: Number(Number(e.target.value).toFixed(2)) || 0 }
+                              : l
+                          )
                         )
                       }
                     />
@@ -283,8 +307,8 @@ export function PurchaseOrderRecordDialog({
                 </div>
               ))}
             </div>
-            <p className="text-sm font-semibold text-corporate mt-4 text-right">
-              Total: {form.currency} {total.toLocaleString()}
+            <p className="text-sm font-semibold text-corporate mt-4 text-right tabular-nums">
+              Total: {formatMoney(total, form.currency)}
             </p>
           </div>
         </div>

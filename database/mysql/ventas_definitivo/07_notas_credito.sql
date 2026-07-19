@@ -1,4 +1,4 @@
--- =============================================================================
+﻿-- =============================================================================
 -- LibroSys — Ventas DEFINITIVO
 -- Archivo: 07_notas_credito.sql
 -- =============================================================================
@@ -14,11 +14,11 @@ CREATE TABLE IF NOT EXISTS notas_credito (
   fecha                 DATETIME     NOT NULL,
   usuario_id            INT UNSIGNED NOT NULL,
   usuario_dominio_id    VARCHAR(64)  NOT NULL,
-  monto                 DECIMAL(18,0) NOT NULL,
+  monto                 DECIMAL(18,2) NOT NULL,
   moneda_codigo         ENUM('DOP','USD','COP') NOT NULL DEFAULT 'DOP',
   motivo                VARCHAR(500) NOT NULL,
   estado                ENUM('emitida','parcialmente_aplicada','aplicada','anulada') NOT NULL DEFAULT 'emitida',
-  monto_aplicado        DECIMAL(18,0) NOT NULL DEFAULT 0,
+  monto_aplicado        DECIMAL(18,2) NOT NULL DEFAULT 0,
   created_at            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS nota_credito_aplicaciones (
   nota_credito_id       INT UNSIGNED NOT NULL,
   venta_destino_id      INT UNSIGNED NOT NULL,
   venta_destino_dominio_id CHAR(36) NULL,
-  monto_aplicado        DECIMAL(18,0) NOT NULL,
+  monto_aplicado        DECIMAL(18,2) NOT NULL,
   fecha                 DATETIME     NOT NULL,
   PRIMARY KEY (id),
   KEY idx_nc_aplicaciones_nc (nota_credito_id),

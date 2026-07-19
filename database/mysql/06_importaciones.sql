@@ -234,15 +234,35 @@ CREATE TABLE IF NOT EXISTS caja (
 
 -- -----------------------------------------------------------------------------
 -- FK recepción internacional → embarque / factura (opcional, diferida)
+-- Las columnas factura_internacional_id / embarque_id ya existen en
+-- compras_definitivo/06_recepcion.sql (COM-DB-1.0.0). Solo se añaden FKs.
 -- -----------------------------------------------------------------------------
-ALTER TABLE recepcion
-  ADD COLUMN factura_internacional_id INT UNSIGNED NULL AFTER orden_compra_id,
-  ADD COLUMN embarque_id INT UNSIGNED NULL AFTER factura_internacional_id,
-  ADD KEY idx_recepcion_embarque (embarque_id),
-  ADD KEY idx_recepcion_factura_int (factura_internacional_id),
-  ADD CONSTRAINT fk_recepcion_factura_int
-    FOREIGN KEY (factura_internacional_id) REFERENCES factura_internacional (id)
-    ON UPDATE CASCADE ON DELETE RESTRICT,
-  ADD CONSTRAINT fk_recepcion_embarque
-    FOREIGN KEY (embarque_id) REFERENCES embarque (id)
-    ON UPDATE CASCADE ON DELETE RESTRICT;
+SET @fk_rec_fi := (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'recepcion'
+    AND CONSTRAINT_NAME = 'fk_recepcion_factura_int'
+);
+SET @sql_rec_fi := IF(
+  @fk_rec_fi = 0,
+  'ALTER TABLE recepcion ADD CONSTRAINT fk_recepcion_factura_int FOREIGN KEY (factura_internacional_id) REFERENCES factura_internacional (id) ON UPDATE CASCADE ON DELETE RESTRICT',
+  'SELECT 1'
+);
+PREPARE stmt_rec_fi FROM @sql_rec_fi;
+EXECUTE stmt_rec_fi;
+DEALLOCATE PREPARE stmt_rec_fi;
+
+SET @fk_rec_emb := (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'recepcion'
+    AND CONSTRAINT_NAME = 'fk_recepcion_embarque'
+);
+SET @sql_rec_emb := IF(
+  @fk_rec_emb = 0,
+  'ALTER TABLE recepcion ADD CONSTRAINT fk_recepcion_embarque FOREIGN KEY (embarque_id) REFERENCES embarque (id) ON UPDATE CASCADE ON DELETE RESTRICT',
+  'SELECT 1'
+);
+PREPARE stmt_rec_emb FROM @sql_rec_emb;
+EXECUTE stmt_rec_emb;
+DEALLOCATE PREPARE stmt_rec_emb;

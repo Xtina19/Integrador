@@ -2,9 +2,14 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
+const { traceId } = require('./middlewares/traceId');
+const { authPlaceholder } = require('./middlewares/authPlaceholder');
+const { errorHandler } = require('./middlewares/errorHandler');
+
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(traceId);
 
 const { getConnection } = require('./db');
 
@@ -35,6 +40,10 @@ app.use('/api/formas-pago', require('./routes/formasPago.routes'));
 app.use('/api/tasas-cambio', require('./routes/tasasCambio.routes'));
 app.use('/api/productos-legacy', require('./routes/productos'));
 
+app.use('/api/compras', authPlaceholder, require('./routes/compras'));
+// Alias REST alineado a Ventas (/api/v1/…) — mismo router, sin lógica duplicada
+app.use('/api/v1/compras', authPlaceholder, require('./routes/compras'));
+
 // Módulo Inventario (DDD / TypeScript) — conteos, transferencias, descartes, ajustes
 const { register } = require('tsx/cjs/api');
 register();
@@ -47,6 +56,8 @@ const {
   mountVentasModule,
 } = require('./src/modules/ventas/infrastructure/bootstrap/mountVentasModule.ts');
 mountVentasModule(app, inventarioComposition);
+
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));

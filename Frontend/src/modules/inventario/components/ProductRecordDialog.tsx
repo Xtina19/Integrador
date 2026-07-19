@@ -8,6 +8,7 @@ import { publisherNames } from '@/mocks/mockAdmin'
 import { validateProduct } from '@/business-rules/validators'
 import { trim } from '@/utils/formValidation'
 import { useERP } from '@/store/ERPProvider'
+import { formatDop } from '@/lib/money'
 
 interface ProductRecordDialogProps {
   product: Product | null
@@ -120,8 +121,8 @@ export function ProductRecordDialog({ product, mode, open, onClose, onEdit }: Pr
           <DetailRow label="Stock" value={<span className="font-semibold text-corporate">{product.stock}</span>} />
           <DetailRow label="Stock mínimo" value={product.minStock ?? '—'} />
           <DetailRow label="Ubicación" value={product.location} />
-          <DetailRow label="Costo" value={`RD$${(product.cost ?? 0).toLocaleString()}`} />
-          <DetailRow label="Precio" value={`RD$${(product.price ?? 0).toLocaleString()}`} />
+          <DetailRow label="Costo" value={formatDop(product.cost ?? 0)} />
+          <DetailRow label="Precio" value={formatDop(product.price ?? 0)} />
           <DetailRow label="Estado" value={<Badge variant={st.variant}>{st.label}</Badge>} />
         </div>
       ) : (
@@ -134,8 +135,8 @@ export function ProductRecordDialog({ product, mode, open, onClose, onEdit }: Pr
           <Input label="Stock *" type="number" min={0} value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
           <Input label="Stock mínimo *" type="number" min={0} value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
           <Input label="Ubicación *" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className="md:col-span-2" />
-          <Input label="Costo *" type="number" min={0} value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
-          <Input label="Precio *" type="number" min={0} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+          <Input label="Costo *" type="number" min={0} step="0.0001" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
+          <Input label="Precio *" type="number" min={0} step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
         </div>
       )}
     </FormDialog>

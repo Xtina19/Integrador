@@ -1,26 +1,39 @@
 const { getMysqlPool } = require('../db-mysql')
 
 const SELECT = `
-  SELECT p.*, c.nombre AS categoria_nombre, e.nombre AS editorial_nombre
+  SELECT p.*, c.nombre AS categoria_nombre, e.nombre AS editorial_nombre,
+         m.codigo AS moneda_compra_codigo
   FROM productos p
   LEFT JOIN categorias c ON c.id = p.categoria_id
-  LEFT JOIN editoriales e ON e.id = p.editorial_id`
+  LEFT JOIN editoriales e ON e.id = p.editorial_id
+  LEFT JOIN monedas m ON m.id = p.moneda_compra_id`
 
 function mapRow(r) {
   const estado = r.estado === 'activo' ? 'active' : 'inactive'
+  const monedaCodigo =
+    r.moneda_compra_codigo ||
+    (Number(r.moneda_compra_id) === 2 ? 'USD' : Number(r.moneda_compra_id) === 3 ? 'EUR' : 'DOP')
   return {
     id: String(r.id),
     code: r.codigo,
     isbn: r.isbn || '',
+    barcode: r.codigo_barras || '',
     title: r.titulo,
     author: r.autor || '',
+    language: r.idioma || 'es',
+    originCountry: r.pais_origen || '',
     category: r.categoria_nombre || '',
     categoryId: r.categoria_id ? String(r.categoria_id) : '',
+    subcategory: r.subcategoria || '',
     publisher: r.editorial_nombre || '',
     publisherId: r.editorial_id ? String(r.editorial_id) : '',
     price: Number(r.precio || 0),
     cost: Number(r.costo || 0),
-    currency: 'DOP',
+    averageCost: Number(r.costo_promedio ?? r.costo ?? 0),
+    weightKg: r.peso_kg != null ? Number(r.peso_kg) : null,
+    dimensions: r.dimensiones || '',
+    currency: monedaCodigo,
+    purchaseCurrencyId: r.moneda_compra_id != null ? String(r.moneda_compra_id) : '1',
     status: estado,
     createdAt: r.created_at,
     updatedAt: r.updated_at,

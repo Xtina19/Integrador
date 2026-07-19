@@ -56,11 +56,11 @@ INSERT INTO editoriales (id, codigo, nombre, pais, contacto, email, tipo_contrat
 (4, 'ED-ALF',   'Alfaguara',            'España',    'Elena Torres',   'export@alfaguara.com',    'Importación',  'activo');
 
 INSERT INTO proveedores (id, codigo, nombre, contacto, email, telefono, pais, tipo, estado) VALUES
-(1, 'PROV-001', 'Distribuidora Nacional RD',  'Pedro Díaz',    'pedro@distnacional.com',   '809-555-1001', 'República Dominicana', 'nacional',       'activo'),
-(2, 'PROV-002', 'Planeta Internacional',      'Carlos Ruiz',   'intl@planeta.com',         '+34-555-2001', 'España',               'internacional',  'activo'),
-(3, 'PROV-003', 'Alfaguara Export',           'Elena Torres',  'export@alfaguara.com',     '+34-555-2002', 'España',               'internacional',  'activo'),
-(4, 'PROV-004', 'Penguin Random House',       'John Smith',    'intl@prh.com',             '+1-555-2003',  'USA',                  'internacional',  'activo'),
-(5, 'PROV-005', 'Editorial Caribe',           'Rosa Méndez',   'compras@caribe.com',       '809-555-1005', 'República Dominicana', 'nacional',       'activo');
+(1, 'PROV-CORR', 'Distribuidora Corripio',               'Pedro Díaz',      'compras@corripio.com.do',          '809-565-3111',  'República Dominicana', 'nacional',       'activo'),
+(2, 'PROV-PLAN', 'Editorial Planeta',                    'Carlos Ruiz',     'export@planeta.es',                '+34-93-492-8000','España',              'internacional',  'activo'),
+(3, 'PROV-SANT', 'Santillana Dominicana',                'Laura Méndez',    'pedidos@santillana.com.do',        '809-565-2200',  'República Dominicana', 'nacional',       'activo'),
+(4, 'PROV-PRH',  'Penguin Random House Grupo Editorial', 'John Smith',      'latam@penguinrandomhouse.com',     '+1-212-782-9000','USA',                 'internacional',  'activo'),
+(5, 'PROV-NOR',  'Editorial Norma',                      'Patricia Gómez',  'rd@norma.com',                     '809-547-8800',  'Colombia',             'mixto',          'activo');
 
 INSERT INTO sucursales (id, codigo, nombre, ciudad, direccion, telefono, estado) VALUES
 (1, 'SUC-CTR', 'Sucursal Central',    'Santo Domingo', 'Av. Winston Churchill 123', '809-555-3001', 'activa'),
@@ -113,79 +113,12 @@ INSERT INTO inventario (id, producto_id, almacen_id, stock, stock_minimo, ubicac
 (10, 10, 1,  55, 10, 'Pasillo E - Estante 1','normal');
 
 -- =============================================================================
--- COMPRAS
+-- COMPRAS / IMPORTACIONES (documentos OC·REC·FP y bridge FI/embarque)
+-- Semilla: compras_definitivo/11_seed_joselito.sql
+-- Bridge:  compras_definitivo/12_seed_importaciones_bridge.sql
+-- Ambos se ejecutan desde install_all.sql DESPUÉS de este archivo
+-- (requieren productos/usuarios/proveedores ya insertados aquí).
 -- =============================================================================
-
--- OC Nacional
-INSERT INTO orden_compra (id, codigo, proveedor_id, moneda_id, usuario_id, tipo_compra, fecha_orden, subtotal, impuestos, total, cantidad_items, estado) VALUES
-(1, 'OC-2026-001', 1, 1, 2, 'nacional',       '2026-05-10', 1850.00, 333.00, 2183.00, 150, 'recibida'),
-(2, 'OC-INT-2026-091', 2, 3, 2, 'internacional','2026-05-20', 45200.00, 0.00, 45200.00, 840, 'aprobada'),
-(3, 'OC-INT-2026-090', 3, 3, 2, 'internacional','2026-06-05', 12800.00, 0.00, 12800.00, 240, 'aprobada');
-
-INSERT INTO detalle_orden_compra (id, orden_compra_id, producto_id, cantidad, costo_unitario, subtotal) VALUES
-(1, 1, 4, 100, 4.50, 450.00),
-(2, 1, 9,  50, 5.20, 260.00),
-(3, 2, 1, 200, 8.50, 1700.00),
-(4, 2, 2, 300, 6.80, 2040.00),
-(5, 2, 4, 340, 4.50, 1530.00),
-(6, 3, 3, 240, 53.33, 12800.00);
-
-INSERT INTO factura_proveedor (id, codigo, orden_compra_id, proveedor_id, moneda_id, numero_factura, fecha_factura, monto, estado_pago) VALUES
-(1, 'FP-2026-001', 1, 1, 1, 'FAC-DN-4587', '2026-05-12', 2183.00, 'pagada');
-
-INSERT INTO recepcion (id, codigo, orden_compra_id, proveedor_id, usuario_id, tipo_compra, fecha_recepcion, estado, total_items_esperados, total_items_recibidos) VALUES
-(1, 'REC-2026-001', 1, 1, 2, 'nacional', '2026-05-15', 'completa', 150, 150);
-
-INSERT INTO detalle_recepcion (id, recepcion_id, producto_id, cantidad_esperada, cantidad_recibida, costo_unitario) VALUES
-(1, 1, 4, 100, 100, 4.50),
-(2, 1, 9,  50,  50,  5.20);
-
--- =============================================================================
--- IMPORTACIONES
--- =============================================================================
-
-INSERT INTO factura_internacional (id, codigo, orden_compra_id, proveedor_id, moneda_id, fecha_factura, monto, estado_pago, etapa_importacion) VALUES
-(1, 'FI-2026-045', 2, 2, 3, '2026-05-25', 45200.00, 'pendiente', 'costos_flete'),
-(2, 'FI-2026-044', 3, 3, 3, '2026-06-08', 12800.00, 'pagada',    'costeo_libro');
-
-INSERT INTO consolidacion (id, codigo, nombre, estado, total_cajas, observaciones, fecha_creacion) VALUES
-(1, 'CON-2026-008', 'Consolidación España Q2 2026', 'activa', 84, 'Consolidación marítima desde España', '2026-05-28'),
-(2, 'CON-2026-007', 'Consolidación Alfaguara Junio', 'cerrada', 12, 'Embarque aéreo cerrado',            '2026-06-10');
-
-INSERT INTO embarque (id, codigo, factura_internacional_id, orden_compra_id, proveedor_id, consolidacion_id, tipo_transporte, origen, destino, fecha_salida, fecha_llegada_estimada, cantidad_cajas, estado, observaciones) VALUES
-(1, 'EMB-012', 1, 2, 2, 1, 'maritimo', 'Barcelona, ES', 'Santo Domingo, RD', '2026-05-28', '2026-06-25', 84, 'costeado', 'Contenedor refrigerado — prioridad alta'),
-(2, 'EMB-011', 2, 3, 3, 2, 'aereo',    'Madrid, ES',    'Santo Domingo, RD', '2026-06-10', '2026-06-12', 12, 'recibido', 'Envío urgente de novedades editoriales');
-
-INSERT INTO consolidacion_embarque (consolidacion_id, embarque_id) VALUES
-(1, 1),
-(2, 2);
-
-INSERT INTO costos_embarque (id, embarque_id, moneda_id, flete_internacional, seguro, aduana, transporte_local, gastos_portuarios, manipulacion, otros) VALUES
-(1, 1, 1, 12400.00, 2100.00, 8900.00, 800.00, 450.00, 250.00, 0.00),
-(2, 2, 1,  3200.00,  450.00, 1800.00, 120.00,  50.00,  30.00, 0.00);
-
-INSERT INTO costeo_libro (id, embarque_id, producto_id, orden_compra_id, detalle_orden_id, costo_producto, flete_asignado) VALUES
-(1, 1, 1, 2, 3, 8.5000, 1.2000),
-(2, 1, 2, 2, 4, 6.8000, 0.9500),
-(3, 1, 4, 2, 5, 4.5000, 0.6500),
-(4, 2, 3, 3, 6, 9.2000, 1.3500);
-
-INSERT INTO pallet (id, codigo, embarque_id, cantidad_cajas, peso_kg, ubicacion) VALUES
-(1, 'PAL-012-A', 1, 42, 680.00, 'Puerto SD — Muelle 3'),
-(2, 'PAL-012-B', 1, 42, 695.00, 'Puerto SD — Muelle 3'),
-(3, 'PAL-011-A', 2, 12, 216.00, 'Almacén Central — Zona A');
-
-INSERT INTO caja (id, codigo, pallet_id, embarque_id, peso_kg, ubicacion) VALUES
-(1, 'CAJ-012-01', 1, 1, 16.20, 'Puerto SD — Muelle 3'),
-(2, 'CAJ-012-02', 1, 1, 16.50, 'Puerto SD — Muelle 3'),
-(3, 'CAJ-011-01', 3, 2, 18.00, 'Almacén Central — Zona A');
-
--- Recepción internacional pendiente (embarque finalizado)
-INSERT INTO recepcion (id, codigo, orden_compra_id, factura_internacional_id, embarque_id, proveedor_id, usuario_id, tipo_compra, fecha_recepcion, estado, total_items_esperados, total_items_recibidos) VALUES
-(2, 'REC-INT-2026-001', 3, 2, 2, 3, 3, 'internacional', '2026-06-13', 'pendiente', 240, 0);
-
-INSERT INTO detalle_recepcion (id, recepcion_id, producto_id, cantidad_esperada, cantidad_recibida, costo_unitario) VALUES
-(3, 2, 3, 240, 0, 53.33);
 
 -- =============================================================================
 -- VENTAS
@@ -248,7 +181,7 @@ INSERT INTO configuracion (id, clave, valor, tipo_dato, modulo, descripcion) VAL
 
 INSERT INTO notificaciones (id, usuario_id, tipo, titulo, mensaje, modulo, leida) VALUES
 (1, 3, 'info',    'Nuevo Embarque',        'EMB-012 registrado con costos asociados', 'importaciones', 0),
-(2, 2, 'success', 'Orden Aprobada',        'OC-INT-2026-091 lista para embarque',     'compras',       1),
+(2, 2, 'success', 'Orden Aprobada',        'OC-INT-2026-000004 lista para embarque',  'compras',       1),
 (3, 1, 'warning', 'Stock Bajo',            'El código Da Vinci bajo mínimo en Santiago','inventario',   0);
 
 INSERT INTO correo_notificacion (id, notificacion_id, destinatario_email, asunto, cuerpo, estado_envio, fecha_envio) VALUES
@@ -259,8 +192,8 @@ INSERT INTO correo_notificacion (id, notificacion_id, destinatario_email, asunto
 -- =============================================================================
 
 INSERT INTO auditoria (id, modulo, entidad, entidad_id, accion, usuario_id, ip_address, descripcion, fecha_evento) VALUES
-(1, 'compras',       'orden_compra',        '2',         'crear',      2, '192.168.1.10', 'Orden internacional OC-INT-2026-091 creada',       '2026-05-20 09:00:00'),
-(2, 'importaciones', 'embarque',            '1',         'crear',      3, '192.168.1.12', 'Embarque EMB-012 registrado',                    '2026-05-28 09:10:00'),
+(1, 'compras',       'orden_compra',        '4',         'crear',      2, '192.168.1.10', 'Orden internacional OC-INT-2026-000004 creada',  '2026-07-01 09:00:00'),
+(2, 'importaciones', 'embarque',            '1',         'crear',      3, '192.168.1.12', 'Embarque EMB-012 registrado',                    '2026-07-10 09:10:00'),
 (3, 'ventas',        'venta',               '1',         'crear',      1, '192.168.1.5',  'Venta VTA-2026-001 confirmada',                  '2026-06-01 10:30:00');
 
 INSERT INTO auditoria_cambio (id, auditoria_id, campo, valor_anterior, valor_nuevo) VALUES

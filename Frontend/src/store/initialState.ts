@@ -30,6 +30,7 @@ import { createNotification, createActivity } from '@/services/activityService'
 import { salesStats } from '@/mocks/mockVentas'
 import { transfers as seedTransfers, transferHistory as seedTransferHistory } from '@/mocks/mockCore'
 import type { PurchaseStatus, TransferStatus, ImportStatus, EventStatus } from '@/types/domain'
+import { isApiEnabled } from '@/config/api'
 
 export interface ERPState {
   products: Product[]
@@ -136,6 +137,8 @@ function mapLegacyPurchaseStatus(s: string): PurchaseStatus {
 }
 
 export function createInitialERPState(): ERPState {
+  const comprasFromApi = isApiEnabled('compras')
+
   return {
     products: seedProducts.map((p) => {
       const low = lowStockProducts.find((l) => l.id === p.id)
@@ -145,16 +148,21 @@ export function createInitialERPState(): ERPState {
         status: p.status as Product['status'],
       }
     }),
-    purchaseOrders: [
-      ...seedOrders.map((o) => ({
-        ...o,
-        status: mapLegacyPurchaseStatus(o.status),
-        currency: 'DOP',
-        purchaseType: 'national' as const,
-      })),
-      ...seedInternationalOrders,
-    ],
-    receptions: seedReceptions.map((r) => ({ ...r, purchaseType: 'national' as const })),
+    // FASE 6: con API Compras activa no se sembrán mocks; ERPProvider hidrata desde /api/compras
+    purchaseOrders: comprasFromApi
+      ? []
+      : [
+          ...seedOrders.map((o) => ({
+            ...o,
+            status: mapLegacyPurchaseStatus(o.status),
+            currency: 'DOP',
+            purchaseType: 'national' as const,
+          })),
+          ...seedInternationalOrders,
+        ],
+    receptions: comprasFromApi
+      ? []
+      : seedReceptions.map((r) => ({ ...r, purchaseType: 'national' as const })),
     transfers: seedTransfers.map((t) => ({
       id: t.id,
       origin: t.origin,

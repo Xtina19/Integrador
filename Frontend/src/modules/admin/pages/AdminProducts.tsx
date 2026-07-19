@@ -16,6 +16,7 @@ import { categoriasApi } from '@/services/api/categoriasApi'
 import { editorialesApi } from '@/services/api/editorialesApi'
 import { getFriendlyErrorMessage } from '@/services/http'
 import { useToast } from '@/context/ToastContext'
+import { formatMoney } from '@/lib/money'
 
 type Product = {
   id: string
@@ -244,7 +245,7 @@ export function AdminProducts() {
               {
                 key: 'price',
                 header: 'Precio',
-                render: (p) => <span className="font-semibold text-corporate">RD${p.price.toLocaleString()}</span>,
+                render: (p) => <span className="font-semibold text-corporate tabular-nums">{formatMoney(p.price, p.currency)}</span>,
               },
               { key: 'currency', header: 'Moneda', render: (p) => <Badge variant="gold">{p.currency}</Badge> },
               {
@@ -293,7 +294,7 @@ export function AdminProducts() {
             <DetailRow label="Autor" value={selected.author} />
             <DetailRow label="Categoría" value={<Badge variant="neutral">{selected.category}</Badge>} />
             <DetailRow label="Editorial" value={selected.publisher} />
-            <DetailRow label="Precio" value={<span className="font-semibold text-corporate">RD${selected.price.toLocaleString()}</span>} />
+            <DetailRow label="Precio" value={<span className="font-semibold text-corporate tabular-nums">{formatMoney(selected.price, selected.currency)}</span>} />
             <DetailRow label="Moneda" value={<Badge variant="gold">{selected.currency}</Badge>} />
             <DetailRow label="Estado" value={<Badge variant={statusMap[selected.status]?.variant || 'neutral'}>{statusMap[selected.status]?.label}</Badge>} />
           </>
@@ -311,7 +312,7 @@ export function AdminProducts() {
             <Input label="Autor" value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} className="md:col-span-2" />
             <Select label="Categoría" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} options={categoryNames.map((c) => ({ value: c, label: c }))} />
             <Select label="Editorial" value={form.publisher} onChange={(e) => setForm({ ...form, publisher: e.target.value })} options={publisherNames.map((p) => ({ value: p, label: p }))} />
-            <Input label="Precio" type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+            <Input label="Precio" type="number" min={0} step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
             <Select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={statusOptions} />
           </div>
           </>

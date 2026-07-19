@@ -32,10 +32,14 @@ export interface PurchaseOrderLine {
   product: string
   qty: number
   unitCost: number
+  /** Id numérico de producto cuando la fuente es API Compras. */
+  productoId?: number
 }
 
 export interface PurchaseOrder {
   id: string
+  /** Id numérico BD cuando VITE_USE_API_COMPRAS. */
+  dbId?: number
   supplier: string
   date: string
   currency: string
@@ -45,6 +49,10 @@ export interface PurchaseOrder {
   purchaseType: PurchaseType
   lines?: PurchaseOrderLine[]
   internationalInvoiceId?: string
+  proveedorId?: number
+  condicionPagoId?: number
+  monedaId?: number
+  sucursalId?: number
 }
 
 export interface InternationalInvoice {
@@ -108,7 +116,10 @@ export interface BookCostingEntry {
 
 export interface Reception {
   id: string
+  /** Id numérico BD cuando VITE_USE_API_COMPRAS. */
+  dbId?: number
   orderId: string
+  orderDbId?: number
   supplier: string
   date: string
   items: number

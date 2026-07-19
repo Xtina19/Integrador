@@ -25,6 +25,7 @@ import { Table } from '@/components/ui/Table'
 import { useERP } from '@/store/ERPProvider'
 import { dashboardService } from '@/services/dashboardService'
 import { refreshActivityTimes } from '@/services/activityService'
+import { formatDop } from '@/lib/money'
 
 const CATEGORY_ORDER = ['Literatura', 'Académico', 'Infantil', 'Cómics', 'Otros']
 
@@ -90,13 +91,13 @@ export function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <StatCard
           title="Ventas del Mes"
-          value={`RD$${metrics.monthlySales.toLocaleString()}`}
-          detail={`Ticket prom. RD$${metrics.avgTicket}`}
+          value={formatDop(metrics.monthlySales)}
+          detail={`Ticket prom. ${formatDop(metrics.avgTicket)}`}
           icon={<TrendingUp size={22} />}
         />
         <StatCard
           title="Compras del Mes"
-          value={`RD$${metrics.monthlyPurchases.toLocaleString()}`}
+          value={formatDop(metrics.monthlyPurchases)}
           detail={`${metrics.openOrders} órdenes abiertas`}
           icon={<ShoppingCart size={22} />}
         />

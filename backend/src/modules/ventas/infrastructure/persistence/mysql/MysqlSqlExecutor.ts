@@ -56,6 +56,7 @@ export class MysqlSqlExecutor implements SqlExecutor {
             database: (config as MysqlPoolConfig).database,
             waitForConnections: true,
             connectionLimit: (config as MysqlPoolConfig).connectionLimit ?? 10,
+            charset: 'utf8mb4',
             namedPlaceholders: false,
           })
   }

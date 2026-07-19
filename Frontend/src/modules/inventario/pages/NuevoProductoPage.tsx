@@ -77,7 +77,7 @@ export function NuevoProductoPage() {
         <Select label="Categoría *" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} options={categories.map((c) => ({ value: c, label: c }))} />
         <Select label="Editorial *" value={form.publisher} onChange={(e) => setForm({ ...form, publisher: e.target.value })} options={publisherNames.map((p) => ({ value: p, label: p }))} />
         <Select label="Proveedor *" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} options={adminSuppliers.map((s) => ({ value: s.name, label: s.name }))} />
-        <Input label="Costo *" type="number" min={0} value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
+        <Input label="Costo *" type="number" min={0} step="0.0001" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
         <Input label="Precio venta *" type="number" min={0} step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
         <Input label="Stock inicial *" type="number" min={0} value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
         <Input label="Stock mínimo *" type="number" min={0} value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} />

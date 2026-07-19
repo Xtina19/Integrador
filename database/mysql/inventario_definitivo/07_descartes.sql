@@ -1,4 +1,4 @@
--- =============================================================================
+﻿-- =============================================================================
 -- LibroSys — Inventario DEFINITIVO
 -- Archivo: 07_descartes.sql
 -- Versión: INV-DB-1.0.0  |  Fecha: 2026-07-18
@@ -89,7 +89,7 @@ CREATE TABLE descarte_detalle (
   descarte_id         INT UNSIGNED NOT NULL,
   producto_id         INT UNSIGNED NOT NULL,
   cantidad            INT NOT NULL,
-  costo               DECIMAL(18,0) NOT NULL DEFAULT 0,
+  costo               DECIMAL(18,4) NOT NULL DEFAULT 0.0000,
   motivo_codigo       VARCHAR(40)   NOT NULL,
   observacion         VARCHAR(255)  NULL,
   dominio_id          CHAR(36)      NULL,

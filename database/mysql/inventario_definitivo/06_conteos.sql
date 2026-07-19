@@ -1,4 +1,4 @@
--- =============================================================================
+﻿-- =============================================================================
 -- LibroSys — Inventario DEFINITIVO
 -- Archivo: 06_conteos.sql
 -- Versión: INV-DB-1.0.0  |  Fecha: 2026-07-18
@@ -89,7 +89,7 @@ CREATE TABLE snapshot_conteo (
   conteo_id           INT UNSIGNED NOT NULL,
   producto_id         INT UNSIGNED NOT NULL,
   cantidad_teorica    INT NOT NULL,
-  costo_referencia    DECIMAL(18,0) NULL,
+  costo_referencia    DECIMAL(18,4) NULL,
   version             INT UNSIGNED NOT NULL DEFAULT 1,
   dominio_id          CHAR(36) NULL,
   created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

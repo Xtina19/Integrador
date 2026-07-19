@@ -45,6 +45,4 @@ export function labelSucursalPreferida(id: string): string {
   return CLIENTE_SUCURSAL_OPTIONS.find((o) => o.value === id)?.label ?? id
 }
 
-export function formatDop(n: number): string {
-  return new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP', maximumFractionDigits: 0 }).format(n)
-}
+export { formatDop } from '@/lib/money'

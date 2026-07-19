@@ -19,6 +19,7 @@ import { useStaffAssignment } from '@/context/StaffAssignmentContext'
 import { STAFF_AREA_LABELS, type StaffAssignmentRecord } from '@/types/staffAssignment'
 import { eventStatusLabels } from '@/constants/stateMachines'
 import type { EventStatus, LibroSysEvent } from '@/types/domain'
+import { formatDop } from '@/lib/money'
 
 type Tab = 'calendario' | 'presupuestos' | 'costos' | 'ingresos' | 'editoriales' | 'asignaciones'
 
@@ -306,9 +307,9 @@ export function Events() {
               data={eventBudgets}
               columns={[
                 { key: 'eventName', header: 'Evento', render: (b) => <span className="font-medium">{b.eventName}</span> },
-                { key: 'budget', header: 'Presupuesto', render: (b) => <span className="font-semibold text-corporate">RD${b.budget.toLocaleString()}</span> },
-                { key: 'spent', header: 'Gastado', render: (b) => <span>RD${b.spent.toLocaleString()}</span> },
-                { key: 'remaining', header: 'Disponible', render: (b) => <Badge variant={b.remaining > 10000 ? 'success' : 'warning'}>RD${b.remaining.toLocaleString()}</Badge> },
+                { key: 'budget', header: 'Presupuesto', render: (b) => <span className="font-semibold text-corporate tabular-nums">{formatDop(b.budget)}</span> },
+                { key: 'spent', header: 'Gastado', render: (b) => <span className="tabular-nums">{formatDop(b.spent)}</span> },
+                { key: 'remaining', header: 'Disponible', render: (b) => <Badge variant={b.remaining > 10000 ? 'success' : 'warning'}><span className="tabular-nums">{formatDop(b.remaining)}</span></Badge> },
               ]}
             />
           </CardBody>
@@ -325,7 +326,7 @@ export function Events() {
               columns={[
                 { key: 'event', header: 'Evento', render: (c) => <span className="font-medium">{c.event}</span> },
                 { key: 'concept', header: 'Concepto' },
-                { key: 'amount', header: 'Monto', render: (c) => <span className="font-semibold text-corporate">RD${c.amount.toLocaleString()}</span> },
+                { key: 'amount', header: 'Monto', render: (c) => <span className="font-semibold text-corporate tabular-nums">{formatDop(c.amount)}</span> },
                 { key: 'date', header: 'Fecha' },
               ]}
             />
@@ -343,7 +344,7 @@ export function Events() {
               columns={[
                 { key: 'event', header: 'Evento', render: (i) => <span className="font-medium">{i.event}</span> },
                 { key: 'concept', header: 'Concepto' },
-                { key: 'amount', header: 'Monto', render: (i) => <span className="font-semibold text-emerald-600">RD${i.amount.toLocaleString()}</span> },
+                { key: 'amount', header: 'Monto', render: (i) => <span className="font-semibold text-emerald-600 tabular-nums">{formatDop(i.amount)}</span> },
                 { key: 'date', header: 'Fecha' },
               ]}
             />

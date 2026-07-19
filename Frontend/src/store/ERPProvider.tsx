@@ -1,7 +1,13 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ERPState } from './initialState'
 import { createInitialERPState } from './initialState'
 import { purchaseService, type CreatePurchaseInput, type UpdatePurchaseInput, type UpdateReceptionInput } from '@/services/purchaseService'
+import { comprasApi } from '@/services/api/comprasApi'
+import { loadComprasFromApi } from '@/services/api/comprasLoader'
+import { monedaIdFromCode, ordenToPurchaseOrder, resolveProductoIdByTitle } from '@/services/api/comprasMappers'
+import { loadMonedas, resolveTasaCambio, roundMoney } from '@/lib/money'
+import { proveedoresApi } from '@/services/api/proveedoresApi'
+import { getFriendlyErrorMessage } from '@/services/http'
 import { inventoryService, type CreateProductInput, type CreateAdjustmentInput, type UpdateProductInput } from '@/services/inventoryService'
 import { transferService, type CreateTransferInput } from '@/services/transferService'
 import { importService, type CreateShipmentInput, type UpdateShipmentInput, type UpdateInternationalInvoiceInput, type UpdateConsolidationInput } from '@/services/importService'
@@ -17,14 +23,16 @@ interface ERPContextValue {
   activities: Activity[]
   notifications: Notification[]
   unreadNotifications: number
+  comprasReady: boolean
+  refreshCompras: () => Promise<void>
 
-  createPurchaseOrder: (input: CreatePurchaseInput) => { success: boolean; errors?: string[] }
-  updatePurchaseOrder: (input: UpdatePurchaseInput) => { success: boolean; errors?: string[] }
-  deletePurchaseOrder: (orderId: string) => { success: boolean; errors?: string[] }
-  approvePurchaseOrder: (orderId: string) => { success: boolean; errors?: string[] }
-  completeReception: (receptionId: string, items?: number) => { success: boolean; errors?: string[] }
+  createPurchaseOrder: (input: CreatePurchaseInput) => { success: boolean; errors?: string[] } | Promise<{ success: boolean; errors?: string[] }>
+  updatePurchaseOrder: (input: UpdatePurchaseInput) => { success: boolean; errors?: string[] } | Promise<{ success: boolean; errors?: string[] }>
+  deletePurchaseOrder: (orderId: string) => { success: boolean; errors?: string[] } | Promise<{ success: boolean; errors?: string[] }>
+  approvePurchaseOrder: (orderId: string) => { success: boolean; errors?: string[] } | Promise<{ success: boolean; errors?: string[] }>
+  completeReception: (receptionId: string, items?: number) => { success: boolean; errors?: string[] } | Promise<{ success: boolean; errors?: string[] }>
   updateReception: (input: UpdateReceptionInput) => { success: boolean; errors?: string[] }
-  deleteReception: (receptionId: string) => { success: boolean; errors?: string[] }
+  deleteReception: (receptionId: string) => { success: boolean; errors?: string[] } | Promise<{ success: boolean; errors?: string[] }>
 
   createProduct: (input: CreateProductInput) => { success: boolean; errors?: string[] }
   updateProduct: (input: UpdateProductInput) => { success: boolean; errors?: string[] }
@@ -72,6 +80,30 @@ function applySideEffects(
 
 export function ERPProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<ERPState>(createInitialERPState)
+  const [comprasReady, setComprasReady] = useState(!comprasApi.isEnabled())
+
+  const refreshCompras = useCallback(async () => {
+    if (!comprasApi.isEnabled()) {
+      setComprasReady(true)
+      return
+    }
+    try {
+      const loaded = await loadComprasFromApi()
+      setState((s) => ({
+        ...s,
+        purchaseOrders: loaded.purchaseOrders,
+        receptions: loaded.receptions,
+      }))
+      setComprasReady(true)
+    } catch (e) {
+      console.error('[Compras] No se pudo hidratar desde API:', getFriendlyErrorMessage(e))
+      setComprasReady(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshCompras()
+  }, [refreshCompras])
 
   const metrics = useMemo(() => dashboardService.getMetrics(state), [state])
   const lowStockProducts = useMemo(() => dashboardService.getLowStockProducts(state), [state])
@@ -80,97 +112,241 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
     [state.notifications]
   )
 
-  const createPurchaseOrder = useCallback((input: CreatePurchaseInput) => {
-    const result = purchaseService.createOrder(state, input)
-    if (!result.success) return { success: false, errors: result.errors }
-    setState((s) => ({
-      ...s,
-      purchaseOrders: [...s.purchaseOrders, result.order],
-      monthlyPurchasesExtra: result.monthlyPurchasesExtra,
-    }))
-    applySideEffects(setState, result.activity, result.notification)
-    return { success: true }
-  }, [state])
+  const createPurchaseOrder = useCallback(async (input: CreatePurchaseInput) => {
+    if (!comprasApi.isEnabled()) {
+      const result = purchaseService.createOrder(state, input)
+      if (!result.success) return { success: false, errors: result.errors }
+      setState((s) => ({
+        ...s,
+        purchaseOrders: [...s.purchaseOrders, result.order],
+        monthlyPurchasesExtra: result.monthlyPurchasesExtra,
+      }))
+      applySideEffects(setState, result.activity, result.notification)
+      return { success: true }
+    }
 
-  const updatePurchaseOrder = useCallback((input: UpdatePurchaseInput) => {
-    const result = purchaseService.updateOrder(state, input)
-    if (!result.success) return { success: false, errors: result.errors }
-    setState((s) => ({
-      ...s,
-      purchaseOrders: s.purchaseOrders.map((o) => (o.id === input.orderId ? result.order : o)),
-    }))
-    applySideEffects(setState, result.activity, null)
-    return { success: true }
-  }, [state])
+    try {
+      const proveedores = await proveedoresApi.list()
+      const proveedor = proveedores.find(
+        (p) => String(p.nombre ?? p.name ?? '').toLowerCase() === input.supplier.toLowerCase()
+      )
+      if (!proveedor?.id) {
+        return { success: false, errors: [`Proveedor no encontrado en catálogo: ${input.supplier}`] }
+      }
 
-  const deletePurchaseOrder = useCallback((orderId: string) => {
-    const result = purchaseService.deleteOrder(state, orderId)
-    if (!result.success) return { success: false, errors: result.errors }
-    setState((s) => ({
-      ...s,
-      purchaseOrders: s.purchaseOrders.filter((o) => o.id !== orderId),
-    }))
-    applySideEffects(setState, result.activity, null)
-    return { success: true }
-  }, [state])
+      const condiciones = await comprasApi.listCondicionesPago()
+      const condicionId = condiciones.data[0]?.id
+      if (!condicionId) {
+        return { success: false, errors: ['No hay condiciones de pago configuradas en Compras.'] }
+      }
 
-  const approvePurchaseOrder = useCallback((orderId: string) => {
-    const result = purchaseService.approveOrder(state, orderId)
-    if (!result.success) return { success: false, errors: result.errors }
-    setState((s) => ({
-      ...s,
-      purchaseOrders: s.purchaseOrders.map((o) => {
-        if (o.id !== orderId) return o
-        const updated = { ...o, status: result.newStatus }
-        if ('updatedOrder' in result && result.updatedOrder) {
-          return result.updatedOrder
+      const productByTitle = new Map(
+        state.products.map((p) => [p.title.trim().toLowerCase(), p])
+      )
+      const lineas = input.lines.map((l) => {
+        const resolvedId =
+          l.productoId ??
+          resolveProductoIdByTitle(l.product) ??
+          (() => {
+            const prod = productByTitle.get(l.product.trim().toLowerCase())
+            const n = prod ? Number(prod.id) : NaN
+            return Number.isInteger(n) && n > 0 ? n : null
+          })()
+        if (!resolvedId) {
+          throw new Error(`Producto no mapeado a catálogo BD: ${l.product}`)
         }
-        return updated
-      }),
-      receptions: result.reception ? [...s.receptions, result.reception] : s.receptions,
-      internationalInvoices:
-        'internationalInvoice' in result && result.internationalInvoice
-          ? [...s.internationalInvoices, result.internationalInvoice]
+        return {
+          productoId: resolvedId,
+          cantidadSolicitada: Math.round(l.qty),
+          costoUnitario: roundMoney(l.unitCost),
+          descuento: 0,
+          impuesto: input.purchaseType === 'national' ? roundMoney(l.qty * l.unitCost * 0.18) : 0,
+        }
+      })
+
+      const monedas = await loadMonedas()
+      const monedaId = monedaIdFromCode(input.currency, monedas)
+      const tasaCambio = await resolveTasaCambio(input.currency, 'DOP')
+
+      const created = await comprasApi.createOrden({
+        proveedorId: Number(proveedor.id),
+        monedaId,
+        condicionPagoId: condicionId,
+        tipoCompra: input.purchaseType === 'international' ? 'internacional' : 'nacional',
+        fechaOrden: input.date,
+        sucursalId: 1,
+        tasaCambio,
+        estado: input.status === 'pending' ? 'pendiente_aprobacion' : 'borrador',
+        lineas,
+      })
+
+      const order = ordenToPurchaseOrder(created, input.supplier)
+      setState((s) => ({
+        ...s,
+        purchaseOrders: [...s.purchaseOrders, order],
+      }))
+      return { success: true }
+    } catch (e) {
+      return { success: false, errors: [getFriendlyErrorMessage(e)] }
+    }
+  }, [state])
+
+  const updatePurchaseOrder = useCallback(async (input: UpdatePurchaseInput) => {
+    if (!comprasApi.isEnabled()) {
+      const result = purchaseService.updateOrder(state, input)
+      if (!result.success) return { success: false, errors: result.errors }
+      setState((s) => ({
+        ...s,
+        purchaseOrders: s.purchaseOrders.map((o) => (o.id === input.orderId ? result.order : o)),
+      }))
+      applySideEffects(setState, result.activity, null)
+      return { success: true }
+    }
+
+    try {
+      const existing = state.purchaseOrders.find((o) => o.id === input.orderId)
+      if (!existing?.dbId) return { success: false, errors: ['Orden no sincronizada. Recargue e intente de nuevo.'] }
+
+      const productByTitle = new Map(state.products.map((p) => [p.title.trim().toLowerCase(), p]))
+      const lineas = input.lines.map((l) => {
+        let productoId = l.productoId
+        if (!productoId) {
+          const prod = productByTitle.get(l.product.trim().toLowerCase())
+          const n = prod ? Number(prod.id) : NaN
+          if (Number.isInteger(n) && n > 0) productoId = n
+        }
+        if (!productoId) throw new Error(`Producto no mapeado: ${l.product}`)
+        return {
+          productoId,
+          cantidadSolicitada: Math.round(l.qty),
+          costoUnitario: roundMoney(l.unitCost),
+          descuento: 0,
+          impuesto: input.purchaseType === 'national' ? roundMoney(l.qty * l.unitCost * 0.18) : 0,
+        }
+      })
+
+      const monedas = await loadMonedas()
+      await comprasApi.updateOrden(existing.dbId, {
+        fechaOrden: input.date,
+        tipoCompra: input.purchaseType === 'international' ? 'internacional' : 'nacional',
+        monedaId: monedaIdFromCode(input.currency, monedas),
+        tasaCambio: await resolveTasaCambio(input.currency, 'DOP'),
+        lineas,
+      })
+      await refreshCompras()
+      return { success: true }
+    } catch (e) {
+      return { success: false, errors: [getFriendlyErrorMessage(e)] }
+    }
+  }, [state, refreshCompras])
+
+  const deletePurchaseOrder = useCallback(async (orderId: string) => {
+    if (!comprasApi.isEnabled()) {
+      const result = purchaseService.deleteOrder(state, orderId)
+      if (!result.success) return { success: false, errors: result.errors }
+      setState((s) => ({
+        ...s,
+        purchaseOrders: s.purchaseOrders.filter((o) => o.id !== orderId),
+      }))
+      applySideEffects(setState, result.activity, null)
+      return { success: true }
+    }
+
+    try {
+      const existing = state.purchaseOrders.find((o) => o.id === orderId)
+      if (!existing?.dbId) return { success: false, errors: ['Orden no sincronizada. Recargue e intente de nuevo.'] }
+      await comprasApi.cancelarOrden(existing.dbId)
+      await refreshCompras()
+      return { success: true }
+    } catch (e) {
+      return { success: false, errors: [getFriendlyErrorMessage(e)] }
+    }
+  }, [state, refreshCompras])
+
+  const approvePurchaseOrder = useCallback(async (orderId: string) => {
+    if (!comprasApi.isEnabled()) {
+      const result = purchaseService.approveOrder(state, orderId)
+      if (!result.success) return { success: false, errors: result.errors }
+      setState((s) => ({
+        ...s,
+        purchaseOrders: s.purchaseOrders.map((o) => {
+          if (o.id !== orderId) return o
+          const updated = { ...o, status: result.newStatus }
+          if ('updatedOrder' in result && result.updatedOrder) {
+            return result.updatedOrder
+          }
+          return updated
+        }),
+        receptions: result.reception ? [...s.receptions, result.reception] : s.receptions,
+        internationalInvoices:
+          'internationalInvoice' in result && result.internationalInvoice
+            ? [...s.internationalInvoices, result.internationalInvoice]
+            : s.internationalInvoices,
+      }))
+      applySideEffects(setState, result.activity, result.notification)
+      return { success: true }
+    }
+
+    try {
+      const existing = state.purchaseOrders.find((o) => o.id === orderId)
+      if (!existing?.dbId) return { success: false, errors: ['Orden no sincronizada. Recargue e intente de nuevo.'] }
+      if (existing.status === 'draft') {
+        await comprasApi.enviarAprobacion(existing.dbId)
+      }
+      await comprasApi.aprobarOrden(existing.dbId)
+      await refreshCompras()
+      return { success: true }
+    } catch (e) {
+      return { success: false, errors: [getFriendlyErrorMessage(e)] }
+    }
+  }, [state, refreshCompras])
+
+  const completeReception = useCallback(async (receptionId: string, items?: number) => {
+    if (!comprasApi.isEnabled()) {
+      const reception = state.receptions.find((r) => r.id === receptionId)
+      const isInternational = reception?.purchaseType === 'international'
+
+      const result = isInternational
+        ? importService.completeImportReception(state, receptionId, items ?? 0)
+        : purchaseService.completeReception(state, receptionId, items ?? 0)
+      if (!result.success) return { success: false, errors: result.errors }
+
+      const invUpdate = inventoryService.applyReceptionToInventory(state, result.orderId, result.itemsReceived)
+      const updatedInvoice: InternationalInvoice | undefined =
+        isInternational && 'updatedInvoice' in result
+          ? (result as { updatedInvoice?: InternationalInvoice }).updatedInvoice
+          : undefined
+
+      setState((s) => ({
+        ...s,
+        receptions: s.receptions.map((r) =>
+          r.id === receptionId ? { ...r, status: 'complete' as const, items: result.itemsReceived } : r
+        ),
+        purchaseOrders: s.purchaseOrders.map((o) =>
+          o.id === result.orderId ? { ...o, status: result.orderStatus } : o
+        ),
+        internationalInvoices: updatedInvoice
+          ? s.internationalInvoices.map((f) => (f.id === updatedInvoice.id ? updatedInvoice : f))
           : s.internationalInvoices,
-    }))
-    applySideEffects(setState, result.activity, result.notification)
-    return { success: true }
-  }, [state])
+        products: invUpdate?.products ?? s.products,
+        kardexMovements: invUpdate?.kardex ? [invUpdate.kardex, ...s.kardexMovements] : s.kardexMovements,
+        stockByCategory: invUpdate?.stockByCategory ?? s.stockByCategory,
+        inventoryChartData: invUpdate?.inventoryChartData ?? s.inventoryChartData,
+      }))
+      applySideEffects(setState, result.activity, result.notification)
+      return { success: true }
+    }
 
-  const completeReception = useCallback((receptionId: string, items?: number) => {
-    const reception = state.receptions.find((r) => r.id === receptionId)
-    const isInternational = reception?.purchaseType === 'international'
-
-    const result = isInternational
-      ? importService.completeImportReception(state, receptionId, items ?? 0)
-      : purchaseService.completeReception(state, receptionId, items ?? 0)
-    if (!result.success) return { success: false, errors: result.errors }
-
-    const invUpdate = inventoryService.applyReceptionToInventory(state, result.orderId, result.itemsReceived)
-    const updatedInvoice: InternationalInvoice | undefined =
-      isInternational && 'updatedInvoice' in result
-        ? (result as { updatedInvoice?: InternationalInvoice }).updatedInvoice
-        : undefined
-
-    setState((s) => ({
-      ...s,
-      receptions: s.receptions.map((r) =>
-        r.id === receptionId ? { ...r, status: 'complete' as const, items: result.itemsReceived } : r
-      ),
-      purchaseOrders: s.purchaseOrders.map((o) =>
-        o.id === result.orderId ? { ...o, status: result.orderStatus } : o
-      ),
-      internationalInvoices: updatedInvoice
-        ? s.internationalInvoices.map((f) => (f.id === updatedInvoice.id ? updatedInvoice : f))
-        : s.internationalInvoices,
-      products: invUpdate?.products ?? s.products,
-      kardexMovements: invUpdate?.kardex ? [invUpdate.kardex, ...s.kardexMovements] : s.kardexMovements,
-      stockByCategory: invUpdate?.stockByCategory ?? s.stockByCategory,
-      inventoryChartData: invUpdate?.inventoryChartData ?? s.inventoryChartData,
-    }))
-    applySideEffects(setState, result.activity, result.notification)
-    return { success: true }
-  }, [state])
+    try {
+      const existing = state.receptions.find((r) => r.id === receptionId)
+      if (!existing?.dbId) return { success: false, errors: ['Recepción no sincronizada. Recargue e intente de nuevo.'] }
+      await comprasApi.confirmarRecepcion(existing.dbId, { resultadoInspeccion: 'aceptada' })
+      await refreshCompras()
+      return { success: true }
+    } catch (e) {
+      return { success: false, errors: [getFriendlyErrorMessage(e)] }
+    }
+  }, [state, refreshCompras])
 
   const updateReception = useCallback((input: UpdateReceptionInput) => {
     const result = purchaseService.updateReception(state, input)
@@ -183,16 +359,28 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
     return { success: true }
   }, [state])
 
-  const deleteReception = useCallback((receptionId: string) => {
-    const result = purchaseService.deleteReception(state, receptionId)
-    if (!result.success) return { success: false, errors: result.errors }
-    setState((s) => ({
-      ...s,
-      receptions: s.receptions.filter((r) => r.id !== receptionId),
-    }))
-    applySideEffects(setState, result.activity, null)
-    return { success: true }
-  }, [state])
+  const deleteReception = useCallback(async (receptionId: string) => {
+    if (!comprasApi.isEnabled()) {
+      const result = purchaseService.deleteReception(state, receptionId)
+      if (!result.success) return { success: false, errors: result.errors }
+      setState((s) => ({
+        ...s,
+        receptions: s.receptions.filter((r) => r.id !== receptionId),
+      }))
+      applySideEffects(setState, result.activity, null)
+      return { success: true }
+    }
+
+    try {
+      const existing = state.receptions.find((r) => r.id === receptionId)
+      if (!existing?.dbId) return { success: false, errors: ['Recepción no sincronizada. Recargue e intente de nuevo.'] }
+      await comprasApi.anularRecepcion(existing.dbId)
+      await refreshCompras()
+      return { success: true }
+    } catch (e) {
+      return { success: false, errors: [getFriendlyErrorMessage(e)] }
+    }
+  }, [state, refreshCompras])
 
   const createProduct = useCallback((input: CreateProductInput) => {
     const result = inventoryService.createProduct(state, input)
@@ -479,6 +667,8 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
       activities: state.activities,
       notifications: state.notifications,
       unreadNotifications,
+      comprasReady,
+      refreshCompras,
       createPurchaseOrder,
       updatePurchaseOrder,
       deletePurchaseOrder,
@@ -514,6 +704,8 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
       metrics,
       lowStockProducts,
       unreadNotifications,
+      comprasReady,
+      refreshCompras,
       createPurchaseOrder,
       updatePurchaseOrder,
       deletePurchaseOrder,

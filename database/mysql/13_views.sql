@@ -31,23 +31,9 @@ LEFT JOIN inventario i ON i.producto_id = p.id
 WHERE p.estado = 'activo';
 
 -- -----------------------------------------------------------------------------
--- Dashboard Compras
+-- Dashboard Compras (DEPRECATED FASE 7 — KPIs vía API / FE)
 -- -----------------------------------------------------------------------------
-CREATE OR REPLACE VIEW vw_dashboard_compras AS
-SELECT
-  COUNT(*)                                                          AS total_ordenes,
-  SUM(CASE WHEN oc.estado = 'pendiente'  THEN 1 ELSE 0 END)         AS ordenes_pendientes,
-  SUM(CASE WHEN oc.estado = 'aprobada'   THEN 1 ELSE 0 END)         AS ordenes_aprobadas,
-  SUM(CASE WHEN oc.estado = 'recibida'   THEN 1 ELSE 0 END)         AS ordenes_recibidas,
-  SUM(CASE WHEN oc.tipo_compra = 'internacional' THEN 1 ELSE 0 END) AS ordenes_internacionales,
-  COALESCE(SUM(oc.total), 0)                                        AS monto_total_ordenes,
-  (
-    SELECT COUNT(*) FROM recepcion r WHERE r.estado = 'pendiente'
-  )                                                                 AS recepciones_pendientes,
-  (
-    SELECT COUNT(*) FROM factura_proveedor fp WHERE fp.estado_pago = 'pendiente'
-  )                                                                 AS facturas_pendientes_pago
-FROM orden_compra oc;
+DROP VIEW IF EXISTS vw_dashboard_compras;
 
 -- -----------------------------------------------------------------------------
 -- Dashboard Importaciones

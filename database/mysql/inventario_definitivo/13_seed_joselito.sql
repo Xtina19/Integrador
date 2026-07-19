@@ -40,7 +40,7 @@ SELECT * FROM (
   UNION ALL SELECT 'CAT-INF', 'Infantil',      'Literatura infantil y juvenil',                          'activo'
   UNION ALL SELECT 'CAT-TXT', 'Texto escolar', 'Libros de texto para primaria y secundaria',             'activo'
   UNION ALL SELECT 'CAT-REF', 'Referencia',    'Diccionarios, atlas y enciclopedias',                    'activo'
-  UNION ALL SELECT 'CAT-PAP', 'Papelería',     'Útiles y materiales escolares',                          'activo'
+  UNION ALL SELECT 'CAT-ACC', 'Accesorios de lectura', 'Separadores, fundas, luces, sujetalibros',       'activo'
 ) AS nuevas
 WHERE NOT EXISTS (SELECT 1 FROM categorias c WHERE c.codigo = nuevas.codigo);
 
@@ -113,13 +113,13 @@ FROM (
   UNION ALL SELECT 'JSL-039', '978-9945-939-6', 'Enciclopedia Temática Escolar',               'Equipo Editorial Norma',      'CAT-REF', 'ED-NOR',  3500, 5900
   UNION ALL SELECT 'JSL-040', '978-9945-940-2', 'Gramática de la Lengua Española',             'Real Academia Española',      'CAT-REF', 'ED-SANT', 1500, 2600
   UNION ALL SELECT 'JSL-041', '978-9945-941-9', 'Diccionario de Sinónimos y Antónimos',        'Equipo Editorial Larousse',   'CAT-REF', 'ED-LAR',  895,  1550
-  -- Papelería (CAT-PAP)
-  UNION ALL SELECT 'JSL-042', '978-9945-942-6', 'Cuaderno Universitario 100 Hojas',            'N/A', 'CAT-PAP', 'ED-GEN', 650,  1150
-  UNION ALL SELECT 'JSL-043', '978-9945-943-3', 'Set de Lápices de Colores x24',                'N/A', 'CAT-PAP', 'ED-GEN', 650,  1150
-  UNION ALL SELECT 'JSL-044', '978-9945-944-0', 'Cuaderno Argollado Profesional',               'N/A', 'CAT-PAP', 'ED-GEN', 895,  1550
-  UNION ALL SELECT 'JSL-045', '978-9945-945-7', 'Calculadora Científica Básica',                'N/A', 'CAT-PAP', 'ED-GEN', 1200, 2100
-  UNION ALL SELECT 'JSL-046', '978-9945-946-4', 'Mochila Escolar Reforzada',                     'N/A', 'CAT-PAP', 'ED-GEN', 1500, 2600
-  UNION ALL SELECT 'JSL-047', '978-9945-947-1', 'Set de Marcadores Permanentes x12',             'N/A', 'CAT-PAP', 'ED-GEN', 650,  1150
+  -- Accesorios de lectura (CAT-ACC) — NO papelería de oficina
+  UNION ALL SELECT 'JSL-042', NULL, 'Separador magnético Joselito — Set x3', 'LibroSys', 'CAT-ACC', 'ED-PLAN', 85, 175
+  UNION ALL SELECT 'JSL-043', NULL, 'Funda transparente para paperback', 'LibroSys', 'CAT-ACC', 'ED-PLAN', 45, 95
+  UNION ALL SELECT 'JSL-044', NULL, 'Protector rígido tapa dura', 'LibroSys', 'CAT-ACC', 'ED-PLAN', 120, 250
+  UNION ALL SELECT 'JSL-045', NULL, 'Book sleeve — Lino azul', 'LibroSys', 'CAT-ACC', 'ED-PLAN', 180, 350
+  UNION ALL SELECT 'JSL-046', NULL, 'Book light LED clip', 'LibroSys', 'CAT-ACC', 'ED-PLAN', 220, 450
+  UNION ALL SELECT 'JSL-047', NULL, 'Sujetalibros metálicos — Par', 'LibroSys', 'CAT-ACC', 'ED-PLAN', 350, 690
 ) AS nuevos
 WHERE NOT EXISTS (SELECT 1 FROM productos p WHERE p.codigo = nuevos.codigo);
 
@@ -201,14 +201,14 @@ BEGIN
       UNION ALL SELECT 'JSL-040','ALM-CTR',8,4
       UNION ALL SELECT 'JSL-041','ALM-CTR',11,4
       UNION ALL SELECT 'JSL-041','ALM-STI',5,3
-      -- Papelería
-      UNION ALL SELECT 'JSL-042','ALM-CTR',120,30
-      UNION ALL SELECT 'JSL-042','ALM-STI',45,15
-      UNION ALL SELECT 'JSL-043','ALM-CTR',95,25
-      UNION ALL SELECT 'JSL-044','ALM-CTR',40,10
-      UNION ALL SELECT 'JSL-045','ALM-CTR',18,6
-      UNION ALL SELECT 'JSL-046','ALM-CTR',22,6
-      UNION ALL SELECT 'JSL-047','ALM-CTR',60,15
+      -- Accesorios de lectura
+      UNION ALL SELECT 'JSL-042','ALM-CTR',60,15
+      UNION ALL SELECT 'JSL-042','ALM-STI',20,5
+      UNION ALL SELECT 'JSL-043','ALM-CTR',80,20
+      UNION ALL SELECT 'JSL-044','ALM-CTR',35,10
+      UNION ALL SELECT 'JSL-045','ALM-CTR',25,8
+      UNION ALL SELECT 'JSL-046','ALM-CTR',30,8
+      UNION ALL SELECT 'JSL-047','ALM-CTR',18,5
     ) t;
   DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = 1;
 
@@ -435,7 +435,7 @@ BEGIN
         'motivo_codigo', 'ERROR_DIGITACION',
         'observacion', 'Se digitó 120 en vez de 115 durante la carga inicial'
       )),
-      'Corrección de cantidad mal capturada al recibir papelería',
+      'Corrección de cantidad mal capturada al recibir mercancía',
       NULL, NULL, 1,
       v_adj2_id
     );
@@ -454,7 +454,7 @@ BEGIN
         'motivo_codigo', 'DANO_FISICO',
         'observacion', 'Cuadernos con encuadernación dañada por manipulación en bodega'
       )),
-      'Descarte de artículos de papelería dañados',
+      'Descarte de accesorios de lectura dañados',
       NULL, NULL, NULL, 1,
       v_dsc1_id
     );

@@ -7,7 +7,7 @@ export const purchaseStats = {
 
 export const purchaseOrders = [
   { id: 'OC-2026-089', supplier: 'Distribuidora Continental', date: '2026-06-18', items: 45, total: 125400, status: 'approved' as const },
-  { id: 'OC-2026-088', supplier: 'Importadora del Caribe', date: '2026-06-15', items: 120, total: 342000, status: 'sent' as const },
+  { id: 'OC-2026-088', supplier: 'Importadora del Caribe', date: '2026-06-15', items: 120, total: 342000, status: 'pending' as const },
   { id: 'OC-2026-087', supplier: 'Editorial Planeta RD', date: '2026-06-12', items: 28, total: 45600, status: 'received' as const },
   { id: 'OC-2026-086', supplier: 'Papelería Mayorista', date: '2026-06-10', items: 15, total: 8900, status: 'draft' as const },
   { id: 'OC-2026-085', supplier: 'Logística Express', date: '2026-06-08', items: 8, total: 3200, status: 'cancelled' as const },
@@ -26,11 +26,13 @@ export const supplierInvoices = [
   { id: 'FP-2026-154', supplier: 'Importadora del Caribe', orderId: 'OC-2026-088', date: '2026-06-19', amount: 342000, status: 'pending' as const },
 ]
 
+/** Alineado con constants/stateMachines + modules/compras/constants/comprasUi */
 export const purchaseStatusMap: Record<string, { label: string; variant: 'neutral' | 'info' | 'warning' | 'success' | 'danger' }> = {
   draft: { label: 'Borrador', variant: 'neutral' },
+  pending: { label: 'Pendiente', variant: 'warning' },
   approved: { label: 'Aprobada', variant: 'info' },
-  sent: { label: 'Enviada', variant: 'warning' },
   received: { label: 'Recibida', variant: 'success' },
+  finalized: { label: 'Finalizada', variant: 'success' },
   cancelled: { label: 'Cancelada', variant: 'danger' },
 }
 

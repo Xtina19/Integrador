@@ -2,6 +2,7 @@ import { FormDialog, DetailRow } from '@/components/ui/FormDialog'
 import { Badge } from '@/components/ui/Badge'
 import type { CreditNote } from '@/modules/ventas/types/salesExchange'
 import { CREDIT_NOTE_STATUS_LABELS } from '@/modules/ventas/types/salesExchange'
+import { formatDop } from '@/modules/ventas/utils/ventasUi'
 
 const statusVariant = {
   active: 'success' as const,
@@ -27,7 +28,7 @@ export function CreditNoteRecordDialog({ note, open, onClose }: CreditNoteRecord
         <DetailRow label="Motivo" value={note.reason} />
         <DetailRow
           label="Monto"
-          value={<span className="font-semibold text-emerald-600">RD${note.amount.toLocaleString()}</span>}
+          value={<span className="font-semibold text-emerald-600">{formatDop(note.amount)}</span>}
         />
         <DetailRow
           label="Estado"

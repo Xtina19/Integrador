@@ -6,21 +6,8 @@
 
 USE librosys;
 
--- Compras
-CREATE INDEX idx_orden_compra_proveedor_estado
-  ON orden_compra (proveedor_id, estado);
-
-CREATE INDEX idx_orden_compra_fecha_estado
-  ON orden_compra (fecha_orden, estado);
-
-CREATE INDEX idx_detalle_orden_subtotal
-  ON detalle_orden_compra (orden_compra_id, subtotal);
-
-CREATE INDEX idx_recepcion_tipo_estado
-  ON recepcion (tipo_compra, estado);
-
-CREATE INDEX idx_factura_proveedor_estado_fecha
-  ON factura_proveedor (estado_pago, fecha_factura);
+-- Compras: índices canónicos en compras_definitivo/10_indices.sql (COM-DB-1.0.0).
+-- Bloque legacy eliminado en FASE 7 — no recrear aquí.
 
 -- Inventario
 CREATE INDEX idx_inventario_estado_stock_almacen

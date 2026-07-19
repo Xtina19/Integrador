@@ -1,4 +1,7 @@
 import type { EstadoVentaDto } from '@/services/api/ventasApi'
+import { formatDop as formatDopShared, formatMoney } from '@/lib/money'
+
+export { formatMoney }
 
 type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'gold'
 
@@ -58,16 +61,23 @@ const REF_LABELS: Record<string, string> = {
   'usr-cajero': 'Cajero',
   'usr-supervisor': 'Supervisor',
   'usr-admin': 'Administrador',
+  'cli-mostrador': 'Cliente de Mostrador',
   'cli-lasalle': 'Colegio La Salle',
+  'cli-iberia': 'Instituto Iberia',
   'cli-pucmm': 'PUCMM',
   'cli-utesa': 'UTESA',
+  'cli-sagrado': 'Colegio Sagrado Corazón',
+  'cli-libuni': 'Librería Universitaria',
+  'cli-fundacion': 'Fundación Madre y Maestra',
   'cli-maria': 'María González',
   'CLI-000001': 'Colegio La Salle',
-  'CLI-000002': 'PUCMM',
-  'CLI-000003': 'UTESA',
-  'CLI-000004': 'María González',
-  'CLI-000005': 'José Ramírez',
-  'CLI-000006': 'Ministerio de Educación',
+  'CLI-000002': 'Instituto Iberia',
+  'CLI-000003': 'PUCMM',
+  'CLI-000004': 'UTESA',
+  'CLI-000005': 'Colegio Sagrado Corazón',
+  'CLI-000006': 'Librería Universitaria',
+  'CLI-000007': 'Fundación Madre y Maestra',
+  'CLI-000008': 'Cliente de Mostrador',
 }
 
 export function refLabel(id: string | undefined | null, fallback = '—'): string {
@@ -75,8 +85,9 @@ export function refLabel(id: string | undefined | null, fallback = '—'): strin
   return REF_LABELS[id] ?? id
 }
 
+/** Formato DOP vía helper central del ERP (siempre 2 decimales). */
 export function formatDop(n: number): string {
-  return `RD$ ${Math.round(n).toLocaleString('es-DO')}`
+  return formatDopShared(n)
 }
 
 export function formatFecha(iso: string): string {

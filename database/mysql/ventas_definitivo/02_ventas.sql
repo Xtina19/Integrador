@@ -1,4 +1,4 @@
--- =============================================================================
+﻿-- =============================================================================
 -- LibroSys — Ventas DEFINITIVO
 -- Archivo: 02_ventas.sql
 -- Tabla raíz: ventas (= Aggregate Root Venta / factura).
@@ -22,9 +22,9 @@ CREATE TABLE IF NOT EXISTS ventas (
   usuario_emision_dominio_id VARCHAR(64) NOT NULL,
   moneda_codigo         ENUM('DOP','USD','COP') NOT NULL DEFAULT 'DOP',
   fecha_emision         DATETIME     NOT NULL,
-  subtotal              DECIMAL(18,0) NOT NULL DEFAULT 0,
-  total_descuentos      DECIMAL(18,0) NOT NULL DEFAULT 0,
-  total                 DECIMAL(18,0) NOT NULL DEFAULT 0,
+  subtotal              DECIMAL(18,2) NOT NULL DEFAULT 0,
+  total_descuentos      DECIMAL(18,2) NOT NULL DEFAULT 0,
+  total                 DECIMAL(18,2) NOT NULL DEFAULT 0,
   version               INT UNSIGNED NOT NULL DEFAULT 1,
   tiene_cambios         TINYINT(1)   NOT NULL DEFAULT 0,
   tiene_devoluciones    TINYINT(1)   NOT NULL DEFAULT 0,

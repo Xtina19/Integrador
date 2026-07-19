@@ -7,6 +7,7 @@ import { Select } from '@/components/ui/Input'
 import type { BookCostingEntry } from '@/types/domain'
 import { computeShipmentCostsTotal, hasShipmentCosts } from '@/business-rules/shipmentCosts'
 import { useERP } from '@/store/ERPProvider'
+import { formatDop } from '@/lib/money'
 
 function formatUsd(value: number) {
   return `$${value.toFixed(2)}`
@@ -62,7 +63,7 @@ export function CosteoLibroPage() {
             {selectedShipment?.costs && (
               <div className="flex-1 text-sm bg-surface border border-gray-100 rounded-lg px-4 py-3">
                 <span className="text-gray-500">Total costos del embarque aplicado al costeo:</span>{' '}
-                <span className="font-bold text-corporate">RD${freightTotal.toLocaleString()}</span>
+                <span className="font-bold text-corporate tabular-nums">{formatDop(freightTotal)}</span>
                 <span className="text-gray-400 mx-2">·</span>
                 <span className="text-gray-500">Distribuido entre {filtered.length} líneas de producto</span>
               </div>

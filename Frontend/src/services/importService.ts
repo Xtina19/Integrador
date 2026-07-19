@@ -15,6 +15,7 @@ import { computeShipmentCostsTotal, hasShipmentCosts } from '@/business-rules/sh
 import { createActivity, createNotification } from '@/services/activityService'
 import { nextId } from '@/utils/idGenerator'
 import { nowFormatted } from '@/utils/timeUtils'
+import { formatDop } from '@/lib/money'
 
 export interface CreateShipmentInput {
   code: string
@@ -194,7 +195,7 @@ export const importService = {
       shipment,
       updatedInvoice,
       activity: createActivity(
-        `Embarque ${shipment.code} registrado con costos por RD$${costTotal.toLocaleString()} — OC ${invoice.orderId}.`,
+        `Embarque ${shipment.code} registrado con costos por ${formatDop(costTotal)} — OC ${invoice.orderId}.`,
         'Importaciones'
       ),
       notification: createNotification(

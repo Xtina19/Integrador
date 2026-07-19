@@ -130,14 +130,7 @@ CREATE TABLE IF NOT EXISTS ajuste_inventario (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------------------------------
--- FKs diferidas desde Compras → Productos
+-- FKs Compras → Productos
+-- Desde COM-DB-1.0.0 viven en compras_definitivo/05_detalle_orden_compra.sql
+-- y 07_detalle_recepcion.sql (instalados tras este archivo).
 -- -----------------------------------------------------------------------------
-ALTER TABLE detalle_orden_compra
-  ADD CONSTRAINT fk_detalle_orden_producto
-    FOREIGN KEY (producto_id) REFERENCES productos (id)
-    ON UPDATE CASCADE ON DELETE RESTRICT;
-
-ALTER TABLE detalle_recepcion
-  ADD CONSTRAINT fk_detalle_recepcion_producto
-    FOREIGN KEY (producto_id) REFERENCES productos (id)
-    ON UPDATE CASCADE ON DELETE RESTRICT;

@@ -9,10 +9,7 @@ import type { Shipment } from '@/types/domain'
 import { computeShipmentCostsTotal, hasShipmentCosts } from '@/business-rules/shipmentCosts'
 import { ShipmentCostsDetailDialog } from '@/modules/importaciones/components/ShipmentCostsDetailDialog'
 import { useERP } from '@/store/ERPProvider'
-
-function formatCurrency(value: number) {
-  return `RD$${value.toLocaleString()}`
-}
+import { formatDop } from '@/lib/money'
 
 export function CostosFletePage() {
   const { state } = useERP()
@@ -82,7 +79,7 @@ export function CostosFletePage() {
                 key: 'totalCosts',
                 header: 'Total Costos',
                 render: (s) => (
-                  <span className="font-semibold text-corporate">{formatCurrency(s.totalCosts)}</span>
+                  <span className="font-semibold text-corporate tabular-nums">{formatDop(s.totalCosts)}</span>
                 ),
               },
               {

@@ -12,11 +12,7 @@ import type { Reception } from '@/types/domain'
 import { useERP } from '@/store/ERPProvider'
 import { useToast } from '@/context/ToastContext'
 import { Button } from '@/components/ui/Button'
-
-const receptionStatusMap: Record<string, { label: string; variant: 'success' | 'warning' }> = {
-  complete: { label: 'Completa', variant: 'success' },
-  pending: { label: 'Pendiente', variant: 'warning' },
-}
+import { receptionStatusMap } from '@/modules/compras/constants/comprasUi'
 
 export function RecepcionesPage() {
   const { state, completeReception, deleteReception } = useERP()
@@ -41,9 +37,9 @@ export function RecepcionesPage() {
     })
   }, [search, statusFilter, receptions])
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!deleteId) return
-    const result = deleteReception(deleteId)
+    const result = await deleteReception(deleteId)
     if (!result.success) return
     showSuccess('Recepción eliminada correctamente')
     setDeleteId(null)
@@ -64,8 +60,8 @@ export function RecepcionesPage() {
                 onChange={(e) => setStatusFilter(e.target.value)}
                 options={[
                   { value: 'all', label: 'Todos' },
-                  { value: 'complete', label: 'Completa' },
-                  { value: 'pending', label: 'Pendiente' },
+                  { value: 'pending', label: 'Borrador' },
+                  { value: 'complete', label: 'Confirmada' },
                 ]}
               />
             }
@@ -120,13 +116,13 @@ export function RecepcionesPage() {
                 render: (r) => (
                   <div className="flex items-center gap-2">
                     {r.status === 'pending' && (
-                      <Button size="sm" onClick={() => completeReception(r.id)}>
-                        Completar
-                      </Button>
+                      <Button size="sm" onClick={() => void completeReception(r.id)}>
+                  Completar
+                    </Button>
                     )}
                     <TableActions
                       onView={() => setDialog({ receptionId: r.id, mode: 'view' })}
-                      onEdit={() => setDialog({ receptionId: r.id, mode: 'edit' })}
+                      onEdit={r.status === 'pending' ? () => setDialog({ receptionId: r.id, mode: 'edit' }) : undefined}
                       onDelete={r.status === 'pending' ? () => setDeleteId(r.id) : undefined}
                     />
                   </div>

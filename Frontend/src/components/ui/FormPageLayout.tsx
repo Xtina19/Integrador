@@ -10,7 +10,7 @@ interface FormPageLayoutProps {
   subtitle?: string
   listPath: string
   children: React.ReactNode
-  onSave?: () => void | boolean
+  onSave?: () => void | boolean | Promise<void | boolean>
   saveDisabled?: boolean
 }
 
@@ -25,8 +25,8 @@ export function FormPageLayout({
 }: FormPageLayoutProps) {
   const navigate = useNavigate()
 
-  const handleSave = () => {
-    const result = onSave?.()
+  const handleSave = async () => {
+    const result = await onSave?.()
     if (result === false) return
     navigate(listPath)
   }

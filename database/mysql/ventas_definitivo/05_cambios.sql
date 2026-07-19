@@ -1,4 +1,4 @@
--- =============================================================================
+﻿-- =============================================================================
 -- LibroSys — Ventas DEFINITIVO
 -- Archivo: 05_cambios.sql
 -- Cambios + líneas (devueltas / nuevas) — siempre hijos de ventas.
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS cambios (
   fecha                 DATETIME     NOT NULL,
   usuario_id            INT UNSIGNED NOT NULL,
   usuario_dominio_id    VARCHAR(64)  NOT NULL,
-  diferencia_monto      DECIMAL(18,0) NOT NULL DEFAULT 0,
+  diferencia_monto      DECIMAL(18,2) NOT NULL DEFAULT 0,
   moneda_codigo         ENUM('DOP','USD','COP') NOT NULL DEFAULT 'DOP',
   resolucion            ENUM('cobro','devolucion_dinero','nota_credito','mixto','sin_diferencia') NOT NULL,
   created_at            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS cambio_lineas (
   producto_id           INT UNSIGNED NOT NULL,
   producto_dominio_id   VARCHAR(64)  NULL,
   cantidad              INT UNSIGNED NOT NULL,
-  precio_unitario       DECIMAL(18,0) NULL,
+  precio_unitario       DECIMAL(18,2) NULL,
   descripcion_snapshot  VARCHAR(300) NULL,
   PRIMARY KEY (id),
   KEY idx_cambio_lineas_cambio (cambio_id),

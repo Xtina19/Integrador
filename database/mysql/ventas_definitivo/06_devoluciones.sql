@@ -1,4 +1,4 @@
--- =============================================================================
+﻿-- =============================================================================
 -- LibroSys — Ventas DEFINITIVO
 -- Archivo: 06_devoluciones.sql
 -- =============================================================================
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS devoluciones (
   usuario_dominio_id    VARCHAR(64)  NOT NULL,
   aptitud_reingreso     ENUM('vendible','no_apto','no_aplica') NOT NULL,
   compensacion          ENUM('dinero','nota_credito','mixto') NOT NULL,
-  monto_compensacion    DECIMAL(18,0) NOT NULL DEFAULT 0,
+  monto_compensacion    DECIMAL(18,2) NOT NULL DEFAULT 0,
   moneda_codigo         ENUM('DOP','USD','COP') NOT NULL DEFAULT 'DOP',
   created_at            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),

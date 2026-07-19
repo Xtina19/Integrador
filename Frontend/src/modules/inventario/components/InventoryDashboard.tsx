@@ -1,8 +1,9 @@
+import { formatDop } from '@/lib/money'
 import type { InventoryDashboardKpis } from '../types/inventoryUi'
 
 function formatValor(value: number | null): string {
   if (value === null) return '—'
-  return `RD$${Math.round(value).toLocaleString('es-DO')}`
+  return formatDop(value)
 }
 
 interface KpiItem {

@@ -1,5 +1,6 @@
 import { FormDialog, DetailRow } from '@/components/ui/FormDialog'
 import { Badge } from '@/components/ui/Badge'
+import { formatDop } from '@/modules/ventas/utils/ventasUi'
 
 export interface SaleRecord {
   id: string
@@ -26,7 +27,10 @@ export function SaleRecordDialog({ sale, open, onClose }: SaleRecordDialogProps)
         <DetailRow label="Fecha" value={sale.date} />
         <DetailRow label="Cliente" value={sale.customer} />
         <DetailRow label="Sucursal" value={sale.branch} />
-        <DetailRow label="Total" value={<span className="font-semibold text-corporate">${sale.total.toLocaleString()}</span>} />
+        <DetailRow
+          label="Total"
+          value={<span className="font-semibold text-corporate">{formatDop(sale.total)}</span>}
+        />
         <DetailRow
           label="Estado"
           value={

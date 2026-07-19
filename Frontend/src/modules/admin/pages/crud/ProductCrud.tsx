@@ -15,6 +15,7 @@ import { editorialesApi } from '@/services/api/editorialesApi'
 import { ensureCode } from '@/services/api/httpList'
 import { getFriendlyErrorMessage } from '@/services/http'
 import { useToast } from '@/context/ToastContext'
+import { formatMoney } from '@/lib/money'
 
 const config = ADMIN_MODULES.productos
 const statusOptions = [
@@ -210,7 +211,7 @@ export function ProductFormPage() {
         <Input label="Autor" value={form.author} onChange={(e) => update('author', e.target.value)} className="md:col-span-2" />
         <Select label="Categoría *" value={form.categoryId} onChange={(e) => update('categoryId', e.target.value)} options={categories.map((c) => ({ value: c.id, label: c.name }))} />
         <Select label="Editorial *" value={form.publisherId} onChange={(e) => update('publisherId', e.target.value)} options={publishers.map((p) => ({ value: p.id, label: p.name }))} />
-        <Input label="Precio *" type="number" value={form.price} onChange={(e) => update('price', e.target.value)} />
+        <Input label="Precio *" type="number" min={0} step="0.01" value={form.price} onChange={(e) => update('price', e.target.value)} />
         <Input label="Moneda" value={form.currency} disabled />
         <Select label="Estado" value={form.status} onChange={(e) => update('status', e.target.value)} options={statusOptions} />
         <Textarea label="Notas internas" value={form.notes} onChange={(e) => update('notes', e.target.value)} className="md:col-span-2" rows={3} />
@@ -302,7 +303,7 @@ export function ProductDetailPage() {
           <dl>
             <DetailRow label="Categoría" value={<Badge variant="neutral">{product.category}</Badge>} />
             <DetailRow label="Editorial" value={product.publisher} />
-            <DetailRow label="Precio" value={<span className="text-lg font-bold text-corporate">RD${product.price.toLocaleString()}</span>} />
+            <DetailRow label="Precio" value={<span className="text-lg font-bold text-corporate tabular-nums">{formatMoney(product.price, product.currency)}</span>} />
             <DetailRow label="Moneda" value={<Badge variant="gold">{product.currency}</Badge>} />
           </dl>
         </DetailSection>
@@ -357,7 +358,7 @@ export function ProductDeletePage() {
       recordSummary={[
         { label: 'ISBN', value: product.isbn },
         { label: 'Categoría', value: product.category },
-        { label: 'Precio', value: `RD$${product.price.toLocaleString()}` },
+        { label: 'Precio', value: formatMoney(product.price, product.currency) },
         { label: 'Estado', value: product.status === 'active' ? 'Activo' : 'Inactivo' },
       ]}
       onConfirm={async () => {

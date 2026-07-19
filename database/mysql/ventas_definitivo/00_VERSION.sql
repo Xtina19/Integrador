@@ -8,7 +8,7 @@
 -- NO modifica el dominio TypeScript ni mueve invariantes a la BD.
 --
 -- Convención: PK INT + dominio_id CHAR(36) UNIQUE (UUID del Aggregate).
--- Dinero operativo DOP: DECIMAL(18,0) sin centavos.
+-- Dinero operativo: DECIMAL(18,2) (estándar monetario global ERP).
 -- Las tablas legado `venta` / `detalle_venta` (07_ventas.sql) NO se usan
 -- por este paquete; quedan para compatibilidad histórica del ERP.
 -- =============================================================================

@@ -14,6 +14,7 @@ import {
 } from '@/business-rules/shipmentCosts'
 import { extractCountry } from '@/lib/importSearchUtils'
 import { useERP } from '@/store/ERPProvider'
+import { formatDop } from '@/lib/money'
 
 interface ShipmentRecordDialogProps {
   shipment: Shipment | null
@@ -30,10 +31,6 @@ const importStatusVariants: Record<Shipment['status'], 'info' | 'warning' | 'suc
   received: 'success',
   costed: 'success',
   finalized: 'success',
-}
-
-function formatCurrency(value: number) {
-  return `RD$${value.toLocaleString()}`
 }
 
 export function ShipmentRecordDialog({ shipment, mode, open, onClose, onEdit }: ShipmentRecordDialogProps) {
@@ -155,11 +152,11 @@ export function ShipmentRecordDialog({ shipment, mode, open, onClose, onEdit }: 
             <div className="pt-4 mt-2 border-t border-gray-100">
               <p className="text-sm font-semibold text-gray-900 mb-3">Costos asociados</p>
               {shipmentCostFields.map(({ key, label }) => (
-                <DetailRow key={key} label={label} value={formatCurrency(shipment.costs![key])} />
+                <DetailRow key={key} label={label} value={<span className="tabular-nums">{formatDop(shipment.costs![key])}</span>} />
               ))}
               <DetailRow
                 label="Total costos"
-                value={<span className="font-bold text-corporate">{formatCurrency(computeShipmentCostsTotal(shipment.costs!))}</span>}
+                value={<span className="font-bold text-corporate tabular-nums">{formatDop(computeShipmentCostsTotal(shipment.costs!))}</span>}
               />
             </div>
           )}
@@ -200,7 +197,7 @@ export function ShipmentRecordDialog({ shipment, mode, open, onClose, onEdit }: 
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-gray-900">Costos del Embarque</h3>
               <p className="text-sm text-gray-500">
-                Total: <span className="font-bold text-corporate">RD${computeShipmentCostsTotal(costs).toLocaleString()}</span>
+                Total: <span className="font-bold text-corporate tabular-nums">{formatDop(computeShipmentCostsTotal(costs))}</span>
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

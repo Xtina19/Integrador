@@ -1,4 +1,4 @@
--- =============================================================================
+﻿-- =============================================================================
 -- LibroSys — Inventario DEFINITIVO
 -- Archivo: 10_procedimientos.sql
 -- Versión: INV-DB-1.0.0  |  Fecha: 2026-07-18
@@ -961,7 +961,7 @@ BEGIN
   DECLARE v_cantidad     INT;
   DECLARE v_producto_id  INT UNSIGNED;
   DECLARE v_motivo       VARCHAR(40);
-  DECLARE v_costo        DECIMAL(18,0);
+  DECLARE v_costo        DECIMAL(18,4);
 
   SET v_len = JSON_LENGTH(p_lineas);
   IF v_len IS NULL OR v_len = 0 THEN

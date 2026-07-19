@@ -1,4 +1,4 @@
--- =============================================================================
+﻿-- =============================================================================
 -- LibroSys — Ventas DEFINITIVO
 -- Archivo: 03_venta_lineas.sql
 -- =============================================================================
@@ -13,10 +13,10 @@ CREATE TABLE IF NOT EXISTS venta_lineas (
   producto_dominio_id   VARCHAR(64)  NULL,
   descripcion_snapshot  VARCHAR(300) NOT NULL,
   cantidad              INT UNSIGNED NOT NULL,
-  precio_unitario       DECIMAL(18,0) NOT NULL,
+  precio_unitario       DECIMAL(18,2) NOT NULL,
   descuento_tipo        ENUM('monto','porcentaje') NULL,
   descuento_valor       DECIMAL(18,4) NULL,
-  importe_neto          DECIMAL(18,0) NOT NULL,
+  importe_neto          DECIMAL(18,2) NOT NULL,
   created_at            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uk_venta_lineas_dominio (dominio_id),

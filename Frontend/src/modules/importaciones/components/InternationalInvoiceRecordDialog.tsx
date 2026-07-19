@@ -10,6 +10,7 @@ import { trim } from '@/utils/formValidation'
 import { getInvoiceProducts } from '@/lib/importSearchUtils'
 import { currencyCodes } from '@/mocks/mockAdmin'
 import { useERP } from '@/store/ERPProvider'
+import { formatMoney } from '@/lib/money'
 
 interface InternationalInvoiceRecordDialogProps {
   invoice: InternationalInvoice | null
@@ -115,7 +116,7 @@ export function InternationalInvoiceRecordDialog({
             <DetailRow label="Moneda" value={invoice.currency} />
             <DetailRow
               label="Total factura"
-              value={<span className="font-semibold text-corporate">{invoice.amount.toLocaleString()}</span>}
+              value={<span className="font-semibold text-corporate tabular-nums">{formatMoney(invoice.amount, invoice.currency)}</span>}
             />
             <DetailRow
               label="Estado del pago"
@@ -144,8 +145,8 @@ export function InternationalInvoiceRecordDialog({
                     key: 'unitCost',
                     header: 'Costo unitario',
                     render: (p) => (
-                      <span className="text-sm">
-                        {invoice.currency} {p.unitCost.toLocaleString()}
+                      <span className="text-sm tabular-nums">
+                        {formatMoney(p.unitCost, invoice.currency)}
                       </span>
                     ),
                   },
@@ -153,8 +154,8 @@ export function InternationalInvoiceRecordDialog({
                     key: 'subtotal',
                     header: 'Subtotal',
                     render: (p) => (
-                      <span className="font-semibold text-corporate">
-                        {invoice.currency} {(p.qty * p.unitCost).toLocaleString()}
+                      <span className="font-semibold text-corporate tabular-nums">
+                        {formatMoney(p.qty * p.unitCost, invoice.currency)}
                       </span>
                     ),
                   },
@@ -182,6 +183,7 @@ export function InternationalInvoiceRecordDialog({
             label="Total factura *"
             type="number"
             min={0}
+            step="0.01"
             value={form.amount}
             onChange={(e) => setForm({ ...form, amount: e.target.value })}
           />

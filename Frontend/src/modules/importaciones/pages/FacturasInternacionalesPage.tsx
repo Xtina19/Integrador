@@ -15,6 +15,7 @@ import { filterInternationalInvoices } from '@/lib/importSearchUtils'
 import { InternationalInvoiceRecordDialog } from '@/modules/importaciones/components/InternationalInvoiceRecordDialog'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/context/ToastContext'
+import { formatMoney } from '@/lib/money'
 
 const invoiceStatusMap: Record<string, { label: string; variant: 'success' | 'warning' }> = {
   paid: { label: 'Pagada', variant: 'success' },
@@ -99,7 +100,7 @@ export function FacturasInternacionalesPage() {
               { key: 'supplier', header: 'Proveedor', render: (f) => <span className="font-medium">{f.supplier}</span> },
               { key: 'date', header: 'Fecha', className: 'text-sm' },
               { key: 'currency', header: 'Moneda' },
-              { key: 'amount', header: 'Monto', render: (f) => <span className="font-semibold text-corporate">{f.amount.toLocaleString()}</span> },
+              { key: 'amount', header: 'Monto', render: (f) => <span className="font-semibold text-corporate tabular-nums">{formatMoney(f.amount, f.currency)}</span> },
               {
                 key: 'stage',
                 header: 'Etapa importación',

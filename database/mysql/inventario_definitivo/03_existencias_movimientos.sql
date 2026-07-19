@@ -5,8 +5,8 @@
 --
 -- ALTERa (no recrea) las tablas núcleo `productos`, `inventario` (Existencia),
 -- `almacenes` y `movimiento_inventario` para alinearlas al dominio DDD:
---   - productos.costo / precio -> DECIMAL(18,0)  (pesos dominicanos, sin
---     centavos, según el diseño aprobado).
+--   - productos.costo  -> DECIMAL(18,4)  (costo unitario, estándar ERP)
+--   - productos.precio -> DECIMAL(18,2)  (precio venta, estándar ERP)
 --   - inventario (Existencia): version, bloqueado_por_conteo,
 --     conteo_bloqueante_id, dominio_id.
 --   - almacenes: espejo de bloqueo a nivel de almacén (usado por los
@@ -27,11 +27,11 @@
 USE librosys;
 
 -- -----------------------------------------------------------------------------
--- 1) productos — dinero DOP sin centavos
+-- 1) productos — estándar monetario ERP
 -- -----------------------------------------------------------------------------
 ALTER TABLE productos
-  MODIFY COLUMN costo  DECIMAL(18,0) NOT NULL DEFAULT 0,
-  MODIFY COLUMN precio DECIMAL(18,0) NOT NULL DEFAULT 0;
+  MODIFY COLUMN costo  DECIMAL(18,4) NOT NULL DEFAULT 0.0000,
+  MODIFY COLUMN precio DECIMAL(18,2) NOT NULL DEFAULT 0.00;
 
 -- -----------------------------------------------------------------------------
 -- 2) inventario (Existencia) — concurrencia optimista + bloqueo por conteo

@@ -10,7 +10,7 @@ interface FormDialogProps {
   subtitle?: string
   children: React.ReactNode
   mode?: 'view' | 'edit'
-  onSave?: () => void | boolean
+  onSave?: () => void | boolean | Promise<void | boolean>
   onEdit?: () => void
   saveLabel?: string
   saveDisabled?: boolean
@@ -39,6 +39,11 @@ export function FormDialog({
   maxWidth = '3xl',
 }: FormDialogProps) {
   if (!open) return null
+
+  const handleSave = async () => {
+    const result = await onSave?.()
+    if (result === false) return
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -82,7 +87,7 @@ export function FormDialog({
             </Button>
           )}
           {mode === 'edit' && onSave && (
-            <Button icon={Save} onClick={onSave} disabled={saveDisabled}>
+            <Button icon={Save} onClick={() => void handleSave()} disabled={saveDisabled}>
               {saveLabel}
             </Button>
           )}

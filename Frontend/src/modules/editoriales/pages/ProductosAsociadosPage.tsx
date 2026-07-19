@@ -5,6 +5,7 @@ import { Table } from '@/components/ui/Table'
 import { Toolbar } from '@/components/ui/Toolbar'
 import { Select } from '@/components/ui/Input'
 import { adminProducts, publisherNames } from '@/mocks/mockAdmin'
+import { formatDop } from '@/lib/money'
 
 export function ProductosAsociadosPage() {
   const [search, setSearch] = useState('')
@@ -52,7 +53,7 @@ export function ProductosAsociadosPage() {
               { key: 'author', header: 'Autor', className: 'text-sm text-gray-500' },
               { key: 'publisher', header: 'Editorial', render: (p) => <Badge variant="neutral">{p.publisher}</Badge> },
               { key: 'category', header: 'Categoría' },
-              { key: 'price', header: 'Precio', render: (p) => <span className="font-semibold text-corporate">RD${p.price}</span> },
+              { key: 'price', header: 'Precio', render: (p) => <span className="font-semibold text-corporate tabular-nums">{formatDop(p.price)}</span> },
             ]}
           />
         </CardBody>

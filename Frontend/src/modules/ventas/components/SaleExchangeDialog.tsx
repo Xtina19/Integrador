@@ -6,6 +6,7 @@ import { Input, Select } from '@/components/ui/Input'
 import { Table } from '@/components/ui/Table'
 import { posProducts } from '@/mocks/mockVentas'
 import { useSalesData, type SaleRecord } from '@/context/SalesDataContext'
+import { formatDop } from '@/modules/ventas/utils/ventasUi'
 import {
   computeExchangeDifference,
   formatPriceDifference,
@@ -199,7 +200,7 @@ export function SaleExchangeDialog({ open, onClose, initialSale, onCompleted }: 
                     <span className="text-gray-400 mx-2">·</span>
                     {sale.date}
                     <span className="text-gray-400 mx-2">·</span>
-                    RD${sale.total.toLocaleString()}
+                    {formatDop(sale.total)}
                   </button>
                 ))}
                 {searchResults.length === 0 && (
@@ -229,12 +230,12 @@ export function SaleExchangeDialog({ open, onClose, initialSale, onCompleted }: 
                       { key: 'title', header: 'Producto', render: (r) => <span className="font-medium">{r.title}</span> },
                       { key: 'code', header: 'Código', render: (r) => <span className="font-mono text-xs">{r.code}</span> },
                       { key: 'qty', header: 'Cantidad' },
-                      { key: 'unitPrice', header: 'Precio', render: (r) => `RD$${r.unitPrice.toLocaleString()}` },
+                      { key: 'unitPrice', header: 'Precio', render: (r) => formatDop(r.unitPrice) },
                       {
                         key: 'lineTotal',
                         header: 'Total',
                         render: (r) => (
-                          <span className="font-semibold text-corporate">RD${r.lineTotal.toLocaleString()}</span>
+                          <span className="font-semibold text-corporate">{formatDop(r.lineTotal)}</span>
                         ),
                       },
                     ]}
@@ -272,7 +273,7 @@ export function SaleExchangeDialog({ open, onClose, initialSale, onCompleted }: 
                 onChange={(e) => setNewProductId(e.target.value)}
                 options={posProducts.map((p) => ({
                   value: p.id,
-                  label: `${p.title} — RD$${p.price.toLocaleString()}`,
+                  label: `${p.title} — ${formatDop(p.price)}`,
                 }))}
               />
               <Input
@@ -331,7 +332,7 @@ export function SaleExchangeDialog({ open, onClose, initialSale, onCompleted }: 
                           diffInfo.type === 'credit' ? 'text-emerald-600' : 'text-corporate'
                         }`}
                       >
-                        RD${diffInfo.amount.toLocaleString()}
+                        {formatDop(diffInfo.amount)}
                       </p>
                     )}
                   </div>

@@ -5,6 +5,7 @@ import { Input, Select } from '@/components/ui/Input'
 import { Table } from '@/components/ui/Table'
 import { adminSuppliers } from '@/mocks/mockAdmin'
 import { UTENSIL_OPTIONS, type EventUtensil } from '@/modules/eventos/types/eventExtended'
+import { formatDop } from '@/lib/money'
 
 interface EventUtensilsTabContentProps {
   items: EventUtensil[]
@@ -113,11 +114,11 @@ export function EventUtensilsTabContent({ items, onChange, readOnly = false }: E
           { key: 'supplier', header: 'Proveedor' },
           { key: 'utensil', header: 'Utensilio', render: (r) => <span className="font-medium">{r.utensil}</span> },
           { key: 'qty', header: 'Cantidad' },
-          { key: 'unitCost', header: 'Costo unitario', render: (r) => `RD$${r.unitCost.toLocaleString()}` },
+          { key: 'unitCost', header: 'Costo unitario', render: (r) => <span className="tabular-nums">{formatDop(r.unitCost)}</span> },
           {
             key: 'total',
             header: 'Costo total',
-            render: (r) => <span className="font-semibold text-corporate">RD${(r.qty * r.unitCost).toLocaleString()}</span>,
+            render: (r) => <span className="font-semibold text-corporate tabular-nums">{formatDop(r.qty * r.unitCost)}</span>,
           },
           { key: 'notes', header: 'Observaciones', render: (r) => r.notes || '—' },
           ...(!readOnly

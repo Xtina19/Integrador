@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 import { salesHistory as seedSales, creditNotesSeed, productExchangesSeed } from '@/mocks/mockVentas'
 import { useToast } from './ToastContext'
 import type { CreditNote, ProductExchangeRecord } from '@/modules/ventas/types/salesExchange'
+import { formatDop } from '@/lib/money'
 
 export type SaleRecord = (typeof seedSales)[number]
 
@@ -142,9 +143,9 @@ export function SalesDataProvider({ children }: { children: React.ReactNode }) {
       setProductExchanges((prev) => [...prev, exchange])
 
       if (creditNote) {
-        showSuccess(`Nota de crédito ${creditNote.id} generada por RD$${creditNote.amount.toLocaleString()}`)
+        showSuccess(`Nota de crédito ${creditNote.id} generada por ${formatDop(creditNote.amount)}`)
       } else if (priceDifference > 0) {
-        showSuccess(`Cambio registrado. Cobro adicional de RD$${priceDifference.toLocaleString()} pendiente de registro.`)
+        showSuccess(`Cambio registrado. Cobro adicional de ${formatDop(priceDifference)} pendiente de registro.`)
       } else {
         showSuccess('Cambio de producto registrado correctamente')
       }

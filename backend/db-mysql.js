@@ -22,6 +22,7 @@ function getMysqlConfig() {
     database: process.env.DB_NAME || process.env.MYSQL_DATABASE || 'librosys',
     waitForConnections: true,
     connectionLimit: 10,
+    charset: 'utf8mb4',
   };
 }
 

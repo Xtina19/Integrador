@@ -159,7 +159,9 @@ export function VentaDetallePage() {
           producto: m.producto,
           cantidad: m.cantidad,
           almacenId: m.almacenId,
-          documento: `${m.documentoTipo}:${m.documentoId}`,
+          documento: m.documentoTipo
+            ? `${m.documentoTipo === 'venta' ? 'Factura' : m.documentoTipo === 'cambio' ? 'Cambio' : m.documentoTipo === 'nota_credito' ? 'Nota de crédito' : m.documentoTipo} ${m.documentoId}`
+            : m.documentoId,
           estado: 'Registrado',
           fecha: m.fecha,
         })),
@@ -826,10 +828,10 @@ export function VentaDetallePage() {
                 <CardHeader title="Inventario" />
                 <CardBody className="space-y-3">
                   <p className="text-xs text-slate-500 px-1">
-                    Movimientos registrados por el Inventory Engine para esta factura y su postventa.
+                    Movimientos de inventario asociados a esta factura y su postventa.
                   </p>
                   {inventarioRows.length === 0 ? (
-                    <p className="text-sm text-slate-500">Sin movimientos en el Inventory Engine.</p>
+                    <p className="text-sm text-slate-500">Sin movimientos de inventario registrados.</p>
                   ) : (
                     <div className="overflow-hidden rounded-lg border border-slate-200">
                       <Table

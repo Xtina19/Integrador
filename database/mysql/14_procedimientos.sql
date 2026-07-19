@@ -85,69 +85,14 @@ BEGIN
 END$$
 
 -- -----------------------------------------------------------------------------
--- sp_registrar_compra
--- Crea orden de compra con detalle
+-- sp_registrar_compra — ELIMINADO FASE 7
+-- Fuente de verdad: POST /api/compras/ordenes (numeracionDocumentos).
 -- -----------------------------------------------------------------------------
 DROP PROCEDURE IF EXISTS sp_registrar_compra$$
-CREATE PROCEDURE sp_registrar_compra(
-  IN p_codigo           VARCHAR(30),
-  IN p_proveedor_id     INT UNSIGNED,
-  IN p_moneda_id        INT UNSIGNED,
-  IN p_usuario_id       INT UNSIGNED,
-  IN p_tipo_compra      ENUM('nacional','internacional'),
-  IN p_fecha_orden      DATE,
-  IN p_detalle_json     JSON,
-  OUT p_orden_id        INT UNSIGNED
-)
+CREATE PROCEDURE sp_registrar_compra()
 BEGIN
-  DECLARE v_subtotal DECIMAL(18,2) DEFAULT 0;
-  DECLARE v_items    INT UNSIGNED DEFAULT 0;
-  DECLARE v_idx      INT DEFAULT 0;
-  DECLARE v_len      INT DEFAULT 0;
-
-  SET @librosys_from_proc = 1;
-  START TRANSACTION;
-
-  SET v_len = JSON_LENGTH(p_detalle_json);
-
-  WHILE v_idx < v_len DO
-    SET v_subtotal = v_subtotal + (
-      JSON_UNQUOTE(JSON_EXTRACT(p_detalle_json, CONCAT('$[', v_idx, '].cantidad'))) *
-      JSON_UNQUOTE(JSON_EXTRACT(p_detalle_json, CONCAT('$[', v_idx, '].costo_unitario')))
-    );
-    SET v_items = v_items + JSON_UNQUOTE(JSON_EXTRACT(p_detalle_json, CONCAT('$[', v_idx, '].cantidad')));
-    SET v_idx = v_idx + 1;
-  END WHILE;
-
-  INSERT INTO orden_compra (
-    codigo, proveedor_id, moneda_id, usuario_id, tipo_compra,
-    fecha_orden, subtotal, impuestos, total, cantidad_items, estado
-  ) VALUES (
-    p_codigo, p_proveedor_id, p_moneda_id, p_usuario_id, p_tipo_compra,
-    p_fecha_orden, v_subtotal, 0, v_subtotal, v_items, 'pendiente'
-  );
-
-  SET p_orden_id = LAST_INSERT_ID();
-  SET v_idx = 0;
-
-  WHILE v_idx < v_len DO
-    INSERT INTO detalle_orden_compra (orden_compra_id, producto_id, cantidad, costo_unitario, subtotal)
-    VALUES (
-      p_orden_id,
-      JSON_UNQUOTE(JSON_EXTRACT(p_detalle_json, CONCAT('$[', v_idx, '].producto_id'))),
-      JSON_UNQUOTE(JSON_EXTRACT(p_detalle_json, CONCAT('$[', v_idx, '].cantidad'))),
-      JSON_UNQUOTE(JSON_EXTRACT(p_detalle_json, CONCAT('$[', v_idx, '].costo_unitario'))),
-      JSON_UNQUOTE(JSON_EXTRACT(p_detalle_json, CONCAT('$[', v_idx, '].cantidad'))) *
-      JSON_UNQUOTE(JSON_EXTRACT(p_detalle_json, CONCAT('$[', v_idx, '].costo_unitario')))
-    );
-    SET v_idx = v_idx + 1;
-  END WHILE;
-
-  INSERT INTO auditoria (modulo, entidad, entidad_id, accion, usuario_id, descripcion)
-  VALUES ('compras', 'orden_compra', p_orden_id, 'crear', p_usuario_id, CONCAT('Orden ', p_codigo, ' registrada'));
-
-  COMMIT;
-  SET @librosys_from_proc = NULL;
+  SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'DEPRECATED: usar POST /api/compras/ordenes (COM-DB FASE 7).';
 END$$
 
 -- -----------------------------------------------------------------------------
@@ -267,93 +212,14 @@ BEGIN
 END$$
 
 -- -----------------------------------------------------------------------------
--- sp_registrar_recepcion
+-- sp_registrar_recepcion — ELIMINADO FASE 7
+-- Fuente de verdad: POST /api/compras/recepciones (numeracionDocumentos).
 -- -----------------------------------------------------------------------------
 DROP PROCEDURE IF EXISTS sp_registrar_recepcion$$
-CREATE PROCEDURE sp_registrar_recepcion(
-  IN p_codigo           VARCHAR(30),
-  IN p_orden_compra_id  INT UNSIGNED,
-  IN p_usuario_id       INT UNSIGNED,
-  IN p_almacen_id       INT UNSIGNED,
-  IN p_detalle_json     JSON,
-  OUT p_recepcion_id    INT UNSIGNED
-)
+CREATE PROCEDURE sp_registrar_recepcion()
 BEGIN
-  DECLARE v_proveedor_id INT UNSIGNED;
-  DECLARE v_tipo         VARCHAR(20);
-  DECLARE v_idx          INT DEFAULT 0;
-  DECLARE v_len          INT DEFAULT 0;
-  DECLARE v_producto_id  INT UNSIGNED;
-  DECLARE v_esperada     INT UNSIGNED;
-  DECLARE v_recibida     INT UNSIGNED;
-  DECLARE v_costo        DECIMAL(18,4);
-  DECLARE v_total_rec    INT UNSIGNED DEFAULT 0;
-  DECLARE v_total_esp    INT UNSIGNED DEFAULT 0;
-
-  SELECT proveedor_id, tipo_compra INTO v_proveedor_id, v_tipo
-  FROM orden_compra WHERE id = p_orden_compra_id;
-
-  SET @librosys_from_proc = 1;
-  START TRANSACTION;
-
-  SET v_len = JSON_LENGTH(p_detalle_json);
-
-  WHILE v_idx < v_len DO
-    SET v_esperada = JSON_UNQUOTE(JSON_EXTRACT(p_detalle_json, CONCAT('$[', v_idx, '].cantidad_esperada')));
-    SET v_total_esp = v_total_esp + v_esperada;
-    SET v_idx = v_idx + 1;
-  END WHILE;
-
-  INSERT INTO recepcion (
-    codigo, orden_compra_id, proveedor_id, usuario_id, tipo_compra,
-    fecha_recepcion, estado, total_items_esperados, total_items_recibidos
-  ) VALUES (
-    p_codigo, p_orden_compra_id, v_proveedor_id, p_usuario_id, v_tipo,
-    CURDATE(), 'pendiente', v_total_esp, 0
-  );
-
-  SET p_recepcion_id = LAST_INSERT_ID();
-  SET v_idx = 0;
-
-  WHILE v_idx < v_len DO
-    SET v_producto_id = JSON_UNQUOTE(JSON_EXTRACT(p_detalle_json, CONCAT('$[', v_idx, '].producto_id')));
-    SET v_esperada    = JSON_UNQUOTE(JSON_EXTRACT(p_detalle_json, CONCAT('$[', v_idx, '].cantidad_esperada')));
-    SET v_recibida    = JSON_UNQUOTE(JSON_EXTRACT(p_detalle_json, CONCAT('$[', v_idx, '].cantidad_recibida')));
-    SET v_costo       = JSON_UNQUOTE(JSON_EXTRACT(p_detalle_json, CONCAT('$[', v_idx, '].costo_unitario')));
-
-    INSERT INTO detalle_recepcion (recepcion_id, producto_id, cantidad_esperada, cantidad_recibida, costo_unitario)
-    VALUES (p_recepcion_id, v_producto_id, v_esperada, v_recibida, v_costo);
-
-    IF v_recibida > 0 THEN
-      CALL sp_actualizar_inventario(
-        v_producto_id, p_almacen_id, v_recibida, 'recepcion',
-        p_codigo, 'recepcion', p_usuario_id, 'Recepción de mercancía'
-      );
-      SET v_total_rec = v_total_rec + v_recibida;
-    END IF;
-
-    SET v_idx = v_idx + 1;
-  END WHILE;
-
-  UPDATE recepcion
-  SET total_items_recibidos = v_total_rec,
-      estado = CASE
-        WHEN v_total_rec = 0 THEN 'pendiente'
-        WHEN v_total_rec < total_items_esperados THEN 'parcial'
-        ELSE 'completa'
-      END
-  WHERE id = p_recepcion_id;
-
-  IF v_total_rec >= v_total_esp THEN
-    UPDATE orden_compra SET estado = 'recibida' WHERE id = p_orden_compra_id;
-  END IF;
-
-  INSERT INTO auditoria (modulo, entidad, entidad_id, accion, usuario_id, descripcion)
-  VALUES ('compras', 'recepcion', p_recepcion_id, 'crear', p_usuario_id,
-          CONCAT('Recepción ', p_codigo, ' registrada'));
-
-  COMMIT;
-  SET @librosys_from_proc = NULL;
+  SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'DEPRECATED: usar POST /api/compras/recepciones (COM-DB FASE 7).';
 END$$
 
 -- -----------------------------------------------------------------------------
@@ -507,7 +373,7 @@ BEGIN
   DECLARE v_done          INT DEFAULT 0;
 
   DECLARE cur_lineas CURSOR FOR
-    SELECT id, producto_id, cantidad, costo_unitario, subtotal
+    SELECT id, producto_id, cantidad_solicitada, costo_unitario, subtotal
     FROM detalle_orden_compra
     WHERE orden_compra_id = v_orden_id;
 

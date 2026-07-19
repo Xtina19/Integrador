@@ -17,6 +17,7 @@ import { useStaffAssignment } from '@/context/StaffAssignmentContext'
 import { getEventHistory, getEventSales } from '@/mocks/mockEventos'
 import { eventStatusLabels } from '@/constants/stateMachines'
 import type { StaffAssignmentResult } from '@/types/staffAssignment'
+import { formatDop } from '@/lib/money'
 
 const DETAIL_TABS: { id: DetailEventTab; label: string }[] = [
   { id: 'resumen', label: 'Resumen' },
@@ -150,7 +151,7 @@ export function EventDetailDialog({ event, open, onClose, onEdit }: EventDetailD
                 { key: 'id', header: 'Factura', render: (s) => <span className="font-mono text-xs">{s.id}</span> },
                 { key: 'date', header: 'Fecha' },
                 { key: 'customer', header: 'Cliente' },
-                { key: 'total', header: 'Total', render: (s) => <span className="font-semibold text-corporate">RD${s.total.toLocaleString()}</span> },
+                { key: 'total', header: 'Total', render: (s) => <span className="font-semibold text-corporate tabular-nums">{formatDop(s.total)}</span> },
                 {
                   key: 'status',
                   header: 'Estado',
