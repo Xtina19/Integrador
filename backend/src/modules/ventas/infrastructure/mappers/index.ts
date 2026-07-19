@@ -1,0 +1,7 @@
+export { VentaMapper } from './VentaMapper'
+export { VentaLineaMapper } from './VentaLineaMapper'
+export { PagoMapper } from './PagoMapper'
+export { CambioMapper } from './CambioMapper'
+export { DevolucionMapper } from './DevolucionMapper'
+export { NotaCreditoMapper } from './NotaCreditoMapper'
+export { HistorialVentaMapper } from './HistorialVentaMapper'

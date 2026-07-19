@@ -1,12 +1,13 @@
+import { LayoutDashboard, ShoppingCart, Receipt, FileText, UserRound } from 'lucide-react'
 import { Outlet } from 'react-router-dom'
-import { LayoutDashboard, ShoppingCart, Receipt, ArrowLeftRight } from 'lucide-react'
 import { ModuleTabs } from '@/components/ui/ModuleTabs'
 
 const tabs = [
   { to: '/ventas', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/ventas/pos', label: 'Punto de Venta', icon: ShoppingCart },
-  { to: '/ventas/historial', label: 'Historial', icon: Receipt },
-  { to: '/ventas/cambios-notas', label: 'Cambios y Notas de Crédito', icon: ArrowLeftRight },
+  { to: '/ventas/pos', label: 'POS', icon: ShoppingCart },
+  { to: '/ventas/facturas', label: 'Facturas', icon: Receipt },
+  { to: '/ventas/notas-credito', label: 'Notas de Crédito', icon: FileText },
+  { to: '/ventas/clientes', label: 'Clientes', icon: UserRound },
 ]
 
 export function VentasLayout() {

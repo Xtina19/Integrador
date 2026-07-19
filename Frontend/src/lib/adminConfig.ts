@@ -6,6 +6,7 @@ export type AdminModuleKey =
   | 'editoriales'
   | 'sucursales'
   | 'proveedores'
+  | 'clientes'
   | 'monedas'
   | 'tasas-cambio'
 
@@ -25,7 +26,7 @@ export interface AdminModuleConfig {
 export const ADMIN_MODULES: Record<AdminModuleKey, AdminModuleConfig> = {
   productos: {
     key: 'productos',
-    basePath: '/administracion/productos',
+    basePath: '/inventario/productos',
     label: 'Productos',
     singular: 'Producto',
     createLabel: 'Crear Producto',
@@ -42,7 +43,7 @@ export const ADMIN_MODULES: Record<AdminModuleKey, AdminModuleConfig> = {
   },
   categorias: {
     key: 'categorias',
-    basePath: '/administracion/categorias',
+    basePath: '/inventario/categorias',
     label: 'Categorías',
     singular: 'Categoría',
     createLabel: 'Crear Categoría',
@@ -58,7 +59,7 @@ export const ADMIN_MODULES: Record<AdminModuleKey, AdminModuleConfig> = {
   },
   editoriales: {
     key: 'editoriales',
-    basePath: '/editoriales',
+    basePath: '/inventario/editoriales',
     label: 'Editoriales',
     singular: 'Editorial',
     createLabel: 'Registrar Editorial',
@@ -74,23 +75,23 @@ export const ADMIN_MODULES: Record<AdminModuleKey, AdminModuleConfig> = {
   },
   sucursales: {
     key: 'sucursales',
-    basePath: '/administracion/sucursales',
-    label: 'Sucursales',
-    singular: 'Sucursal',
-    createLabel: 'Registrar Sucursal',
-    createTitle: 'Registrar Sucursal',
-    editTitle: 'Editar Sucursal',
-    detailTitle: 'Detalle de Sucursal',
-    deleteTitle: 'Eliminar Sucursal',
+    basePath: '/inventario/almacenes',
+    label: 'Almacenes',
+    singular: 'Almacén',
+    createLabel: 'Registrar Almacén',
+    createTitle: 'Registrar Almacén',
+    editTitle: 'Editar Almacén',
+    detailTitle: 'Detalle de Almacén',
+    deleteTitle: 'Eliminar Almacén',
     deleteConsequences: [
       'El inventario asociado quedará sin ubicación operativa.',
-      'Las transferencias hacia esta sucursal serán canceladas.',
+      'Las transferencias hacia este almacén serán canceladas.',
       'Los usuarios asignados perderán acceso a esta ubicación.',
     ],
   },
   proveedores: {
     key: 'proveedores',
-    basePath: '/administracion/proveedores',
+    basePath: '/compras/proveedores',
     label: 'Proveedores',
     singular: 'Proveedor',
     createLabel: 'Registrar Proveedor',
@@ -104,9 +105,25 @@ export const ADMIN_MODULES: Record<AdminModuleKey, AdminModuleConfig> = {
       'Los contactos comerciales dejarán de estar disponibles.',
     ],
   },
+  clientes: {
+    key: 'clientes',
+    basePath: '/ventas/clientes',
+    label: 'Clientes',
+    singular: 'Cliente',
+    createLabel: 'Registrar Cliente',
+    createTitle: 'Registrar Cliente',
+    editTitle: 'Editar Cliente',
+    detailTitle: 'Expediente del Cliente',
+    deleteTitle: 'Desactivar Cliente',
+    deleteConsequences: [
+      'El cliente dejará de aparecer en búsquedas del POS.',
+      'El historial de facturas permanecerá disponible en consulta.',
+      'No se podrán emitir ventas nuevas a este cliente.',
+    ],
+  },
   monedas: {
     key: 'monedas',
-    basePath: '/administracion/monedas',
+    basePath: '/configuracion/monedas',
     label: 'Monedas',
     singular: 'Moneda',
     createLabel: 'Registrar Moneda',
@@ -122,7 +139,7 @@ export const ADMIN_MODULES: Record<AdminModuleKey, AdminModuleConfig> = {
   },
   'tasas-cambio': {
     key: 'tasas-cambio',
-    basePath: '/administracion/tasas-cambio',
+    basePath: '/configuracion/tasas-cambio',
     label: 'Tasas de Cambio',
     singular: 'Tasa de Cambio',
     createLabel: 'Actualizar Tasa',
@@ -142,6 +159,5 @@ export function adminPath(module: AdminModuleKey, action: 'list' | 'nuevo' | 'ed
   const base = ADMIN_MODULES[module].basePath
   if (action === 'list') return base
   if (action === 'nuevo') return `${base}/nuevo`
-  if (id) return `${base}/${action}/${id}`
-  return base
+  return `${base}/${action}/${id}`
 }

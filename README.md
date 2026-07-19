@@ -1,83 +1,115 @@
 # LibroSys
 
-Sistema de gestión para librería (ERP). Proyecto dividido en dos aplicaciones independientes:
+ERP para librería (universo Joselito). Monorepo con frontend React y backend Express.
 
 ```
 Proyecto/
-├── frontend/     # React + TypeScript + Vite
-├── backend/      # Node.js + Express + SQL Server
-├── LibroSys-Legacy/
+├── Frontend/          # React + TypeScript + Vite
+├── backend/           # Express + módulos DDD (Inventario, Ventas)
+├── database/mysql/    # Packs MySQL definitivos
+├── docs/              # Documentación oficial (fuente de verdad)
 └── README.md
 ```
+
+---
+
+## Estado de módulos
+
+| Módulo | Estado |
+|--------|--------|
+| **Inventario** | Terminado / operativo (Engine, TRF, ajustes, conteos, descartes) |
+| **Ventas** | Terminado / operativo (POS, Facturas, NC consulta, postventa cambios) |
+| Administración (maestros) | Operativo (clientes, productos, etc. en UI) |
+| **Compras** | Pendiente (no documentado como cerrado) |
+| Importaciones / Editoriales / Eventos | Prototipo UI — fuera de docs oficiales |
+
+Documentación: [`docs/README.md`](./docs/README.md) · Guía de onboarding: [`guia/README.md`](./guia/README.md)
+
+---
 
 ## Requisitos
 
 - Node.js 18+
-- SQL Server (para el backend)
 - npm
+- MySQL (`librosys`) para packs Inventario/Ventas
+- SQL Server opcional/legacy para `/api/productos` y health `GETDATE`
+
+---
 
 ## Backend
 
 ```bash
 cd backend
 copy .env.example .env
-# Editar .env con credenciales de SQL Server
 npm install
 npm start
 ```
 
-El servidor inicia en `http://localhost:3001` (o el puerto definido en `PORT`).
+Servidor: `http://localhost:3001`
 
-### Endpoints disponibles
+### APIs relevantes
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/` | Health check |
-| GET | `/api/test-db` | Prueba de conexión a base de datos |
-| GET | `/api/productos` | Lista de productos |
-| GET | `/api/productos/:id` | Producto por ID |
+| Base | Módulo |
+|------|--------|
+| `/api/inventario` | Inventario DDD + Engine |
+| `/api/v1/ventas` | Ventas DDD |
+| `/api/productos` | Legacy catálogo |
+
+Montaje: Inventario primero, luego Ventas con Engine compartido (`backend/server.js`).
+
+---
 
 ## Frontend
 
 ```bash
-cd frontend
+cd Frontend
 copy .env.example .env
 npm install
 npm run dev
 ```
 
-La aplicación inicia en `http://localhost:5173`.
-
-### Comunicación frontend → backend
-
-El frontend consume el backend mediante `VITE_API_URL` (por defecto `http://localhost:3001`).  
-CORS está habilitado en el backend. No mezclar variables: el frontend usa prefijo `VITE_`, el backend usa `DB_*` y `PORT`.
-
-### Migración progresiva Mock → API
-
-Por módulo, activar en `frontend/.env`:
+App: `http://localhost:5173`
 
 ```env
+VITE_API_URL=http://localhost:3001
 VITE_USE_API_INVENTARIO=true
+VITE_USE_API_VENTAS=true
 ```
 
-Mientras el flag esté en `false`, el módulo sigue usando Mock Data.
+### Menú Ventas (actual)
 
-## Desarrollo simultáneo
+Dashboard · POS · Facturas · Notas de Crédito (consulta)
 
-1. Terminal 1: `cd backend && npm start`
-2. Terminal 2: `cd frontend && npm run dev`
+---
 
-## Build de producción (frontend)
+## Base de datos
 
 ```bash
-cd frontend
-npm run build
-npm run preview
+# Desde database/mysql/
+mysql -u root -p < install_all.sql
+# o instaladores por módulo
 ```
+
+Packs: `inventario_definitivo/`, `ventas_definitivo/`.
+
+---
+
+## Documentación
+
+| Tema | Ruta |
+|------|------|
+| **Guía oficial (onboarding)** | [guia/README.md](./guia/README.md) |
+| Índice docs técnicos | [docs/README.md](./docs/README.md) |
+| Arquitectura | [docs/architecture/overview.md](./docs/architecture/overview.md) |
+| Inventario | [docs/inventory/](./docs/inventory/) |
+| Ventas | [docs/sales/](./docs/sales/) |
+| Reglas | [docs/business-rules/](./docs/business-rules/) |
+| BD | [docs/database/](./docs/database/) |
+
+---
 
 ## Notas
 
-- `LibroSys-Legacy/` es una copia de referencia histórica; no forma parte de la ejecución principal.
-- El backend usa **SQL Server** (`mssql`), no MySQL.
-- No debe existir `node_modules` en la raíz del repo. Si aparece, detenga procesos de Vite/Node y elimínelo manualmente.
+- No mezclar mocks FE con API en producción de pruebas: activar flags `VITE_USE_API_*`.  
+- `LibroSys-Legacy/` es referencia histórica, no runtime principal.  
+- Esperar aprobación documental antes de iniciar el módulo Compras.

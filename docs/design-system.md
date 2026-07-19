@@ -425,9 +425,11 @@ Componente: `Card` / `CardHeader` / `CardBody`
 
 ## 22. Dinero y números (UX)
 
-- Mostrar DOP **sin centavos** en Inventario y módulos alineados: enteros con `tabular-nums`
+- Moneda por defecto del ERP: **DOP**. Diseño multimoneda preparado (**DOP**, **USD**, **COP**); ver `docs/ventas/02-coherencia-datos-y-reglas.md`.
+- Operación diaria Joselito: montos DOP **sin centavos** (enteros con `tabular-nums`). Centavos solo con justificación de negocio (p. ej. conversión).
 - Separador miles según locale (`toLocaleString`) cuando se muestre moneda
 - Deltas negativos en `text-red-600`; positivos en `text-emerald-700`
+- Datos de ejemplo / demo: catálogo y nombres **reales** de Librería Joselito; prohibido relleno genérico (“Producto 1”, “Cliente 1”, “Empresa XYZ”).
 
 ---
 

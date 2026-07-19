@@ -22,6 +22,9 @@ import {
   FileText,
   ClipboardList,
   HelpCircle,
+  UserRound,
+  CreditCard,
+  Shield,
 } from 'lucide-react'
 
 const navItems = [
@@ -33,19 +36,37 @@ const navItems = [
   { to: '/editoriales', icon: Building2, label: 'Editoriales' },
   { to: '/eventos', icon: CalendarDays, label: 'Eventos y Ferias' },
   { to: '/reportes', icon: FileText, label: 'Reportes' },
-  { to: '/usuarios', icon: Users, label: 'Usuarios' },
+  { to: '/administracion/usuarios', icon: Users, label: 'Usuarios' },
   { to: '/auditoria', icon: ClipboardList, label: 'Auditoría' },
   { to: '/configuracion', icon: Settings, label: 'Configuración' },
   { to: '/ayuda', icon: HelpCircle, label: 'Ayuda' },
 ]
 
 const adminSubItems = [
-  { to: '/administracion/productos', icon: BookOpen, label: 'Productos' },
-  { to: '/administracion/categorias', icon: Tag, label: 'Categorías' },
-  { to: '/administracion/sucursales', icon: Store, label: 'Sucursales' },
-  { to: '/administracion/proveedores', icon: Truck, label: 'Proveedores' },
-  { to: '/administracion/monedas', icon: Coins, label: 'Monedas' },
-  { to: '/administracion/tasas-cambio', icon: TrendingUp, label: 'Tasas de Cambio' },
+  { to: '/inventario/productos', icon: BookOpen, label: 'Productos' },
+  { to: '/inventario/categorias', icon: Tag, label: 'Categorías' },
+  { to: '/inventario/almacenes', icon: Store, label: 'Almacenes' },
+  { to: '/inventario/editoriales', icon: Building2, label: 'Editoriales' },
+  { to: '/compras/proveedores', icon: Truck, label: 'Proveedores' },
+  { to: '/ventas/clientes', icon: UserRound, label: 'Clientes' },
+  { to: '/configuracion/monedas', icon: Coins, label: 'Monedas' },
+  { to: '/configuracion/tasas-cambio', icon: TrendingUp, label: 'Tasas de Cambio' },
+  { to: '/configuracion/formas-pago', icon: CreditCard, label: 'Formas de Pago' },
+  { to: '/administracion/usuarios', icon: Users, label: 'Usuarios' },
+  { to: '/administracion/roles', icon: Shield, label: 'Roles' },
+]
+
+const adminActivePrefixes = [
+  '/administracion',
+  '/inventario/productos',
+  '/inventario/categorias',
+  '/inventario/almacenes',
+  '/inventario/editoriales',
+  '/compras/proveedores',
+  '/ventas/clientes',
+  '/configuracion/monedas',
+  '/configuracion/tasas-cambio',
+  '/configuracion/formas-pago',
 ]
 
 interface SidebarProps {
@@ -55,7 +76,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation()
-  const isAdminActive = location.pathname.startsWith('/administracion')
+  const isAdminActive = adminActivePrefixes.some((prefix) => location.pathname.startsWith(prefix))
   const [adminExpanded, setAdminExpanded] = useState(isAdminActive)
 
   return (

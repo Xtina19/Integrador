@@ -104,8 +104,8 @@ Cuando se habiliten Compras/Ventas/Importaciones, deben:
 
 ## 8. Referencias internas
 
-- Dominio: `docs/inventario/04-modelo-dominio.md`
-- API: `docs/inventario/08-api.md`
-- BD: `docs/inventario/09-base-datos.md` y `database/docs/INVENTARIO_BD_DEFINITIVA.md`
+- Dominio: `docs/inventory/04-modelo-dominio.md`
+- API: `docs/inventory/08-api.md`
+- BD: `docs/inventory/09-base-datos.md` y `database/docs/INVENTARIO_BD_DEFINITIVA.md`
 - Cierre funcional: `database/docs/INVENTARIO_CIERRE_ENTREGA.md`
 - Backend cierre: `backend/src/modules/inventario/INVENTARIO_CIERRE_BACKEND.md` (si presente)

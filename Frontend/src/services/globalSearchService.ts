@@ -129,7 +129,7 @@ export function searchGlobal(query: string, state: ERPState): GlobalSearchResult
   for (const s of salesHistory) {
     push(
       results,
-      { id: s.id, title: s.id, subtitle: `${s.customer} · ${s.branch}`, moduleLabel: 'Ventas', path: '/ventas/historial', recordType: 'sale', openInDialog: false },
+      { id: s.id, title: s.id, subtitle: `${s.customer} · ${s.branch}`, moduleLabel: 'Ventas', path: '/ventas/facturas', recordType: 'sale', openInDialog: false },
       q,
       s.id,
       s.customer,
@@ -407,7 +407,7 @@ export function searchGlobal(query: string, state: ERPState): GlobalSearchResult
         title: `${c.code} — ${c.name}`,
         subtitle: c.symbol,
         moduleLabel: 'Administración',
-        path: `/administracion/monedas/ver/${c.id}`,
+        path: `/configuracion/monedas/ver/${c.id}`,
         recordType: 'config',
       },
       q,

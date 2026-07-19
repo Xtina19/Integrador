@@ -36,4 +36,11 @@ SOURCE 21_seed_v2.sql;
 -- -----------------------------------------------------------------------------
 SOURCE install_inventario_definitivo.sql;
 
+-- -----------------------------------------------------------------------------
+-- Módulo Ventas — paquete DEFINITIVO (VEN-DB-1.0.0, 2026-07-18).
+-- Tablas alineadas al Aggregate Venta (factura central). No modifica dominio TS.
+-- Ver database/mysql/ventas_definitivo/README.md
+-- -----------------------------------------------------------------------------
+SOURCE install_ventas_definitivo.sql;
+
 SELECT 'LibroSys MySQL v2 instalado correctamente.' AS resultado;

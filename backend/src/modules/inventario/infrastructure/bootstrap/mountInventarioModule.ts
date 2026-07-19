@@ -7,6 +7,7 @@ import type { Express, Request, Response, NextFunction } from 'express'
 import {
   createInventarioComposition,
   seedInventarioJoselitoCompleto,
+  type InventarioComposition,
 } from '../composition/createInventarioComposition'
 import { createInventarioRouter } from '../api/http/routes/inventarioRoutes'
 import { requestObservabilityMiddleware } from '../observability/requestContext'
@@ -14,9 +15,15 @@ import { sendHttpError } from '../api/http/errorHandler'
 import { inventarioOpenApiDocument } from '../api/openapi/inventarioOpenApi'
 
 let mounted = false
+let sharedComposition: InventarioComposition | null = null
 
-export function mountInventarioModule(legacyApp: Express): void {
-  if (mounted) return
+export function getInventarioComposition(): InventarioComposition | null {
+  return sharedComposition
+}
+
+export function mountInventarioModule(legacyApp: Express): InventarioComposition {
+  if (mounted && sharedComposition) return sharedComposition
+
   const composition = createInventarioComposition({ durableConteo: true, durableDescarte: true })
   seedInventarioJoselitoCompleto(composition)
   composition.auth.grant('admin', '*')
@@ -46,8 +53,10 @@ export function mountInventarioModule(legacyApp: Express): void {
   })
 
   mounted = true
+  sharedComposition = composition
   composition.logger.info('inventario_module_mounted', {
     event: 'inventario_module_mounted',
     basePath: '/api/inventario',
   })
+  return composition
 }

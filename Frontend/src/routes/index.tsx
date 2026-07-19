@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom'
 import { Layout } from '@/components/layout/Layout'
 import { Dashboard } from '@/pages/Dashboard'
 import { Inventory } from '@/pages/Inventory'
@@ -31,9 +31,11 @@ import { AdminProducts } from '@/pages/admin/AdminProducts'
 import { AdminCategories } from '@/pages/admin/AdminCategories'
 import { AdminBranches } from '@/pages/admin/AdminBranches'
 import { AdminSuppliers } from '@/pages/admin/AdminSuppliers'
+import { AdminClients } from '@/pages/admin/AdminClients'
 import { AdminCurrencies } from '@/pages/admin/AdminCurrencies'
 import { AdminExchangeRates } from '@/pages/admin/AdminExchangeRates'
-import { AdminEditorialesRedirect } from '@/components/admin/AdminEditorialesRedirect'
+import { FormasPagoPage } from '@/modules/admin/pages/FormasPagoPage'
+import { RolesPage } from '@/modules/admin/pages/RolesPage'
 import { EditorialesLayout } from '@/pages/editoriales/EditorialesLayout'
 import { EditorialesDashboard } from '@/pages/editoriales/EditorialesDashboard'
 import { EditorialesLista } from '@/pages/editoriales/EditorialesLista'
@@ -44,13 +46,17 @@ import { ProductosAsociadosPage } from '@/pages/editoriales/ProductosAsociadosPa
 import { VentasLayout } from '@/pages/ventas/VentasLayout'
 import { VentasDashboard } from '@/pages/ventas/VentasDashboard'
 import { POSPage } from '@/pages/ventas/POSPage'
+import { VentasListPage } from '@/pages/ventas/VentasListPage'
+import { VentaDetallePage } from '@/pages/ventas/VentaDetallePage'
 import { HistorialVentasPage } from '@/pages/ventas/HistorialVentasPage'
 import { CambiosNotasCreditoPage } from '@/pages/ventas/CambiosNotasCreditoPage'
+import { NotasCreditoListPage } from '@/pages/ventas/NotasCreditoListPage'
 import { ProductFormPage, ProductDetailPage, ProductDeletePage } from '@/pages/admin/crud/ProductCrud'
 import { CategoryFormPage, CategoryDetailPage, CategoryDeletePage } from '@/pages/admin/crud/CategoryCrud'
 import { PublisherFormPage, PublisherDetailPage, PublisherDeletePage } from '@/pages/admin/crud/PublisherCrud'
 import { BranchFormPage, BranchDetailPage, BranchDeletePage } from '@/pages/admin/crud/BranchCrud'
 import { SupplierFormPage, SupplierDetailPage, SupplierDeletePage } from '@/pages/admin/crud/SupplierCrud'
+import { ClientFormPage, ClientExpedientePage, ClientAltaRapidaPage } from '@/pages/admin/crud/ClientCrud'
 import { CurrencyFormPage, CurrencyDetailPage, CurrencyDeletePage } from '@/pages/admin/crud/CurrencyCrud'
 import { ExchangeRateFormPage, ExchangeRateDetailPage, ExchangeRateDeletePage } from '@/pages/admin/crud/ExchangeRateCrud'
 import { ReportesLayout } from '@/pages/reportes/ReportesLayout'
@@ -87,6 +93,17 @@ import { CostosFletePage } from '@/pages/importaciones/CostosFletePage'
 import { CosteoLibroPage } from '@/pages/importaciones/CosteoLibroPage'
 import { PalletsCajasPage } from '@/pages/importaciones/PalletsCajasPage'
 
+function RedirectMonedaPath({ action }: { action: 'editar' | 'ver' | 'eliminar' }) {
+  const { id } = useParams()
+  return <Navigate to={`/configuracion/monedas/${action}/${id}`} replace />
+}
+
+function RedirectLegacyPath({ fromPrefix, toPrefix }: { fromPrefix: string; toPrefix: string }) {
+  const location = useLocation()
+  const suffix = location.pathname.slice(fromPrefix.length)
+  return <Navigate to={`${toPrefix}${suffix}${location.search}`} replace />
+}
+
 export function AppRoutes() {
   return (
     <Routes>
@@ -109,10 +126,36 @@ export function AppRoutes() {
         <Route path="inventario/conteos/:id/regularizacion" element={<RegularizacionConteoPage />} />
         <Route path="inventario/ajustes/:id" element={<DetalleAjustePage />} />
         <Route path="inventario/descartes/:id" element={<DetalleDescartePage />} />
+
+        <Route path="inventario/categorias" element={<AdminCategories />} />
+        <Route path="inventario/categorias/nuevo" element={<CategoryFormPage />} />
+        <Route path="inventario/categorias/editar/:id" element={<CategoryFormPage />} />
+        <Route path="inventario/categorias/ver/:id" element={<CategoryDetailPage />} />
+        <Route path="inventario/categorias/eliminar/:id" element={<CategoryDeletePage />} />
+
+        <Route path="inventario/editoriales" element={<EditorialesLista />} />
+        <Route path="inventario/editoriales/nuevo" element={<PublisherFormPage />} />
+        <Route path="inventario/editoriales/editar/:id" element={<PublisherFormPage />} />
+        <Route path="inventario/editoriales/ver/:id" element={<PublisherDetailPage />} />
+        <Route path="inventario/editoriales/eliminar/:id" element={<PublisherDeletePage />} />
+
+        <Route path="inventario/productos" element={<AdminProducts />} />
+        <Route path="inventario/productos/nuevo" element={<ProductFormPage />} />
+        <Route path="inventario/productos/editar/:id" element={<ProductFormPage />} />
+        <Route path="inventario/productos/ver/:id" element={<ProductDetailPage />} />
+        <Route path="inventario/productos/eliminar/:id" element={<ProductDeletePage />} />
         <Route path="inventario/productos/:id" element={<FichaProductoPage />} />
+
+        <Route path="inventario/almacenes" element={<AdminBranches />} />
+        <Route path="inventario/almacenes/nuevo" element={<BranchFormPage />} />
+        <Route path="inventario/almacenes/editar/:id" element={<BranchFormPage />} />
+        <Route path="inventario/almacenes/ver/:id" element={<BranchDetailPage />} />
+        <Route path="inventario/almacenes/eliminar/:id" element={<BranchDeletePage />} />
+
         <Route path="inventario/movimientos/:id" element={<DetalleMovimientoPage />} />
         <Route path="inventario/kardex/:productoId" element={<DetalleKardexPage />} />
         <Route path="inventario/auditoria/:id" element={<DetalleAuditoriaPage />} />
+
         <Route path="editoriales" element={<EditorialesLayout />}>
           <Route index element={<EditorialesDashboard />} />
           <Route path="lista" element={<EditorialesLista />} />
@@ -125,20 +168,32 @@ export function AppRoutes() {
         <Route path="editoriales/editar/:id" element={<PublisherFormPage />} />
         <Route path="editoriales/ver/:id" element={<PublisherDetailPage />} />
         <Route path="editoriales/eliminar/:id" element={<PublisherDeletePage />} />
+
         <Route path="eventos" element={<Events />} />
         <Route path="eventos/nuevo" element={<NuevoEventoPage />} />
-        <Route path="usuarios" element={<Users />} />
-        <Route path="usuarios/nuevo" element={<NuevoUsuarioPage />} />
 
         <Route path="ventas" element={<VentasLayout />}>
           <Route index element={<VentasDashboard />} />
           <Route path="pos" element={<POSPage />} />
+          <Route path="facturas" element={<VentasListPage />} />
+          <Route path="facturas/:id" element={<VentaDetallePage />} />
+          <Route path="notas-credito" element={<NotasCreditoListPage />} />
           <Route path="historial" element={<HistorialVentasPage />} />
           <Route path="cambios-notas" element={<CambiosNotasCreditoPage />} />
+          <Route path="clientes" element={<AdminClients />} />
+          <Route path="clientes/nuevo" element={<ClientFormPage />} />
+          <Route path="clientes/editar/:id" element={<ClientFormPage />} />
+          <Route path="clientes/ver/:id" element={<ClientExpedientePage />} />
+          <Route path="clientes/alta-rapida" element={<ClientAltaRapidaPage />} />
         </Route>
 
         <Route path="compras" element={<ComprasLayout />}>
           <Route index element={<ComprasDashboard />} />
+          <Route path="proveedores" element={<AdminSuppliers />} />
+          <Route path="proveedores/nuevo" element={<SupplierFormPage />} />
+          <Route path="proveedores/editar/:id" element={<SupplierFormPage />} />
+          <Route path="proveedores/ver/:id" element={<SupplierDetailPage />} />
+          <Route path="proveedores/eliminar/:id" element={<SupplierDeletePage />} />
           <Route path="ordenes" element={<OrdenesCompraPage />} />
           <Route path="recepciones" element={<RecepcionesPage />} />
           <Route path="facturas" element={<FacturasProveedoresPage />} />
@@ -157,44 +212,46 @@ export function AppRoutes() {
         <Route path="importaciones/embarques/nuevo" element={<RegistrarEmbarquePage />} />
 
         <Route path="administracion" element={<AdminHome />} />
+        <Route path="administracion/usuarios" element={<Users />} />
+        <Route path="administracion/usuarios/nuevo" element={<NuevoUsuarioPage />} />
+        <Route path="administracion/roles" element={<RolesPage />} />
 
-        <Route path="administracion/productos" element={<AdminProducts />} />
-        <Route path="administracion/productos/nuevo" element={<ProductFormPage />} />
-        <Route path="administracion/productos/editar/:id" element={<ProductFormPage />} />
-        <Route path="administracion/productos/ver/:id" element={<ProductDetailPage />} />
-        <Route path="administracion/productos/eliminar/:id" element={<ProductDeletePage />} />
+        <Route
+          path="administracion/productos/*"
+          element={<RedirectLegacyPath fromPrefix="/administracion/productos" toPrefix="/inventario/productos" />}
+        />
+        <Route
+          path="administracion/categorias/*"
+          element={<RedirectLegacyPath fromPrefix="/administracion/categorias" toPrefix="/inventario/categorias" />}
+        />
+        <Route
+          path="administracion/sucursales/*"
+          element={<RedirectLegacyPath fromPrefix="/administracion/sucursales" toPrefix="/inventario/almacenes" />}
+        />
+        <Route
+          path="administracion/editoriales/*"
+          element={<RedirectLegacyPath fromPrefix="/administracion/editoriales" toPrefix="/inventario/editoriales" />}
+        />
+        <Route
+          path="administracion/proveedores/*"
+          element={<RedirectLegacyPath fromPrefix="/administracion/proveedores" toPrefix="/compras/proveedores" />}
+        />
+        <Route
+          path="administracion/clientes/*"
+          element={<RedirectLegacyPath fromPrefix="/administracion/clientes" toPrefix="/ventas/clientes" />}
+        />
+        <Route path="administracion/monedas" element={<Navigate to="/configuracion/monedas" replace />} />
+        <Route path="administracion/monedas/nuevo" element={<Navigate to="/configuracion/monedas/nuevo" replace />} />
+        <Route path="administracion/monedas/editar/:id" element={<RedirectMonedaPath action="editar" />} />
+        <Route path="administracion/monedas/ver/:id" element={<RedirectMonedaPath action="ver" />} />
+        <Route path="administracion/monedas/eliminar/:id" element={<RedirectMonedaPath action="eliminar" />} />
+        <Route
+          path="administracion/tasas-cambio/*"
+          element={<RedirectLegacyPath fromPrefix="/administracion/tasas-cambio" toPrefix="/configuracion/tasas-cambio" />}
+        />
 
-        <Route path="administracion/categorias" element={<AdminCategories />} />
-        <Route path="administracion/categorias/nuevo" element={<CategoryFormPage />} />
-        <Route path="administracion/categorias/editar/:id" element={<CategoryFormPage />} />
-        <Route path="administracion/categorias/ver/:id" element={<CategoryDetailPage />} />
-        <Route path="administracion/categorias/eliminar/:id" element={<CategoryDeletePage />} />
-
-        <Route path="administracion/editoriales/*" element={<AdminEditorialesRedirect />} />
-
-        <Route path="administracion/sucursales" element={<AdminBranches />} />
-        <Route path="administracion/sucursales/nuevo" element={<BranchFormPage />} />
-        <Route path="administracion/sucursales/editar/:id" element={<BranchFormPage />} />
-        <Route path="administracion/sucursales/ver/:id" element={<BranchDetailPage />} />
-        <Route path="administracion/sucursales/eliminar/:id" element={<BranchDeletePage />} />
-
-        <Route path="administracion/proveedores" element={<AdminSuppliers />} />
-        <Route path="administracion/proveedores/nuevo" element={<SupplierFormPage />} />
-        <Route path="administracion/proveedores/editar/:id" element={<SupplierFormPage />} />
-        <Route path="administracion/proveedores/ver/:id" element={<SupplierDetailPage />} />
-        <Route path="administracion/proveedores/eliminar/:id" element={<SupplierDeletePage />} />
-
-        <Route path="administracion/monedas" element={<AdminCurrencies />} />
-        <Route path="administracion/monedas/nuevo" element={<CurrencyFormPage />} />
-        <Route path="administracion/monedas/editar/:id" element={<CurrencyFormPage />} />
-        <Route path="administracion/monedas/ver/:id" element={<CurrencyDetailPage />} />
-        <Route path="administracion/monedas/eliminar/:id" element={<CurrencyDeletePage />} />
-
-        <Route path="administracion/tasas-cambio" element={<AdminExchangeRates />} />
-        <Route path="administracion/tasas-cambio/nuevo" element={<ExchangeRateFormPage />} />
-        <Route path="administracion/tasas-cambio/editar/:id" element={<ExchangeRateFormPage />} />
-        <Route path="administracion/tasas-cambio/ver/:id" element={<ExchangeRateDetailPage />} />
-        <Route path="administracion/tasas-cambio/eliminar/:id" element={<ExchangeRateDeletePage />} />
+        <Route path="usuarios" element={<Navigate to="/administracion/usuarios" replace />} />
+        <Route path="usuarios/nuevo" element={<Navigate to="/administracion/usuarios/nuevo" replace />} />
 
         <Route path="reportes" element={<ReportesLayout />}>
           <Route index element={<ReportesHub />} />
@@ -217,6 +274,17 @@ export function AppRoutes() {
           <Route index element={<ConfiguracionGeneralPage />} />
           <Route path="notificaciones" element={<NotificacionesPage />} />
           <Route path="correos" element={<CorreosPage />} />
+          <Route path="monedas" element={<AdminCurrencies />} />
+          <Route path="monedas/nuevo" element={<CurrencyFormPage />} />
+          <Route path="monedas/editar/:id" element={<CurrencyFormPage />} />
+          <Route path="monedas/ver/:id" element={<CurrencyDetailPage />} />
+          <Route path="monedas/eliminar/:id" element={<CurrencyDeletePage />} />
+          <Route path="tasas-cambio" element={<AdminExchangeRates />} />
+          <Route path="tasas-cambio/nuevo" element={<ExchangeRateFormPage />} />
+          <Route path="tasas-cambio/editar/:id" element={<ExchangeRateFormPage />} />
+          <Route path="tasas-cambio/ver/:id" element={<ExchangeRateDetailPage />} />
+          <Route path="tasas-cambio/eliminar/:id" element={<ExchangeRateDeletePage />} />
+          <Route path="formas-pago" element={<FormasPagoPage />} />
         </Route>
 
         <Route path="ayuda" element={<AyudaPage />} />

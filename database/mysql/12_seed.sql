@@ -76,7 +76,8 @@ INSERT INTO almacenes (id, sucursal_id, codigo, nombre, tipo, capacidad, estado)
 INSERT INTO monedas (id, codigo, nombre, simbolo, es_principal, estado) VALUES
 (1, 'DOP', 'Peso Dominicano', 'RD$', 1, 'activa'),
 (2, 'USD', 'Dólar Estadounidense', '$', 0, 'activa'),
-(3, 'EUR', 'Euro', '€', 0, 'activa');
+(3, 'EUR', 'Euro', '€', 0, 'activa'),
+(4, 'COP', 'Peso Colombiano', 'COL$', 0, 'activa');
 
 INSERT INTO tasas_cambio (id, moneda_origen_id, moneda_destino_id, tasa, vigente_desde, actualizado_por_id) VALUES
 (1, 2, 1, 58.500000, '2026-01-01 00:00:00', 1),

@@ -1,4 +1,14 @@
-import type { IConteoFisicoRepository } from '../../application/ports/outbound'
+import type {
+  IAlmacenRepository,
+  IClock,
+  IConteoFisicoRepository,
+  IExistenciaRepository,
+  IIdGenerator,
+  IIdempotencyRepository,
+  IProductoReadPort,
+  IUnitOfWork,
+  PersistEngineResultPorts,
+} from '../../application/ports/outbound'
 import { InventoryEngine } from '../../domain/services/InventoryEngine'
 import { TransferenciaApplicationService } from '../../application/services/TransferenciaApplicationService'
 import { DescarteApplicationService } from '../../application/services/DescarteApplicationService'
@@ -38,6 +48,21 @@ import { InMemoryDescarteCreateStore } from '../../application/testing/InMemoryD
 import { StructuredLogger, rootLogger } from '../observability/StructuredLogger'
 import { MetricsRegistry, metricsRegistry } from '../observability/MetricsRegistry'
 import { seedInventarioJoselito } from './seedJoselito'
+import { ensureVentasStockCatalog } from './ensureVentasStockCatalog'
+
+/** Superficie mínima para ACL de módulos externos (p. ej. Ventas) hacia el Engine. */
+export interface InventarioEngineBridge {
+  engine: InventoryEngine
+  uow: IUnitOfWork
+  existencias: IExistenciaRepository
+  almacenes: IAlmacenRepository
+  productos: IProductoReadPort
+  idempotency: IIdempotencyRepository
+  clock: IClock
+  ids: IIdGenerator
+  persistPorts: PersistEngineResultPorts
+  queryService: InventoryQueryService
+}
 
 export interface InventarioComposition {
   db: InMemoryDatabaseAdapter
@@ -57,6 +82,7 @@ export interface InventarioComposition {
   ajusteService: AjusteApplicationService
   queryService: InventoryQueryService
   existencias: DbExistenciaRepository
+  almacenes: DbAlmacenRepository
   movimientos: DbMovimientoRepository
   transferencias: DbTransferenciaRepository
   ajustes: DbAjusteRepository
@@ -66,6 +92,8 @@ export interface InventarioComposition {
   auditorias: DbAuditoriaRepository
   productos: DbProductoReadAdapter
   snapshotStore: DurableInventorySnapshotStore | null
+  /** Puente hacia el Inventory Engine para BC consumidores (Ventas). */
+  engineBridge: InventarioEngineBridge
 }
 
 export function createInventarioComposition(options?: {
@@ -204,6 +232,19 @@ export function createInventarioComposition(options?: {
 
   const queryService = new InventoryQueryService(db)
 
+  const engineBridge: InventarioEngineBridge = {
+    engine,
+    uow,
+    existencias,
+    almacenes,
+    productos,
+    idempotency,
+    clock,
+    ids,
+    persistPorts,
+    queryService,
+  }
+
   return {
     db,
     uow,
@@ -222,6 +263,7 @@ export function createInventarioComposition(options?: {
     ajusteService,
     queryService,
     existencias,
+    almacenes,
     movimientos,
     transferencias,
     ajustes,
@@ -231,6 +273,7 @@ export function createInventarioComposition(options?: {
     auditorias,
     productos,
     snapshotStore,
+    engineBridge,
   }
 }
 
@@ -273,18 +316,19 @@ export function seedInventarioJoselitoCompleto(composition: InventarioCompositio
   // reinicia el catálogo/documentos para no pisar operaciones reales previas.
   // OJO: este chequeo debe ocurrir ANTES de seedInventarioOperativo, que ya
   // siembra `prod-1` incondicionalmente.
-  if (composition.db.tables.productos.size > 0) {
-    return
+  if (composition.db.tables.productos.size === 0) {
+    seedInventarioOperativo(composition.db)
+    seedInventarioJoselito({
+      db: composition.db,
+      transferencias: composition.transferencias,
+      ajustes: composition.ajustes,
+      descartes: composition.descartes,
+      conteos: composition.conteos,
+      movimientos: composition.movimientos,
+      kardex: composition.kardex,
+      auditorias: composition.auditorias,
+    })
   }
-  seedInventarioOperativo(composition.db)
-  seedInventarioJoselito({
-    db: composition.db,
-    transferencias: composition.transferencias,
-    ajustes: composition.ajustes,
-    descartes: composition.descartes,
-    conteos: composition.conteos,
-    movimientos: composition.movimientos,
-    kardex: composition.kardex,
-    auditorias: composition.auditorias,
-  })
+  // Siempre alinea el catálogo vendible de Ventas con el Engine (idempotente).
+  ensureVentasStockCatalog(composition.db)
 }

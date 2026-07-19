@@ -1,0 +1,12 @@
+export * from './enums'
+export * from './errors/VentasDomainError'
+export * from './value-objects'
+export * from './entities'
+export * from './events/VentasDomainEvents'
+export * from './services/CalculadorasVenta'
+export * from './services/EmisorIntencionInventario'
+export * from './policies/PoliticasVenta'
+export * from './guards'
+export * from './ports/VentaRepository'
+export { Venta, type VentaProps } from './aggregates/Venta'
+

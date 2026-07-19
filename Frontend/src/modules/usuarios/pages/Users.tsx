@@ -1,45 +1,84 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Shield, UserCheck, Monitor, KeyRound, AlertOctagon, Smartphone } from 'lucide-react'
+import { Plus, Shield, UserCheck } from 'lucide-react'
 import { Card, CardHeader, CardBody, StatCard } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Table } from '@/components/ui/Table'
-import { roles, permissions } from '@/mocks/mockCore'
-import { activeSessions, accessHistory, failedAttempts, mfaSettings } from '@/mocks/mockUsuarios'
-import { useGlobalSearchRecordEffect, useRecordHighlightScroll } from '@/context/GlobalSearchNavigationContext'
+import { rolesApi } from '@/services/api/rolesApi'
+import { usuariosApi } from '@/services/api/usuariosApi'
+import { getFriendlyErrorMessage } from '@/services/http'
+import { useToast } from '@/context/ToastContext'
 
-type Tab = 'roles' | 'permissions' | 'sesiones' | 'accesos' | 'fallidos' | 'mfa'
+type Tab = 'usuarios' | 'roles'
+
+type Rol = { id: string; code: string; name: string; description?: string; status: string; users?: number }
+type Usuario = {
+  id: string
+  code: string
+  name: string
+  lastName?: string
+  email: string
+  roleName?: string
+  status: string
+}
 
 export function Users() {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<Tab>('roles')
-  const [highlightId, setHighlightId] = useState<string | null>(null)
-  const totalUsers = roles.reduce((sum, r) => sum + r.users, 0)
+  const { showError, showSuccess } = useToast()
+  const [activeTab, setActiveTab] = useState<Tab>('usuarios')
+  const [roles, setRoles] = useState<Rol[]>([])
+  const [users, setUsers] = useState<Usuario[]>([])
 
-  useGlobalSearchRecordEffect('user', {
-    onHighlight: (recordId) => {
-      setActiveTab('mfa')
-      setHighlightId(recordId)
-    },
-  })
-  useRecordHighlightScroll(highlightId)
+  const load = useCallback(async () => {
+    try {
+      const [r, u] = await Promise.all([rolesApi.list(), usuariosApi.list()])
+      setRoles(r as Rol[])
+      setUsers(u as Usuario[])
+    } catch (err) {
+      showError(getFriendlyErrorMessage(err))
+    }
+  }, [showError])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  async function toggleUser(u: Usuario) {
+    try {
+      await usuariosApi.setEstado(u.id, u.status === 'active' ? 'inactive' : 'active')
+      showSuccess(u.status === 'active' ? 'Usuario desactivado' : 'Usuario activado')
+      await load()
+    } catch (err) {
+      showError(getFriendlyErrorMessage(err))
+    }
+  }
+
+  async function toggleRol(r: Rol) {
+    try {
+      await rolesApi.setEstado(r.id, r.status === 'active' ? 'inactive' : 'active')
+      showSuccess(r.status === 'active' ? 'Rol desactivado' : 'Rol activado')
+      await load()
+    } catch (err) {
+      showError(getFriendlyErrorMessage(err))
+    }
+  }
 
   const tabs: { id: Tab; label: string; icon: typeof Shield }[] = [
+    { id: 'usuarios', label: 'Usuarios', icon: UserCheck },
     { id: 'roles', label: 'Roles', icon: Shield },
-    { id: 'permissions', label: 'Permisos', icon: UserCheck },
-    { id: 'sesiones', label: 'Sesiones', icon: Monitor },
-    { id: 'accesos', label: 'Historial', icon: KeyRound },
-    { id: 'fallidos', label: 'Intentos Fallidos', icon: AlertOctagon },
-    { id: 'mfa', label: 'MFA', icon: Smartphone },
   ]
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard title="Usuarios Activos" value={totalUsers} detail={`${roles.length} roles configurados`} icon={<UserCheck size={22} />} />
-        <StatCard title="Sesiones Activas" value={activeSessions.length} detail="Conectados ahora" icon={<Monitor size={22} />} />
-        <StatCard title="Intentos Fallidos" value={failedAttempts.length} detail="Últimas 24 horas" icon={<AlertOctagon size={22} />} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <StatCard
+          title="Usuarios"
+          value={users.length}
+          detail={`${users.filter((u) => u.status === 'active').length} activos`}
+          icon={<UserCheck size={22} />}
+        />
+        <StatCard title="Roles" value={roles.length} detail="Perfiles del sistema" icon={<Shield size={22} />} />
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -57,8 +96,59 @@ export function Users() {
             </button>
           ))}
         </div>
-        <Button icon={Plus} onClick={() => navigate('/usuarios/nuevo')}>Nuevo Usuario</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate('/administracion/roles')}>
+            Mant. Roles
+          </Button>
+          <Button icon={Plus} onClick={() => navigate('/administracion/usuarios/nuevo')}>
+            Nuevo Usuario
+          </Button>
+        </div>
       </div>
+
+      {activeTab === 'usuarios' && (
+        <Card>
+          <CardHeader title="Usuarios del Sistema" />
+          <CardBody className="!p-0">
+            <Table
+              keyField="id"
+              data={users}
+              columns={[
+                { key: 'code', header: 'Código', render: (u) => <Badge variant="gold">{u.code}</Badge> },
+                {
+                  key: 'name',
+                  header: 'Nombre',
+                  render: (u) => (
+                    <span className="font-medium">
+                      {u.name} {u.lastName || ''}
+                    </span>
+                  ),
+                },
+                { key: 'email', header: 'Email' },
+                { key: 'roleName', header: 'Rol' },
+                {
+                  key: 'status',
+                  header: 'Estado',
+                  render: (u) => (
+                    <Badge variant={u.status === 'active' ? 'success' : 'neutral'}>
+                      {u.status === 'active' ? 'Activo' : u.status === 'blocked' ? 'Bloqueado' : 'Inactivo'}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: 'actions',
+                  header: 'Acciones',
+                  render: (u) => (
+                    <button type="button" className="text-xs font-medium text-corporate hover:underline" onClick={() => void toggleUser(u)}>
+                      {u.status === 'active' ? 'Desactivar' : 'Activar'}
+                    </button>
+                  ),
+                },
+              ]}
+            />
+          </CardBody>
+        </Card>
+      )}
 
       {activeTab === 'roles' && (
         <Card>
@@ -68,129 +158,28 @@ export function Users() {
               keyField="id"
               data={roles}
               columns={[
+                { key: 'code', header: 'Código', render: (r) => <Badge variant="gold">{r.code}</Badge> },
+                { key: 'name', header: 'Rol', render: (r) => <span className="font-medium">{r.name}</span> },
+                { key: 'description', header: 'Descripción', render: (r) => r.description || '—' },
+                { key: 'users', header: 'Usuarios', render: (r) => r.users ?? 0 },
                 {
-                  key: 'name',
-                  header: 'Rol',
+                  key: 'status',
+                  header: 'Estado',
                   render: (r) => (
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-corporate/10 flex items-center justify-center">
-                        <Shield size={16} className="text-corporate" />
-                      </div>
-                      <span className="font-medium text-gray-900">{r.name}</span>
-                    </div>
+                    <Badge variant={r.status === 'active' ? 'success' : 'neutral'}>
+                      {r.status === 'active' ? 'Activo' : 'Inactivo'}
+                    </Badge>
                   ),
                 },
-                { key: 'users', header: 'Usuarios', render: (r) => <span className="font-semibold text-corporate">{r.users}</span> },
                 {
-                  key: 'permissions',
-                  header: 'Permisos',
+                  key: 'actions',
+                  header: 'Acciones',
                   render: (r) => (
-                    <div className="flex flex-wrap gap-1">
-                      {r.permissions.map((p) => (
-                        <Badge key={p} variant={p === 'all' ? 'gold' : 'neutral'}>
-                          {p === 'all' ? 'Acceso total' : p.replace('_', ' ')}
-                        </Badge>
-                      ))}
-                    </div>
+                    <button type="button" className="text-xs font-medium text-corporate hover:underline" onClick={() => void toggleRol(r)}>
+                      {r.status === 'active' ? 'Desactivar' : 'Activar'}
+                    </button>
                   ),
                 },
-              ]}
-            />
-          </CardBody>
-        </Card>
-      )}
-
-      {activeTab === 'permissions' && (
-        <Card>
-          <CardHeader title="Matriz de Permisos" subtitle="Permisos del rol Administrador" />
-          <CardBody className="!p-0">
-            <Table
-              keyField="module"
-              data={permissions}
-              columns={[
-                { key: 'module', header: 'Módulo', render: (p) => <span className="font-medium text-gray-900">{p.module}</span> },
-                { key: 'view', header: 'Ver', render: (p) => <Badge variant={p.view ? 'success' : 'neutral'}>{p.view ? 'Sí' : 'No'}</Badge> },
-                { key: 'create', header: 'Crear', render: (p) => <Badge variant={p.create ? 'success' : 'neutral'}>{p.create ? 'Sí' : 'No'}</Badge> },
-                { key: 'edit', header: 'Editar', render: (p) => <Badge variant={p.edit ? 'success' : 'neutral'}>{p.edit ? 'Sí' : 'No'}</Badge> },
-                { key: 'delete', header: 'Eliminar', render: (p) => <Badge variant={p.delete ? 'success' : 'neutral'}>{p.delete ? 'Sí' : 'No'}</Badge> },
-              ]}
-            />
-          </CardBody>
-        </Card>
-      )}
-
-      {activeTab === 'sesiones' && (
-        <Card>
-          <CardHeader title="Sesiones Activas" subtitle="Usuarios conectados al sistema" />
-          <CardBody className="!p-0">
-            <Table
-              keyField="id"
-              data={activeSessions}
-              columns={[
-                { key: 'name', header: 'Usuario', render: (s) => <span className="font-medium">{s.name}</span> },
-                { key: 'user', header: 'Correo', className: 'text-sm text-gray-500' },
-                { key: 'device', header: 'Dispositivo' },
-                { key: 'ip', header: 'IP', className: 'text-xs font-mono' },
-                { key: 'started', header: 'Inicio' },
-                { key: 'lastActivity', header: 'Última actividad' },
-              ]}
-            />
-          </CardBody>
-        </Card>
-      )}
-
-      {activeTab === 'accesos' && (
-        <Card>
-          <CardHeader title="Historial de Acceso" subtitle="Inicios y cierres de sesión" />
-          <CardBody className="!p-0">
-            <Table
-              keyField="id"
-              data={accessHistory}
-              columns={[
-                { key: 'timestamp', header: 'Fecha/Hora', className: 'text-xs whitespace-nowrap' },
-                { key: 'user', header: 'Usuario', render: (a) => <span className="font-medium">{a.user}</span> },
-                { key: 'action', header: 'Acción' },
-                { key: 'ip', header: 'IP', className: 'text-xs font-mono' },
-                { key: 'device', header: 'Dispositivo', className: 'text-xs' },
-                { key: 'status', header: 'Estado', render: (a) => <Badge variant={a.status === 'success' ? 'success' : 'danger'}>{a.status === 'success' ? 'Exitoso' : 'Fallido'}</Badge> },
-              ]}
-            />
-          </CardBody>
-        </Card>
-      )}
-
-      {activeTab === 'fallidos' && (
-        <Card>
-          <CardHeader title="Intentos Fallidos de Acceso" subtitle="Alertas de seguridad" />
-          <CardBody className="!p-0">
-            <Table
-              keyField="id"
-              data={failedAttempts}
-              columns={[
-                { key: 'timestamp', header: 'Fecha/Hora', className: 'text-xs' },
-                { key: 'username', header: 'Usuario', render: (f) => <span className="font-medium">{f.username}</span> },
-                { key: 'ip', header: 'IP', className: 'text-xs font-mono' },
-                { key: 'reason', header: 'Motivo', render: (f) => <Badge variant="danger">{f.reason}</Badge> },
-              ]}
-            />
-          </CardBody>
-        </Card>
-      )}
-
-      {activeTab === 'mfa' && (
-        <Card>
-          <CardHeader title="Autenticación Multifactor (MFA)" subtitle="Estado de MFA por usuario" />
-          <CardBody className="!p-0">
-            <Table
-              keyField="user"
-              highlightId={highlightId}
-              data={mfaSettings}
-              columns={[
-                { key: 'name', header: 'Usuario', render: (m) => <span className="font-medium">{m.name}</span> },
-                { key: 'user', header: 'Correo', className: 'text-sm text-gray-500' },
-                { key: 'mfaEnabled', header: 'MFA', render: (m) => <Badge variant={m.mfaEnabled ? 'success' : 'warning'}>{m.mfaEnabled ? 'Activo' : 'Inactivo'}</Badge> },
-                { key: 'method', header: 'Método' },
-                { key: 'lastVerified', header: 'Última verificación' },
               ]}
             />
           </CardBody>

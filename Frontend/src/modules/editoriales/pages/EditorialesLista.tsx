@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Globe, BookMarked, Mail } from 'lucide-react'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
@@ -10,14 +10,29 @@ import { TableActions } from '@/components/ui/TableActions'
 import { Toolbar } from '@/components/ui/Toolbar'
 import { Pagination } from '@/components/ui/Pagination'
 import { FormDialog, DetailRow } from '@/components/ui/FormDialog'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { adminPath } from '@/lib/adminConfig'
 import { contractStatusConfig, getContractVisualStatus } from '@/lib/publisherContractStatus'
-import { useAdminCatalog } from '@/context/AdminCatalogContext'
 import { validateAdminPublisher } from '@/business-rules/adminValidators'
 import { trim } from '@/utils/formValidation'
+import { editorialesApi } from '@/services/api/editorialesApi'
+import { getFriendlyErrorMessage } from '@/services/http'
+import { useToast } from '@/context/ToastContext'
 
 const PAGE_SIZE = 5
+
+type Publisher = {
+  id: string
+  code: string
+  name: string
+  country: string
+  contact: string
+  phone: string
+  address: string
+  contractType: string
+  contractExpiry: string
+  status: string
+  productCount: number
+}
 
 const statusOptions = [
   { value: 'active', label: 'Activo' },
@@ -33,12 +48,13 @@ const contractTypes = [
 
 export function EditorialesLista() {
   const navigate = useNavigate()
-  const { publishers, updatePublisher, deletePublisher } = useAdminCatalog()
+  const { showSuccess, showError } = useToast()
+  const [publishers, setPublishers] = useState<Publisher[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [dialog, setDialog] = useState<{ id: string; mode: 'view' | 'edit' } | null>(null)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
   const [form, setForm] = useState({
     name: '',
     country: '',
@@ -49,6 +65,22 @@ export function EditorialesLista() {
     contractExpiry: '',
     status: 'active',
   })
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const list = (await editorialesApi.list({ q: search || undefined })) as Publisher[]
+      setPublishers(list)
+    } catch (err) {
+      showError(getFriendlyErrorMessage(err))
+    } finally {
+      setLoading(false)
+    }
+  }, [search, showError])
+
+  useEffect(() => {
+    void load()
+  }, [load])
 
   const selected = dialog ? publishers.find((p) => p.id === dialog.id) ?? null : null
 
@@ -61,7 +93,7 @@ export function EditorialesLista() {
     })
   }, [publishers, search, statusFilter])
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   useEffect(() => {
@@ -71,8 +103,8 @@ export function EditorialesLista() {
         country: selected.country,
         contact: selected.contact,
         phone: selected.phone,
-        address: selected.address,
-        contractType: selected.contractType,
+        address: selected.address || '',
+        contractType: selected.contractType || contractTypes[0],
         contractExpiry: selected.contractExpiry,
         status: selected.status,
       })
@@ -80,23 +112,39 @@ export function EditorialesLista() {
   }, [selected, dialog?.mode, dialog?.id])
 
   const validation = useMemo(
-    () => validateAdminPublisher(form, publishers.map((p) => p.name), selected?.name),
+    () => validateAdminPublisher({ ...form, address: form.address || 'Sin dirección registrada' }, publishers.map((p) => p.name), selected?.name),
     [form, publishers, selected]
   )
 
-  function handleSave() {
+  async function handleSave() {
     if (!selected || !validation.valid) return false
-    updatePublisher(selected.id, {
-      name: trim(form.name),
-      country: trim(form.country),
-      contact: trim(form.contact),
-      phone: trim(form.phone),
-      address: trim(form.address),
-      contractType: form.contractType,
-      contractExpiry: form.contractExpiry,
-      status: form.status,
-    } as Parameters<typeof updatePublisher>[1])
-    setDialog(null)
+    try {
+      await editorialesApi.update(selected.id, {
+        name: trim(form.name),
+        country: trim(form.country),
+        contact: trim(form.contact),
+        phone: trim(form.phone),
+        contractType: form.contractType,
+        contractExpiry: form.contractExpiry,
+        status: form.status,
+      })
+      showSuccess('Editorial actualizada')
+      setDialog(null)
+      await load()
+    } catch (err) {
+      showError(getFriendlyErrorMessage(err))
+      return false
+    }
+  }
+
+  async function toggle(p: Publisher) {
+    try {
+      await editorialesApi.setEstado(p.id, p.status === 'active' ? 'inactive' : 'active')
+      showSuccess(p.status === 'active' ? 'Editorial desactivada' : 'Editorial activada')
+      await load()
+    } catch (err) {
+      showError(getFriendlyErrorMessage(err))
+    }
   }
 
   return (
@@ -130,7 +178,7 @@ export function EditorialesLista() {
       </Card>
 
       <Card>
-        <CardHeader title="Editoriales" />
+        <CardHeader title="Editoriales" subtitle={loading ? 'Cargando…' : `${filtered.length} registros`} />
         <CardBody className="!p-0">
           <Table
             keyField="id"
@@ -165,11 +213,15 @@ export function EditorialesLista() {
                 key: 'actions',
                 header: 'Acciones',
                 render: (p) => (
-                  <TableActions
-                    onView={() => setDialog({ id: p.id, mode: 'view' })}
-                    onEdit={() => setDialog({ id: p.id, mode: 'edit' })}
-                    onDelete={() => setDeleteId(p.id)}
-                  />
+                  <div className="flex items-center gap-2">
+                    <button type="button" className="text-xs font-medium text-corporate hover:underline" onClick={() => void toggle(p)}>
+                      {p.status === 'active' ? 'Desactivar' : 'Activar'}
+                    </button>
+                    <TableActions
+                      onView={() => navigate(adminPath('editoriales', 'ver', p.id))}
+                      onEdit={() => navigate(adminPath('editoriales', 'editar', p.id))}
+                    />
+                  </div>
                 ),
               },
             ]}
@@ -185,7 +237,7 @@ export function EditorialesLista() {
         subtitle={selected?.country}
         mode={dialog?.mode ?? 'view'}
         onEdit={() => setDialog((d) => (d ? { ...d, mode: 'edit' } : null))}
-        onSave={handleSave}
+        onSave={() => void handleSave()}
         saveDisabled={!validation.valid}
       >
         {selected && dialog?.mode === 'view' ? (
@@ -194,19 +246,9 @@ export function EditorialesLista() {
             <DetailRow label="País" value={selected.country} />
             <DetailRow label="Contacto" value={selected.contact} />
             <DetailRow label="Teléfono" value={selected.phone} />
-            <DetailRow label="Dirección" value={selected.address} />
             <DetailRow label="Tipo de Contrato" value={<Badge variant="gold">{selected.contractType}</Badge>} />
             <DetailRow label="Vencimiento" value={selected.contractExpiry} />
-            <DetailRow
-              label="Estado del contrato"
-              value={
-                <Badge variant={contractStatusConfig[getContractVisualStatus(selected.contractExpiry)].variant}>
-                  {contractStatusConfig[getContractVisualStatus(selected.contractExpiry)].label}
-                </Badge>
-              }
-            />
             <DetailRow label="Productos asociados" value={<span className="font-semibold text-corporate">{selected.productCount}</span>} />
-            <DetailRow label="Estado" value={<Badge variant={selected.status === 'active' ? 'success' : 'neutral'}>{selected.status === 'active' ? 'Activo' : 'Inactivo'}</Badge>} />
           </>
         ) : selected ? (
           <>
@@ -220,7 +262,6 @@ export function EditorialesLista() {
             <Input label="País" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
             <Input label="Contacto" value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
             <Input label="Teléfono" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-            <Input label="Dirección" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="md:col-span-2" />
             <Select label="Tipo de Contrato" value={form.contractType} onChange={(e) => setForm({ ...form, contractType: e.target.value })} options={contractTypes.map((t) => ({ value: t, label: t }))} />
             <Input label="Vencimiento contrato" type="date" value={form.contractExpiry} onChange={(e) => setForm({ ...form, contractExpiry: e.target.value })} />
             <Select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={statusOptions} />
@@ -228,17 +269,6 @@ export function EditorialesLista() {
           </>
         ) : null}
       </FormDialog>
-
-      <ConfirmDialog
-        open={Boolean(deleteId)}
-        onClose={() => setDeleteId(null)}
-        onConfirm={() => {
-          if (!deleteId) return
-          deletePublisher(deleteId)
-          setDeleteId(null)
-        }}
-        message="¿Está seguro de eliminar esta editorial del catálogo?"
-      />
     </div>
   )
 }

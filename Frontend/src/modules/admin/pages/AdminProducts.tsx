@@ -1,7 +1,6 @@
-import { useState, useMemo, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { Plus, Search, Filter } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input, Select } from '@/components/ui/Input'
@@ -9,12 +8,27 @@ import { Badge } from '@/components/ui/Badge'
 import { Table } from '@/components/ui/Table'
 import { TableActions } from '@/components/ui/TableActions'
 import { FormDialog, DetailRow } from '@/components/ui/FormDialog'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { categoryNames, publisherNames, currencyCodes } from '@/mocks/mockAdmin'
 import { adminPath } from '@/lib/adminConfig'
-import { useAdminCatalog } from '@/context/AdminCatalogContext'
 import { validateAdminProduct } from '@/business-rules/adminValidators'
 import { trim } from '@/utils/formValidation'
+import { productosApi } from '@/services/api/productosApi'
+import { categoriasApi } from '@/services/api/categoriasApi'
+import { editorialesApi } from '@/services/api/editorialesApi'
+import { getFriendlyErrorMessage } from '@/services/http'
+import { useToast } from '@/context/ToastContext'
+
+type Product = {
+  id: string
+  code: string
+  isbn: string
+  title: string
+  author: string
+  category: string
+  publisher: string
+  price: number
+  currency: string
+  status: string
+}
 
 const statusMap: Record<string, { label: string; variant: 'success' | 'neutral' }> = {
   active: { label: 'Activo', variant: 'success' },
@@ -28,13 +42,16 @@ const statusOptions = [
 
 export function AdminProducts() {
   const navigate = useNavigate()
-  const { products, updateProduct, deleteProduct } = useAdminCatalog()
+  const { showSuccess, showError } = useToast()
+  const [products, setProducts] = useState<Product[]>([])
+  const [categoryNames, setCategoryNames] = useState<string[]>([])
+  const [publisherNames, setPublisherNames] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('all')
   const [publisher, setPublisher] = useState('all')
   const [status, setStatus] = useState('all')
   const [dialog, setDialog] = useState<{ id: string; mode: 'view' | 'edit' } | null>(null)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
   const [form, setForm] = useState({
     code: '',
     isbn: '',
@@ -46,6 +63,28 @@ export function AdminProducts() {
     currency: 'DOP',
     status: 'active',
   })
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [list, cats, pubs] = await Promise.all([
+        productosApi.list({ q: search || undefined }),
+        categoriasApi.list(),
+        editorialesApi.list(),
+      ])
+      setProducts(list as Product[])
+      setCategoryNames((cats as { name: string }[]).map((c) => c.name).filter(Boolean))
+      setPublisherNames((pubs as { name: string }[]).map((p) => p.name).filter(Boolean))
+    } catch (err) {
+      showError(getFriendlyErrorMessage(err))
+    } finally {
+      setLoading(false)
+    }
+  }, [search, showError])
+
+  useEffect(() => {
+    void load()
+  }, [load])
 
   const selected = dialog ? products.find((p) => p.id === dialog.id) ?? null : null
 
@@ -91,20 +130,38 @@ export function AdminProducts() {
     [form, products, selected]
   )
 
-  function handleSave() {
+  async function handleSave() {
     if (!selected || !validation.valid) return false
-    updateProduct(selected.id, {
-      code: trim(form.code),
-      isbn: trim(form.isbn),
-      title: trim(form.title),
-      author: trim(form.author),
-      category: form.category,
-      publisher: form.publisher,
-      price: Number(form.price) || 0,
-      currency: form.currency,
-      status: form.status as 'active' | 'inactive',
-    })
-    setDialog(null)
+    try {
+      const cats = (await categoriasApi.list()) as { id: string; name: string }[]
+      const pubs = (await editorialesApi.list()) as { id: string; name: string }[]
+      await productosApi.update(selected.id, {
+        code: trim(form.code),
+        isbn: trim(form.isbn),
+        title: trim(form.title),
+        author: trim(form.author),
+        categoryId: cats.find((c) => c.name === form.category)?.id,
+        publisherId: pubs.find((p) => p.name === form.publisher)?.id,
+        price: Number(form.price) || 0,
+        status: form.status,
+      })
+      showSuccess('Producto actualizado')
+      setDialog(null)
+      await load()
+    } catch (err) {
+      showError(getFriendlyErrorMessage(err))
+      return false
+    }
+  }
+
+  async function toggleEstado(p: Product) {
+    try {
+      await productosApi.setEstado(p.id, p.status === 'active' ? 'inactive' : 'active')
+      showSuccess(p.status === 'active' ? 'Producto desactivado' : 'Producto activado')
+      await load()
+    } catch (err) {
+      showError(getFriendlyErrorMessage(err))
+    }
   }
 
   return (
@@ -114,7 +171,7 @@ export function AdminProducts() {
           <Link to="/administracion" className="text-corporate hover:underline">Administración</Link>
           <span>/</span>
           <span>Productos</span>
-          <span className="ml-2">— {filtered.length} de {products.length} registros</span>
+          <span className="ml-2">— {loading ? '…' : `${filtered.length} de ${products.length} registros`}</span>
         </div>
         <Button icon={Plus} onClick={() => navigate(adminPath('productos', 'nuevo'))}>
           Crear Producto
@@ -194,7 +251,7 @@ export function AdminProducts() {
                 key: 'status',
                 header: 'Estado',
                 render: (p) => {
-                  const s = statusMap[p.status]
+                  const s = statusMap[p.status] || statusMap.inactive
                   return <Badge variant={s.variant}>{s.label}</Badge>
                 },
               },
@@ -202,11 +259,15 @@ export function AdminProducts() {
                 key: 'actions',
                 header: 'Acciones',
                 render: (p) => (
-                  <TableActions
-                    onView={() => setDialog({ id: p.id, mode: 'view' })}
-                    onEdit={() => setDialog({ id: p.id, mode: 'edit' })}
-                    onDelete={() => setDeleteId(p.id)}
-                  />
+                  <div className="flex items-center gap-2">
+                    <button type="button" className="text-xs font-medium text-corporate hover:underline" onClick={() => void toggleEstado(p)}>
+                      {p.status === 'active' ? 'Desactivar' : 'Activar'}
+                    </button>
+                    <TableActions
+                      onView={() => navigate(adminPath('productos', 'ver', p.id))}
+                      onEdit={() => navigate(adminPath('productos', 'editar', p.id))}
+                    />
+                  </div>
                 ),
               },
             ]}
@@ -221,7 +282,7 @@ export function AdminProducts() {
         subtitle={selected?.code}
         mode={dialog?.mode ?? 'view'}
         onEdit={() => setDialog((d) => (d ? { ...d, mode: 'edit' } : null))}
-        onSave={handleSave}
+        onSave={() => void handleSave()}
         saveDisabled={!validation.valid}
       >
         {selected && dialog?.mode === 'view' ? (
@@ -234,7 +295,7 @@ export function AdminProducts() {
             <DetailRow label="Editorial" value={selected.publisher} />
             <DetailRow label="Precio" value={<span className="font-semibold text-corporate">RD${selected.price.toLocaleString()}</span>} />
             <DetailRow label="Moneda" value={<Badge variant="gold">{selected.currency}</Badge>} />
-            <DetailRow label="Estado" value={<Badge variant={statusMap[selected.status].variant}>{statusMap[selected.status].label}</Badge>} />
+            <DetailRow label="Estado" value={<Badge variant={statusMap[selected.status]?.variant || 'neutral'}>{statusMap[selected.status]?.label}</Badge>} />
           </>
         ) : selected ? (
           <>
@@ -251,23 +312,11 @@ export function AdminProducts() {
             <Select label="Categoría" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} options={categoryNames.map((c) => ({ value: c, label: c }))} />
             <Select label="Editorial" value={form.publisher} onChange={(e) => setForm({ ...form, publisher: e.target.value })} options={publisherNames.map((p) => ({ value: p, label: p }))} />
             <Input label="Precio" type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
-            <Select label="Moneda" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} options={currencyCodes.map((c) => ({ value: c, label: c }))} />
             <Select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={statusOptions} />
           </div>
           </>
         ) : null}
       </FormDialog>
-
-      <ConfirmDialog
-        open={Boolean(deleteId)}
-        onClose={() => setDeleteId(null)}
-        onConfirm={() => {
-          if (!deleteId) return
-          deleteProduct(deleteId)
-          setDeleteId(null)
-        }}
-        message="¿Está seguro de eliminar este producto del catálogo maestro?"
-      />
     </div>
   )
 }

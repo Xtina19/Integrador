@@ -89,6 +89,7 @@ interface AdminDeleteLayoutProps {
   recordSummary: { label: string; value: React.ReactNode }[]
   children?: React.ReactNode
   listPath?: string
+  onConfirm?: () => void | boolean | Promise<void | boolean>
 }
 
 export function AdminDeleteLayout({
@@ -99,9 +100,18 @@ export function AdminDeleteLayout({
   recordSummary,
   children,
   listPath,
+  onConfirm,
 }: AdminDeleteLayoutProps) {
   const navigate = useNavigate()
   const backPath = listPath ?? config.basePath
+
+  const handleConfirm = async () => {
+    if (onConfirm) {
+      const result = await onConfirm()
+      if (result === false) return
+    }
+    navigate(backPath)
+  }
 
   return (
     <div className="space-y-6">
@@ -165,7 +175,7 @@ export function AdminDeleteLayout({
         <Button variant="outline" onClick={() => navigate(backPath)}>
           Cancelar
         </Button>
-        <Button variant="danger" icon={Trash2} onClick={() => navigate(backPath)}>
+        <Button variant="danger" icon={Trash2} onClick={() => void handleConfirm()}>
           Confirmar eliminación
         </Button>
       </div>
