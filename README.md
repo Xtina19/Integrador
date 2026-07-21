@@ -111,5 +111,4 @@ Packs: `inventario_definitivo/`, `ventas_definitivo/`.
 ## Notas
 
 - No mezclar mocks FE con API en producción de pruebas: activar flags `VITE_USE_API_*`.  
-- `LibroSys-Legacy/` es referencia histórica, no runtime principal.  
 - Esperar aprobación documental antes de iniciar el módulo Compras.

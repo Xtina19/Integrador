@@ -1,6 +1,0 @@
-export { VentaLinea, type VentaLineaProps } from './VentaLinea'
-export { Pago, type PagoProps } from './Pago'
-export { Cambio, type CambioProps, type LineaCambioProps } from './Cambio'
-export { Devolucion, type DevolucionProps, type LineaDevolucionProps } from './Devolucion'
-export { NotaCredito, type NotaCreditoProps, type AplicacionNotaCreditoProps } from './NotaCredito'
-export { HistorialVenta, type HistorialVentaProps } from './HistorialVenta'

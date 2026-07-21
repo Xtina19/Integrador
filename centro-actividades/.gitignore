@@ -1,0 +1,15 @@
+target/
+.tools/
+*.class
+*.log
+*.tmp
+*.bak
+.idea/
+*.iml
+.vscode/
+output/volantes/
+!output/volantes/.gitkeep
+logs/
+!logs/.gitkeep
+data/*.txt
+!data/.gitkeep
