@@ -2,76 +2,90 @@
 
 ## Objetivo
 
-Describir el esquema **real** usado por Inventario y Ventas (MySQL `librosys`).
-
-Detalle: [`docs/database/`](../docs/database/) · packs en `database/mysql/`.
+Describir el **instalador oficial** y cómo se relacionan los scripts con cada módulo.
 
 ---
 
-## Descripción
+## Instalador oficial
 
-| Pack | Carpeta | Uso |
-|------|---------|-----|
-| Inventario | `database/mysql/inventario_definitivo/` | Existencias, movimientos, TRF, ajustes, conteos, descartes |
-| Ventas | `database/mysql/ventas_definitivo/` | ventas, líneas, pagos, cambios, NC, historial |
+**Fuente de verdad:** `database/sqlserver/`
 
-Instalación: `install_all.sql` o instaladores por módulo.
+| Paso | Archivo |
+|------|---------|
+| Índice | `install.sql` + `README.md` |
+| 01 | `01_Database.sql` |
+| 02 | `02_Seguridad.sql` |
+| 03 | `03_Administracion.sql` |
+| 04 | `04_Catalogo.sql` |
+| 05 | `05_Inventario.sql` |
+| 06 | `06_Compras.sql` |
+| 07 | `07_Ventas.sql` |
+| 08 | `08_Views.sql` |
+| 09 | `09_StoredProcedures.sql` |
+| 10 | `10_Indexes.sql` |
+| 11 | `11_SeedData.sql` |
+| 12 | `12_Editoriales.sql` |
 
----
+Ver también `database/Shared/README.md`.
 
-## Inventario — tablas clave
-
-| Tabla | Rol |
-|-------|-----|
-| `inventario` | Existencia producto×almacén |
-| `movimiento_inventario` | Ledger |
-| `transferencia` / `detalle_transferencia` | TRF |
-| `ajuste` / `ajuste_detalle` | Ajustes |
-| `conteo_fisico` + líneas/snapshot | Conteos |
-| `descarte` + detalle/evidencia | Descartes |
-| `productos`, `almacenes` | Catálogo ERP (alterados por el pack) |
-
----
-
-## Ventas — tablas clave
-
-| Tabla | Rol |
-|-------|-----|
-| `ventas` | Factura (Aggregate Root) |
-| `venta_lineas` | Líneas |
-| `pagos` | Pagos (`forma_pago`, `nota_credito_id`; **sin** `referencia`) |
-| `cambios` | Postventa |
-| `notas_credito` | NC ligadas a `venta_id` |
-| `nota_credito_aplicaciones` | Aplicaciones a ventas destino |
-| `historial_ventas` | Auditoría comercial |
-| `venta_clientes` | ACL identidad para Ventas |
-
-Legacy `venta` / `detalle_venta`: **no** usadas por el pack definitivo.
+> Pueden existir packs históricos bajo `database/mysql/` o material en `docs/`. Para instalaciones nuevas del ERP alineado a esta guía, usar **SQL Server** (`database/sqlserver/`).
 
 ---
 
-## Relaciones
+## Copias de navegación por módulo
 
-```mermaid
-erDiagram
-  ventas ||--o{ venta_lineas : tiene
-  ventas ||--o{ pagos : tiene
-  ventas ||--o{ cambios : tiene
-  ventas ||--o{ notas_credito : emite
-  notas_credito ||--o{ nota_credito_aplicaciones : aplica
-  ventas ||--o{ historial_ventas : registra
-```
+| Módulo | Copia en `Modulos/` | Oficial |
+|--------|---------------------|---------|
+| Inventario | `Database/schema.sql`, `views.sql`, `procedures.sql` | `05`, `08`, `09` |
+| Compras | `Database/schema.sql` | `06_Compras.sql` |
+| Ventas | `Database/schema.sql` | `07_Ventas.sql` |
+| Editoriales | `Database/schema.sql` | `12_Editoriales.sql` (tabla base en `03`) |
 
-Stock ↔ Ventas: vínculo **lógico** vía Engine (`documento_*`), no FK obligatoria en `pagos`.
+**No ejecutar** las copias de `Modulos/*/Database` como instalador. Editar siempre el pack oficial y sincronizar la copia.
 
 ---
 
-## Nota SQL Server
+## Inventario — tablas clave (orientativo)
 
-`/api/productos` y `/api/test-db` aún pueden usar SQL Server. No confundir con el pack MySQL DDD.
+| Tabla / concepto | Rol |
+|------------------|-----|
+| Existencias producto×almacén | Stock |
+| Movimiento / kardex | Ledger |
+| Transferencia, ajuste, conteo, descarte | Documentos de proceso |
+
+Detalle: [modulos/Inventario](./modulos/Inventario/README.md).
+
+---
+
+## Compras — tablas clave (orientativo)
+
+OC, recepción, factura proveedor, numeración, condiciones de pago.  
+Detalle: [modulos/Compras](./modulos/Compras/README.md).
+
+---
+
+## Ventas — tablas clave (orientativo)
+
+| Concepto | Rol |
+|----------|-----|
+| ventas + líneas | Factura (aggregate) |
+| pagos | Cobro |
+| cambios | Postventa física |
+| notas_credito | NC comercial |
+| historial | Auditoría comercial |
+
+Detalle: [modulos/Ventas](./modulos/Ventas/README.md).
+
+---
+
+## Editoriales
+
+Tabla base en administración + script de módulo `12_Editoriales.sql` (constraints / SPs).  
+Detalle: [modulos/Editoriales](./modulos/Editoriales/README.md).
 
 ---
 
 ## Notas
 
-Scripts relevantes Ventas: `11_pagos_nota_credito_id.sql`, `12_pagos_drop_referencia.sql`.
+- Inventario es el único dueño de existencias a nivel de reglas (aunque varias tablas vivan en el mismo pack).
+- Tras cambiar un `.sql` oficial, actualizar la copia del módulo correspondiente y la sección afectada en `guia/modulos/<Modulo>/`.

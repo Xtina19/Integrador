@@ -1,0 +1,84 @@
+{
+  "generatedAt": "2026-07-18T13:45:21.566Z",
+  "totals": {
+    "tsFiles": 51,
+    "testFiles": 5,
+    "domainFiles": 19,
+    "applicationFiles": 9,
+    "infrastructureFiles": 23
+  },
+  "dependenciesReview": {
+    "runtime": [
+      "express",
+      "cors",
+      "dotenv",
+      "mssql (legacy only)"
+    ],
+    "notes": [
+      "El módulo Inventario TS no requiere mssql en runtime actual (memory adapter).",
+      "No se añadieron loggers externos para mantener el núcleo liviano."
+    ]
+  },
+  "duplicationNotes": [
+    "Fakes de application/testing vs repos infrastructure: intencional por capas.",
+    "Validators HTTP y DTOs alineados; mappers delegan en validators."
+  ],
+  "staticChecks": [
+    "TypeScript strict (tsc --noEmit)",
+    "Vitest suite",
+    "Arquitectura hexagonal documentada"
+  ],
+  "files": [
+    "src\\modules\\inventario\\application\\index.ts",
+    "src\\modules\\inventario\\application\\ports\\outbound.ts",
+    "src\\modules\\inventario\\application\\results\\ApplicationResult.ts",
+    "src\\modules\\inventario\\application\\services\\AjusteApplicationService.ts",
+    "src\\modules\\inventario\\application\\services\\ApplicationServices.test.ts",
+    "src\\modules\\inventario\\application\\services\\ConteoApplicationService.ts",
+    "src\\modules\\inventario\\application\\services\\DescarteApplicationService.ts",
+    "src\\modules\\inventario\\application\\services\\TransferenciaApplicationService.ts",
+    "src\\modules\\inventario\\application\\testing\\fakes.ts",
+    "src\\modules\\inventario\\domain\\aggregates\\Ajuste.ts",
+    "src\\modules\\inventario\\domain\\aggregates\\ConteoFisico.ts",
+    "src\\modules\\inventario\\domain\\aggregates\\Descarte.ts",
+    "src\\modules\\inventario\\domain\\aggregates\\Transferencia.ts",
+    "src\\modules\\inventario\\domain\\entities\\AuditoriaMovimiento.ts",
+    "src\\modules\\inventario\\domain\\entities\\Existencia.ts",
+    "src\\modules\\inventario\\domain\\entities\\Kardex.ts",
+    "src\\modules\\inventario\\domain\\entities\\MovimientoInventario.ts",
+    "src\\modules\\inventario\\domain\\errors\\InventoryDomainError.ts",
+    "src\\modules\\inventario\\domain\\events\\InventoryDomainEvents.ts",
+    "src\\modules\\inventario\\domain\\index.ts",
+    "src\\modules\\inventario\\domain\\services\\InventoryEngine.test.ts",
+    "src\\modules\\inventario\\domain\\services\\InventoryEngine.ts",
+    "src\\modules\\inventario\\domain\\value-objects\\Cantidad.ts",
+    "src\\modules\\inventario\\domain\\value-objects\\DocumentoOrigenRef.ts",
+    "src\\modules\\inventario\\domain\\value-objects\\IdempotencyKey.ts",
+    "src\\modules\\inventario\\domain\\value-objects\\Saldo.ts",
+    "src\\modules\\inventario\\domain\\value-objects\\TipoMovimiento.ts",
+    "src\\modules\\inventario\\domain\\value-objects\\Version.ts",
+    "src\\modules\\inventario\\infrastructure\\adapters\\AuthorizationAdapter.ts",
+    "src\\modules\\inventario\\infrastructure\\adapters\\ClockAdapter.ts",
+    "src\\modules\\inventario\\infrastructure\\adapters\\EventPublisherAdapter.ts",
+    "src\\modules\\inventario\\infrastructure\\adapters\\IdGeneratorAdapter.ts",
+    "src\\modules\\inventario\\infrastructure\\api\\http\\controllers.http.test.ts",
+    "src\\modules\\inventario\\infrastructure\\api\\http\\createInventarioHttpApp.ts",
+    "src\\modules\\inventario\\infrastructure\\api\\http\\dto\\inventoryDtos.ts",
+    "src\\modules\\inventario\\infrastructure\\api\\http\\errorHandler.ts",
+    "src\\modules\\inventario\\infrastructure\\api\\http\\mappers\\inventoryMappers.ts",
+    "src\\modules\\inventario\\infrastructure\\api\\http\\routes\\inventarioRoutes.ts",
+    "src\\modules\\inventario\\infrastructure\\api\\http\\validators\\inputValidators.ts",
+    "src\\modules\\inventario\\infrastructure\\api\\openapi\\inventarioOpenApi.ts",
+    "src\\modules\\inventario\\infrastructure\\composition\\createInventarioComposition.ts",
+    "src\\modules\\inventario\\infrastructure\\index.ts",
+    "src\\modules\\inventario\\infrastructure\\observability\\classifyResult.ts",
+    "src\\modules\\inventario\\infrastructure\\observability\\MetricsRegistry.ts",
+    "src\\modules\\inventario\\infrastructure\\observability\\observability.test.ts",
+    "src\\modules\\inventario\\infrastructure\\observability\\requestContext.ts",
+    "src\\modules\\inventario\\infrastructure\\observability\\StructuredLogger.ts",
+    "src\\modules\\inventario\\infrastructure\\persistence\\InMemoryDatabaseAdapter.ts",
+    "src\\modules\\inventario\\infrastructure\\persistence\\InMemoryUnitOfWork.ts",
+    "src\\modules\\inventario\\infrastructure\\persistence\\persistence.integration.test.ts",
+    "src\\modules\\inventario\\infrastructure\\persistence\\repositories.ts"
+  ]
+}

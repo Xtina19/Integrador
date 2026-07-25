@@ -1,20 +1,2 @@
-import { Outlet } from 'react-router-dom'
-import { LayoutDashboard, ShoppingCart, PackageCheck, Receipt, Truck } from 'lucide-react'
-import { ModuleTabs } from '@/components/ui/ModuleTabs'
+﻿export * from '@/modules/compras/layouts/ComprasLayout'
 
-const tabs = [
-  { to: '/compras', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/compras/proveedores', label: 'Proveedores', icon: Truck },
-  { to: '/compras/ordenes', label: 'Órdenes de Compra', icon: ShoppingCart },
-  { to: '/compras/recepciones', label: 'Recepciones', icon: PackageCheck },
-  { to: '/compras/facturas', label: 'Facturas Proveedores', icon: Receipt },
-]
-
-export function ComprasLayout() {
-  return (
-    <div className="space-y-6">
-      <ModuleTabs tabs={tabs} />
-      <Outlet />
-    </div>
-  )
-}

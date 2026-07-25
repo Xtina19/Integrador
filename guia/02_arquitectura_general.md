@@ -2,26 +2,73 @@
 
 ## Objetivo
 
-Describir cómo está armado LibroSys hoy (FE, BE, API, persistencia).
+Describir cómo está armado LibroSys hoy: shells de ejecución, módulos de negocio, compartido y persistencia.
 
 ---
 
-## Descripción
+## Mapa del monorepo
+
+```
+Proyecto/
+├── guia/                  # Documentación oficial
+├── Modulos/<Dominio>/     # Frontend + Backend + Database por dominio
+├── Compartido/            # Código multi-módulo
+├── Infraestructura/       # Mapa del shell (README)
+├── Frontend/              # Shell Vite/React
+├── backend/               # Shell Express
+└── database/sqlserver/    # Instalador oficial SQL Server
+```
+
+Cada dominio sigue:
+
+```
+Modulos/<Nombre>/{ Frontend/, Backend/, Database/, README.md }
+```
+
+---
+
+## Shells vs negocio
+
+| Capa | Ubicación | Contiene |
+|------|-----------|----------|
+| Shell FE | `Frontend/` | Vite, rutas, layout, UI kit, providers de app, shims |
+| Shell BE | `backend/` | `server.js`, db, middlewares, Express clásico pendiente de migrar |
+| Negocio FE | `Modulos/*/Frontend` | Pantallas y clientes API del dominio |
+| Negocio BE DDD | `Modulos/{Inventario,Ventas}/Backend` | domain / application / infrastructure |
+| Negocio BE Express | `backend/**` (Compras, Editoriales, Admin…) | Documentado en `Modulos/*/Backend/README.md` |
+| Compartido | `Compartido/` | DetailPageShell, validators, stateMachines, useProductosMaestro |
+
+### Junctions (Windows)
+
+| Origen | Destino |
+|--------|---------|
+| `Frontend/src/modules/<nombre>` | `Modulos/<Nombre>/Frontend` |
+| `Frontend/src/compartido` | `Compartido/` |
+| `backend/src/modules/inventario` | `Modulos/Inventario/Backend` |
+| `backend/src/modules/ventas` | `Modulos/Ventas/Backend` |
+
+Arranque FE/BE usa `preserveSymlinks` / `register-paths.js` para resolver dependencias correctamente.
+
+---
+
+## Runtime HTTP
 
 ```
 Frontend (Vite :5173)
     │  HTTP JSON  (VITE_API_URL)
     ▼
 backend/server.js (:3001)
-    ├── /api/productos          ← legacy SQL Server
-    ├── /api/inventario/*       ← DDD Inventario + Engine
-    └── /api/v1/ventas/*        ← DDD Ventas (Engine compartido)
+    ├── /api/productos, /categorias, …     ← Express maestros (Admin)
+    ├── /api/compras, /api/v1/compras      ← Express Compras
+    ├── /api/editoriales                   ← Express Editoriales
+    ├── /api/inventario/*                  ← DDD Inventario + Engine
+    └── /api/v1/ventas/*                   ← DDD Ventas (Engine compartido)
          │
          ▼
-    MySQL librosys  (packs inventario_definitivo + ventas_definitivo)
+    SQL Server  (database/sqlserver/install.sql)
 ```
 
-**Orden de montaje obligatorio:** Inventario primero; Ventas recibe la composition del Engine. Sin Engine, Ventas no arranca.
+**Orden de montaje obligatorio:** Inventario primero; Ventas recibe la composition del Engine.
 
 ---
 
@@ -32,38 +79,26 @@ backend/server.js (:3001)
 | `domain/` | Agregados, entidades, VOs, políticas, errores |
 | `application/` | Services, handlers, commands, queries, DTOs |
 | `infrastructure/api` | Routes, controllers, validators, OpenAPI |
-| `infrastructure/persistence` | Repositorios MySQL / in-memory |
-| `infrastructure/adapters` | Engine, permisos, clientes ACL |
+| `infrastructure/persistence` | Repositorios / in-memory |
+| `infrastructure/adapters` | Engine, permisos, ACL |
 | `infrastructure/composition` | Wiring |
 
 El dominio **no** conoce Express ni SQL.
 
 ---
 
-## Frontend
-
-| Área | Path |
-|------|------|
-| Inventario | `Frontend/src/modules/inventario/` → rutas `/inventario/*` |
-| Ventas | `Frontend/src/modules/ventas/` → `/ventas/*` |
-| Layout Ventas | Dashboard · POS · Facturas · Notas de Crédito |
-
-Flags: `VITE_USE_API_INVENTARIO`, `VITE_USE_API_VENTAS`.
-
----
-
-## Conexión entre módulos
+## Conexión entre módulos (ejemplo Ventas → Inventario)
 
 ```mermaid
 sequenceDiagram
   participant FE as Frontend Ventas
   participant V as API Ventas
   participant E as Inventory Engine
-  participant DB as MySQL
+  participant DB as SQL Server
 
   FE->>V: Emitir venta / cambio / anular
   V->>E: InventarioEfectosPort.aplicar(...)
-  E->>DB: inventario + movimiento_inventario
+  E->>DB: existencias + movimiento + kardex
   V->>DB: ventas, pagos, historial, NC...
 ```
 
@@ -71,12 +106,11 @@ Ventas **nunca** escribe existencias directo. NC comercial **no** llama al Engin
 
 ---
 
-## Arquitectura
+## Documentación por módulo
 
-Detalle: [`docs/architecture/overview.md`](../docs/architecture/overview.md).
+- [Inventario](./modulos/Inventario/README.md)
+- [Compras](./modulos/Compras/README.md)
+- [Ventas](./modulos/Ventas/README.md)
+- [Editoriales](./modulos/Editoriales/README.md)
 
----
-
-## Notas
-
-Coexisten SQL Server (legacy productos) y MySQL (packs DDD). Al onboardear, no asumir un solo motor para todo.
+Índice: [guia/README.md](./README.md).

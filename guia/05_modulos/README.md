@@ -1,11 +1,14 @@
-# 05 — Módulos
+# 05 — Módulos (índice legado)
 
-Documentos por módulo **implementado**:
+La documentación técnica completa por módulo vive ahora en:
 
-| Módulo | Archivo |
-|--------|---------|
-| Inventario | [Inventario.md](./Inventario.md) |
-| Ventas | [Ventas.md](./Ventas.md) |
-| Compras | [Compras.md](./Compras.md) |
+**[`guia/modulos/`](../modulos/)**
 
-Al cerrar un módulo nuevo, añadir aquí su `.md` **antes** de iniciar el siguiente.
+| Módulo | Documentación oficial |
+|--------|------------------------|
+| Inventario | [modulos/Inventario](../modulos/Inventario/README.md) |
+| Compras | [modulos/Compras](../modulos/Compras/README.md) |
+| Ventas | [modulos/Ventas](../modulos/Ventas/README.md) |
+| Editoriales | [modulos/Editoriales](../modulos/Editoriales/README.md) |
+
+Los archivos `.md` de esta carpeta se conservan como **redirecciones** para no romper enlaces antiguos.

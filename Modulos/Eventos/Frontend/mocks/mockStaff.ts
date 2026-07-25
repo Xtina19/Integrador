@@ -1,0 +1,77 @@
+import type { Employee, StaffAssignmentRecord, EventDateRange } from '@/types/staffAssignment'
+
+export const employeesSeed: Employee[] = [
+  { id: 'EMP-001', name: 'Juan Pérez', area: 'ventas', status: 'active', available: true, eventsParticipated: 15 },
+  { id: 'EMP-002', name: 'María Gómez', area: 'ventas', status: 'active', available: true, eventsParticipated: 10 },
+  { id: 'EMP-003', name: 'Pedro Reyes', area: 'ventas', status: 'active', available: true, eventsParticipated: 6 },
+  { id: 'EMP-004', name: 'Ana López', area: 'ventas', status: 'active', available: true, eventsParticipated: 4 },
+  { id: 'EMP-005', name: 'Carlos Díaz', area: 'ventas', status: 'active', available: true, eventsParticipated: 8 },
+  { id: 'EMP-006', name: 'Luis Torres', area: 'ventas', status: 'active', available: true, eventsParticipated: 5 },
+  { id: 'EMP-007', name: 'Sofía Ramírez', area: 'ventas', status: 'active', available: true, eventsParticipated: 5 },
+  { id: 'EMP-008', name: 'Luis Fernández', area: 'inventario', status: 'active', available: true, eventsParticipated: 9 },
+  { id: 'EMP-009', name: 'José Rodríguez', area: 'inventario', status: 'active', available: true, eventsParticipated: 7 },
+  { id: 'EMP-010', name: 'Patricia Morales', area: 'inventario', status: 'active', available: true, eventsParticipated: 4 },
+  { id: 'EMP-011', name: 'Elena Vargas', area: 'inventario', status: 'active', available: true, eventsParticipated: 3 },
+  { id: 'EMP-012', name: 'Ramón Pérez', area: 'logistica', status: 'active', available: true, eventsParticipated: 11 },
+  { id: 'EMP-013', name: 'Miguel Santos', area: 'logistica', status: 'active', available: true, eventsParticipated: 6 },
+  { id: 'EMP-014', name: 'Rosa Jiménez', area: 'logistica', status: 'active', available: true, eventsParticipated: 4 },
+  { id: 'EMP-015', name: 'Carolina Sánchez', area: 'caja', status: 'active', available: true, eventsParticipated: 12 },
+  { id: 'EMP-016', name: 'Miguel Gómez', area: 'caja', status: 'active', available: true, eventsParticipated: 8 },
+  { id: 'EMP-017', name: 'Diana Cruz', area: 'caja', status: 'active', available: true, eventsParticipated: 5 },
+  { id: 'EMP-018', name: 'Fernando Ruiz', area: 'caja', status: 'active', available: true, eventsParticipated: 3 },
+  { id: 'EMP-019', name: 'Roberto Núñez', area: 'ventas', status: 'inactive', available: false, eventsParticipated: 20 },
+  { id: 'EMP-020', name: 'Claudia Mejía', area: 'inventario', status: 'active', available: false, eventsParticipated: 6 },
+]
+
+export const confirmedEventDates: EventDateRange[] = [
+  { eventId: 'EV-02', startDate: '2026-06-10', endDate: '2026-06-10' },
+  { eventId: 'EV-04', startDate: '2026-06-20', endDate: '2026-06-20' },
+  { eventId: 'EV-01', startDate: '2026-06-15', endDate: '2026-06-25' },
+]
+
+export const assignmentHistorySeed: StaffAssignmentRecord[] = [
+  {
+    id: 'ASG-001',
+    eventId: 'EV-02',
+    eventName: 'Presentación: Nuevo catálogo infantil',
+    employeeId: 'EMP-004',
+    employeeName: 'Ana López',
+    area: 'ventas',
+    startDate: '2026-06-10',
+    endDate: '2026-06-10',
+    status: 'confirmed',
+  },
+  {
+    id: 'ASG-002',
+    eventId: 'EV-02',
+    eventName: 'Presentación: Nuevo catálogo infantil',
+    employeeId: 'EMP-010',
+    employeeName: 'Patricia Morales',
+    area: 'inventario',
+    startDate: '2026-06-10',
+    endDate: '2026-06-10',
+    status: 'confirmed',
+  },
+  {
+    id: 'ASG-003',
+    eventId: 'EV-01',
+    eventName: 'Feria Internacional del Libro CDMX',
+    employeeId: 'EMP-001',
+    employeeName: 'Juan Pérez',
+    area: 'ventas',
+    startDate: '2026-06-15',
+    endDate: '2026-06-25',
+    status: 'confirmed',
+  },
+  {
+    id: 'ASG-004',
+    eventId: 'EV-01',
+    eventName: 'Feria Internacional del Libro CDMX',
+    employeeId: 'EMP-012',
+    employeeName: 'Ramón Pérez',
+    area: 'logistica',
+    startDate: '2026-06-15',
+    endDate: '2026-06-25',
+    status: 'confirmed',
+  },
+]

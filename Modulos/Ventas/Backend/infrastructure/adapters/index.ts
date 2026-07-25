@@ -1,0 +1,7 @@
+export { UuidIdGeneratorAdapter, SequentialIdGeneratorAdapter } from './IdGeneratorAdapter'
+export { InMemoryClienteConsultaAdapter } from './ClienteConsultaAdapter'
+export { InMemoryProductoConsultaAdapter } from './ProductoConsultaAdapter'
+export { EngineInventarioConsultaAdapter } from './EngineInventarioConsultaAdapter'
+export { EngineInventarioEfectosAdapter } from './EngineInventarioEfectosAdapter'
+export { InMemoryUsuarioPermisosAdapter } from './UsuarioPermisosAdapter'
+export { InMemoryAuditoriaComercialAdapter } from './AuditoriaComercialAdapter'

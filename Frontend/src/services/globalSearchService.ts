@@ -1,4 +1,4 @@
-import type { ERPState } from '@/store/initialState'
+﻿import type { ERPState } from '@/store/initialState'
 import { adminProducts, adminCategories, adminPublishers, adminSuppliers, adminBranches, adminCurrencies, publisherContracts } from '@/mocks/mockAdmin'
 import { salesHistory } from '@/mocks/mockVentas'
 import { supplierInvoices } from '@/mocks/mockCompras'
@@ -241,7 +241,7 @@ export function searchGlobal(query: string, state: ERPState): GlobalSearchResult
         title: t.id,
         subtitle: `${t.product} · ${t.origin} → ${t.destination}`,
         moduleLabel: 'Inventario',
-        path: '/inventario?tab=transferencias',
+        path: '/inventario?tab=movimientos&filtro=transferencias',
         recordType: 'transfer',
         openInDialog: false,
       },

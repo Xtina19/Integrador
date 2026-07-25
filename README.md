@@ -4,10 +4,12 @@ ERP para librería (universo Joselito). Monorepo con frontend React y backend Ex
 
 ```
 Proyecto/
-├── Frontend/          # React + TypeScript + Vite
-├── backend/           # Express + módulos DDD (Inventario, Ventas)
-├── database/mysql/    # Packs MySQL definitivos
-├── docs/              # Documentación oficial (fuente de verdad)
+├── guia/                 # Documentación oficial (fuente de verdad)
+├── Modulos/              # Código de negocio por dominio
+├── Compartido/           # Código multi-módulo
+├── Frontend/             # Shell Vite/React
+├── backend/              # Shell Express (+ DDD Inventario/Ventas)
+├── database/sqlserver/   # Instalador oficial SQL Server
 └── README.md
 ```
 
@@ -17,22 +19,21 @@ Proyecto/
 
 | Módulo | Estado |
 |--------|--------|
-| **Inventario** | Terminado / operativo (Engine, TRF, ajustes, conteos, descartes) |
-| **Ventas** | Terminado / operativo (POS, Facturas, NC consulta, postventa cambios) |
-| Administración (maestros) | Operativo (clientes, productos, etc. en UI) |
-| **Compras** | Pendiente (no documentado como cerrado) |
-| Importaciones / Editoriales / Eventos | Prototipo UI — fuera de docs oficiales |
+| **Inventario** | Operativo (DDD + Engine) |
+| **Ventas** | Operativo (DDD; POS, facturas, NC, postventa) |
+| **Compras** | Operativo (Express + FE) |
+| **Editoriales** | Operativo (Express + FE) |
+| Administración / Usuarios / Configuración | Operativo (maestros UI + Express) |
+| Importaciones / Eventos / Reportes / … | En `Modulos/`; docs pendientes en `guia/` |
 
-Documentación: [`docs/README.md`](./docs/README.md) · Guía de onboarding: [`guia/README.md`](./guia/README.md)
+**Documentación oficial:** [`guia/README.md`](./guia/README.md)
 
 ---
 
 ## Requisitos
 
-- Node.js 18+
-- npm
-- MySQL (`librosys`) para packs Inventario/Ventas
-- SQL Server opcional/legacy para `/api/productos` y health `GETDATE`
+- Node.js 18+ / npm
+- SQL Server — pack oficial en `database/sqlserver/`
 
 ---
 

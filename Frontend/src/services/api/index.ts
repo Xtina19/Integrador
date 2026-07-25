@@ -1,4 +1,3 @@
-export { inventarioApi } from './inventarioApi'
 export { ventasApi } from './ventasApi'
 export { comprasApi } from './comprasApi'
 export { importacionesApi } from './importacionesApi'

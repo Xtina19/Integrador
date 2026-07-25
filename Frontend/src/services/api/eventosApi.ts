@@ -1,9 +1,2 @@
-import { isApiEnabled } from '@/config/api'
+﻿export * from '@/modules/eventos/services/eventosApi'
 
-export const eventosApi = {
-  isEnabled: () => isApiEnabled('eventos'),
-
-  async listEvents() {
-    throw new Error('API de eventos no disponible. Use Mock Data.')
-  },
-}

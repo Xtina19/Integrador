@@ -25,22 +25,23 @@ El diseño favorece **límites de módulo claros**: Inventario no vende; Ventas 
 1. **Una fuente de verdad por concepto** (stock → Engine; clientes → Administración; factura → agregado Venta).  
 2. **Documentos padre/hijo explícitos** (Factura → Nota de Crédito).  
 3. **UI operativa sin duplicar maestros** en cada módulo.  
-4. **Código = verdad**; la documentación (incluida esta guía) se actualiza después de implementar.
+4. **Código = verdad**; `guia/` es la documentación oficial y se actualiza **junto con** cada cambio importante de módulo (ver [CONVENCIONES](./CONVENCIONES.md)).
 
 ---
 
-## Qué está terminado
+## Qué está documentado en `guia/modulos/`
 
-- Inventario DDD + Inventory Engine + pantallas + API `/api/inventario`.  
-- Ventas DDD + POS + Facturas + listado consulta de NC + integración Engine + API `/api/v1/ventas`.
+- **Inventario** — DDD + Engine + API `/api/inventario`
+- **Compras** — Express + FE (OC, recepciones, FP)
+- **Ventas** — DDD + POS/facturas/NC + API `/api/v1/ventas`
+- **Editoriales** — Express + FE (maestro publishers)
 
 ---
 
-## Qué falta (no documentar como hecho)
+## Pendiente de documentar / consolidar
 
-- Módulo Compras (órdenes, recepciones, facturas proveedor).  
-- Cierre de Importaciones / Editoriales / Eventos como módulos de dominio.  
-- Unificación total legacy SQL Server vs MySQL (aún coexisten rutas legacy de productos).
+- Resto de módulos en `Modulos/` (Admin, Usuarios, Configuración, Importaciones, Eventos, Reportes, …).  
+- Unificación total de persistencia (caminos in-memory / MySQL legacy vs pack SQL Server).
 
 ---
 
@@ -51,14 +52,19 @@ flowchart LR
   Admin[Administración]
   Inv[Inventario]
   Ven[Ventas]
+  Com[Compras]
+  Ed[Editoriales]
 
   Admin -->|clientes / productos| Ven
   Admin -->|productos / almacenes| Inv
+  Admin -->|proveedores / productos| Com
+  Ed -->|editorialId| Admin
   Ven -->|efectos de stock| Inv
+  Com -->|puerto recepción| Inv
 ```
 
 ---
 
 ## Notas
 
-Para profundidad técnica: `docs/architecture/`, `docs/inventory/`, `docs/sales/`.
+La referencia oficial para desarrolladores es **`guia/`**. Material histórico en `docs/` puede existir; ante conflicto, prevalece `guia/` alineada al código en `Modulos/`.
