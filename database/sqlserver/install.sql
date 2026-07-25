@@ -18,6 +18,7 @@ Orden de ejecución (sqlcmd / SSMS):
   09_StoredProcedures.sql
   10_Indexes.sql
   11_SeedData.sql
+  12_Editoriales.sql
 
 No ejecutar este archivo como script único con :r a menos que adapte las rutas.
 */

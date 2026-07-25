@@ -1,89 +1,215 @@
-import { useMemo, useState } from 'react'
+/**
+ * Alta operativa de existencia por almacén.
+ * No crea productos: selecciona del Catálogo Maestro (Administración → Productos).
+ */
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { FormPageLayout } from '@/components/ui/FormPageLayout'
 import { Input, Select } from '@/components/ui/Input'
-import { categories } from '@/mocks/mockCore'
-import { publisherNames, adminSuppliers } from '@/mocks/mockAdmin'
-import { validateProduct } from '@/business-rules/validators'
+import { useProductosMaestro } from '@/hooks/useProductosMaestro'
+import { almacenesApi } from '@/services/api/almacenesApi'
+import { existenciasApi } from '@/services/api/existenciasApi'
+import { getFriendlyErrorMessage } from '@/services/http'
+import { useToast } from '@/context/ToastContext'
 import { trim } from '@/utils/formValidation'
-import { useERP } from '@/store/ERPProvider'
+
+type AlmacenOption = { id: string; nombre: string }
 
 export function NuevoProductoPage() {
-  const { state, createProduct } = useERP()
+  const { showSuccess, showError } = useToast()
+  const { productos, loading: loadingProductos, error: catalogError } = useProductosMaestro()
+  const [almacenes, setAlmacenes] = useState<AlmacenOption[]>([])
+  const [loadingAlmacenes, setLoadingAlmacenes] = useState(true)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
-    code: '',
-    isbn: '',
-    name: '',
-    category: categories[0] ?? '',
-    publisher: publisherNames[0] ?? '',
-    supplier: adminSuppliers[0]?.name ?? '',
-    cost: '',
-    price: '',
-    stock: '',
-    minStock: '',
-    location: '',
-    status: 'active',
+    productoId: '',
+    almacenId: '',
+    stockInicial: '0',
+    stockMinimo: '0',
+    ubicacion: '',
   })
 
-  const validation = useMemo(
-    () =>
-      validateProduct(
-        form,
-        state.products.map((p) => p.id),
-        state.products.map((p) => p.isbn)
-      ),
-    [form, state.products]
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoadingAlmacenes(true)
+      try {
+        const rows = await almacenesApi.list()
+        if (cancelled) return
+        const list = (rows as Record<string, unknown>[])
+          .map((r) => ({
+            id: String(r.id ?? ''),
+            nombre: String(r.nombre ?? r.name ?? r.id ?? ''),
+          }))
+          .filter((a) => a.id)
+        setAlmacenes(list)
+        if (list[0] && !form.almacenId) {
+          setForm((f) => ({ ...f, almacenId: list[0].id }))
+        }
+      } catch (e) {
+        if (!cancelled) setError(getFriendlyErrorMessage(e))
+      } finally {
+        if (!cancelled) setLoadingAlmacenes(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo carga inicial de almacenes
+  }, [])
+
+  useEffect(() => {
+    if (!form.productoId && productos[0]) {
+      setForm((f) => ({ ...f, productoId: productos[0].id }))
+    }
+  }, [productos, form.productoId])
+
+  const selected = useMemo(
+    () => productos.find((p) => p.id === form.productoId),
+    [productos, form.productoId],
   )
+
+  const validationErrors = useMemo(() => {
+    const errs: string[] = []
+    if (!form.productoId) errs.push('Seleccione un producto del catálogo maestro.')
+    if (!form.almacenId) errs.push('Seleccione un almacén.')
+    const stock = Number(form.stockInicial)
+    if (!Number.isInteger(stock) || stock < 0) errs.push('Stock inicial debe ser un entero ≥ 0.')
+    const min = Number(form.stockMinimo)
+    if (!Number.isInteger(min) || min < 0) errs.push('Stock mínimo debe ser un entero ≥ 0.')
+    if (!trim(form.ubicacion) || trim(form.ubicacion).length < 2) {
+      errs.push('Ubicación es obligatoria (mín. 2 caracteres).')
+    }
+    return errs
+  }, [form])
+
+  const loading = loadingProductos || loadingAlmacenes
 
   return (
     <FormPageLayout
       breadcrumbs={[
         { label: 'Inventario', to: '/inventario' },
-        { label: 'Nuevo Producto' },
+        { label: 'Registrar existencia' },
       ]}
-      title="Nuevo Producto"
+      title="Registrar existencia"
+      subtitle="Seleccione un producto del catálogo maestro e indique stock por almacén"
       listPath="/inventario"
-      saveDisabled={!validation.valid}
-      onSave={() => {
-        const result = createProduct({
-          code: trim(form.code),
-          isbn: trim(form.isbn),
-          name: trim(form.name),
-          category: form.category,
-          publisher: form.publisher,
-          stock: Number(form.stock) || 0,
-          minStock: Number(form.minStock) || 0,
-          location: trim(form.location),
-          cost: Number(form.cost) || 0,
-          price: Number(form.price) || 0,
-        })
-        if (!result.success) {
-          setError(result.errors?.join(' ') ?? 'Error al guardar')
+      saveDisabled={loading || validationErrors.length > 0}
+      onSave={async () => {
+        if (validationErrors.length) {
+          setError(validationErrors[0])
           return false
         }
-        return true
+        if (!selected) {
+          setError('Producto no encontrado en el catálogo.')
+          return false
+        }
+        try {
+          setError('')
+          await existenciasApi.registrar({
+            productoId: selected.id,
+            almacenId: form.almacenId,
+            stockInicial: Number(form.stockInicial) || 0,
+            stockMinimo: Number(form.stockMinimo) || 0,
+            ubicacion: trim(form.ubicacion),
+            codigo: selected.code,
+            isbn: selected.isbn,
+            titulo: selected.title,
+            autor: selected.author,
+            categoria: selected.category,
+            editorial: selected.publisher,
+            costoReferencia: selected.cost || selected.price,
+            precio: selected.price,
+          })
+          showSuccess('Existencia registrada')
+          return true
+        } catch (e) {
+          const msg = getFriendlyErrorMessage(e)
+          setError(msg)
+          showError(msg)
+          return false
+        }
       }}
     >
-      {error && <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2 mb-4">{error}</div>}
-      {!validation.valid && !error && (
+      <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        Los datos maestros (ISBN, título, categoría, editorial) se gestionan en{' '}
+        <Link to="/inventario/productos" className="font-semibold underline hover:no-underline">
+          Catálogo de Productos
+        </Link>
+        . Aquí solo se registra la existencia operativa por almacén.
+      </div>
+
+      {(error || catalogError || validationErrors[0]) && (
         <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
-          {validation.errors[0]}
+          {error || catalogError || validationErrors[0]}
         </div>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Input label="Código *" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
-        <Input label="ISBN *" value={form.isbn} onChange={(e) => setForm({ ...form, isbn: e.target.value })} />
-        <Input label="Nombre *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="md:col-span-2" />
-        <Select label="Categoría *" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} options={categories.map((c) => ({ value: c, label: c }))} />
-        <Select label="Editorial *" value={form.publisher} onChange={(e) => setForm({ ...form, publisher: e.target.value })} options={publisherNames.map((p) => ({ value: p, label: p }))} />
-        <Select label="Proveedor *" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} options={adminSuppliers.map((s) => ({ value: s.name, label: s.name }))} />
-        <Input label="Costo *" type="number" min={0} step="0.0001" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
-        <Input label="Precio venta *" type="number" min={0} step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
-        <Input label="Stock inicial *" type="number" min={0} value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
-        <Input label="Stock mínimo *" type="number" min={0} value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
-        <Input label="Ubicación *" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className="md:col-span-2" />
-        <Select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={[{ value: 'active', label: 'Activo' }, { value: 'inactive', label: 'Inactivo' }]} />
-      </div>
+
+      {loading ? (
+        <p className="text-sm text-gray-500">Cargando catálogo…</p>
+      ) : productos.length === 0 ? (
+        <div className="rounded-lg border border-amber-100 bg-amber-50 px-4 py-4 text-sm text-amber-900">
+          No hay productos en el catálogo maestro.{' '}
+          <Link to="/inventario/productos/nuevo" className="font-semibold underline">
+            Crear producto en Administración
+          </Link>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Select
+            label="Producto *"
+            value={form.productoId}
+            onChange={(e) => setForm({ ...form, productoId: e.target.value })}
+            options={productos.map((p) => ({
+              value: p.id,
+              label: `${p.code ? `${p.code} · ` : ''}${p.title}`,
+            }))}
+            className="md:col-span-2"
+          />
+          {selected && (
+            <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-lg bg-surface border border-gray-100 px-4 py-3 text-sm text-gray-600">
+              <div>
+                <span className="text-xs uppercase text-gray-400">ISBN</span>
+                <p className="font-mono">{selected.isbn || '—'}</p>
+              </div>
+              <div>
+                <span className="text-xs uppercase text-gray-400">Categoría</span>
+                <p>{selected.category || '—'}</p>
+              </div>
+              <div>
+                <span className="text-xs uppercase text-gray-400">Editorial</span>
+                <p>{selected.publisher || '—'}</p>
+              </div>
+            </div>
+          )}
+          <Select
+            label="Almacén *"
+            value={form.almacenId}
+            onChange={(e) => setForm({ ...form, almacenId: e.target.value })}
+            options={almacenes.map((a) => ({ value: a.id, label: a.nombre }))}
+          />
+          <Input
+            label="Ubicación *"
+            value={form.ubicacion}
+            onChange={(e) => setForm({ ...form, ubicacion: e.target.value })}
+            placeholder="Ej. Pasillo A · Estante 3"
+          />
+          <Input
+            label="Stock inicial *"
+            type="number"
+            min={0}
+            value={form.stockInicial}
+            onChange={(e) => setForm({ ...form, stockInicial: e.target.value })}
+          />
+          <Input
+            label="Stock mínimo *"
+            type="number"
+            min={0}
+            value={form.stockMinimo}
+            onChange={(e) => setForm({ ...form, stockMinimo: e.target.value })}
+          />
+        </div>
+      )}
     </FormPageLayout>
   )
 }

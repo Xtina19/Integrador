@@ -24,7 +24,6 @@ export interface AdminProductForm {
   price: string | number
   currency: string
   status?: string
-  notes?: string
 }
 
 export interface AdminCategoryForm {
@@ -34,11 +33,13 @@ export interface AdminCategoryForm {
 }
 
 export interface AdminPublisherForm {
+  code?: string
   name: string
   country: string
   contact: string
   phone: string
-  address: string
+  email?: string
+  address?: string
   contractType?: string
   contractExpiry?: string
   status?: string
@@ -94,8 +95,7 @@ export function validateAdminProduct(
     validatePositiveDecimal(form.price, 'Precio'),
     requireSelect(form.currency, 'una moneda'),
     validateUnique(form.code, existingCodes, 'código', excludeCode),
-    validateUnique(form.isbn, existingIsbns, 'ISBN', excludeIsbn),
-    form.notes ? validateDescription(form.notes) : null
+    validateUnique(form.isbn, existingIsbns, 'ISBN', excludeIsbn)
   )
   return toValidationResult(errors)
 }
@@ -117,16 +117,26 @@ export function validateAdminCategory(
 export function validateAdminPublisher(
   form: AdminPublisherForm,
   existingNames: string[],
-  excludeName?: string
+  excludeName?: string,
+  existingCodes: string[] = [],
+  excludeCode?: string
 ): ValidationResult {
+  const phone = trim(form.phone || '')
+  const email = trim(form.email || '')
+  const contact = trim(form.contact || '')
+  const code = trim(form.code || '')
+  const EMAIL_RE_CONTACT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   const errors = collectErrors(
+    code ? validateCode(code, 'Código') : null,
     requireText(form.name, 'Nombre'),
     requireText(form.country, 'País', 2, 80),
     requireText(form.contact, 'Contacto'),
-    validatePhone(form.phone),
-    requireText(form.address, 'Dirección', 5, 200),
+    phone ? validatePhone(phone) : null,
+    email ? validateEmail(email) : EMAIL_RE_CONTACT.test(contact) ? validateEmail(contact) : null,
+    form.contractType ? requireSelect(form.contractType, 'un tipo de contrato') : null,
     form.contractExpiry ? validateDate(form.contractExpiry, 'Fecha de vencimiento') : null,
-    validateUnique(form.name, existingNames, 'nombre', excludeName)
+    validateUnique(form.name, existingNames, 'nombre', excludeName),
+    code ? validateUnique(code, existingCodes, 'código', excludeCode) : null
   )
   return toValidationResult(errors)
 }
@@ -197,12 +207,12 @@ export function validateAdminExchangeRate(form: AdminExchangeRateForm): Validati
 }
 
 export function validateAdminPublisherContract(form: AdminPublisherForm): ValidationResult {
+  const phone = trim(form.phone || '')
   const errors = collectErrors(
     requireText(form.name, 'Nombre'),
     requireText(form.country, 'País', 2, 80),
     requireText(form.contact, 'Contacto'),
-    validatePhone(form.phone),
-    requireText(form.address, 'Dirección', 5, 200),
+    phone ? validatePhone(phone) : null,
     form.contractType ? requireSelect(form.contractType, 'un tipo de contrato') : null,
     form.contractExpiry ? validateDate(form.contractExpiry, 'Fecha de vencimiento') : null
   )

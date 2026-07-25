@@ -8,10 +8,11 @@ import { Input, Select } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { RecordNotFound } from '@/modules/admin/components/RecordNotFound'
 import { ADMIN_MODULES } from '@/lib/adminConfig'
+import { formatEditorialDate, toDateInputValue } from '@/lib/editorialesDisplay'
 import { contractStatusConfig, getContractVisualStatus } from '@/lib/publisherContractStatus'
 import { validateAdminPublisher } from '@/business-rules/adminValidators'
 import { trim } from '@/utils/formValidation'
-import { editorialesApi } from '@/services/api/editorialesApi'
+import { editorialesApi, type EditorialRecord } from '@/services/api/editorialesApi'
 import { ensureCode } from '@/services/api/httpList'
 import { getFriendlyErrorMessage } from '@/services/http'
 import { useToast } from '@/context/ToastContext'
@@ -26,21 +27,11 @@ const contractTypes = [
   'Distribución regional',
   'Distribución nacional',
   'Convenio institucional',
+  'Distribución',
+  'Importación',
 ]
 
-type Publisher = {
-  id: string
-  code: string
-  name: string
-  country: string
-  contact: string
-  phone: string
-  address: string
-  contractType: string
-  contractExpiry: string
-  status: string
-  productCount: number
-}
+type Publisher = EditorialRecord
 
 export function PublisherFormPage() {
   const { id } = useParams()
@@ -57,8 +48,8 @@ export function PublisherFormPage() {
     name: '',
     country: '',
     contact: '',
+    email: '',
     phone: '',
-    address: '',
     contractType: contractTypes[0],
     contractExpiry: '',
     status: 'active',
@@ -68,12 +59,12 @@ export function PublisherFormPage() {
     let cancelled = false
     ;(async () => {
       try {
-        const list = (await editorialesApi.list()) as Publisher[]
+        const list = await editorialesApi.list()
         if (cancelled) return
         setAllNames(list.map((p) => p.name))
         setAllCodes(list.map((p) => p.code))
         if (isEdit && id) {
-          const found = list.find((p) => p.id === id) ?? ((await editorialesApi.getById(id)) as Publisher)
+          const found = list.find((p) => p.id === id) ?? (await editorialesApi.getById(id))
           if (cancelled) return
           setExisting(found)
           setForm({
@@ -81,10 +72,10 @@ export function PublisherFormPage() {
             name: found.name,
             country: found.country,
             contact: found.contact,
+            email: found.email || '',
             phone: found.phone,
-            address: found.address || '',
             contractType: found.contractType || contractTypes[0],
-            contractExpiry: found.contractExpiry,
+            contractExpiry: toDateInputValue(found.contractExpiry),
             status: found.status,
           })
         }
@@ -100,11 +91,28 @@ export function PublisherFormPage() {
   }, [id, isEdit])
 
   const validation = useMemo(
-    () => validateAdminPublisher({ ...form, address: form.address || 'Sin dirección registrada' }, allNames, existing?.name),
-    [form, allNames, existing]
+    () =>
+      validateAdminPublisher(
+        form,
+        allNames,
+        existing?.name,
+        allCodes,
+        existing?.code
+      ),
+    [form, allNames, allCodes, existing]
   )
 
-  const empty = { code: '', name: '', country: '', contact: '', phone: '', address: '', contractType: contractTypes[0], contractExpiry: '', status: 'active' }
+  const empty = {
+    code: '',
+    name: '',
+    country: '',
+    contact: '',
+    email: '',
+    phone: '',
+    contractType: contractTypes[0],
+    contractExpiry: '',
+    status: 'active',
+  }
 
   if (isEdit && !loading && (notFound || !existing)) {
     return <RecordNotFound moduleLabel="editorial" listPath={config.basePath} />
@@ -119,9 +127,10 @@ export function PublisherFormPage() {
     name: trim(form.name),
     country: trim(form.country),
     contact: trim(form.contact),
-    phone: trim(form.phone),
+    email: trim(form.email) || undefined,
+    phone: trim(form.phone) || undefined,
     contractType: form.contractType,
-    contractExpiry: form.contractExpiry || null,
+    contractExpiry: form.contractExpiry || undefined,
     status: form.status,
   })
 
@@ -152,7 +161,7 @@ export function PublisherFormPage() {
         await editorialesApi.create(buildPayload())
         showSuccess('Editorial creada')
         setForm(empty)
-        const list = (await editorialesApi.list()) as Publisher[]
+        const list = await editorialesApi.list()
         setAllNames(list.map((p) => p.name))
         setAllCodes(list.map((p) => p.code))
       } catch (err) {
@@ -181,15 +190,58 @@ export function PublisherFormPage() {
         </div>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Input label="Código" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="Se genera si se deja vacío" />
-        <Input label="Nombre *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="md:col-span-2" />
-        <Input label="País *" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
-        <Input label="Contacto *" value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
-        <Input label="Teléfono" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-        <Input label="Dirección" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="md:col-span-2" placeholder="Opcional" />
-        <Select label="Tipo de Contrato *" value={form.contractType} onChange={(e) => setForm({ ...form, contractType: e.target.value })} options={contractTypes.map((t) => ({ value: t, label: t }))} />
-        <Input label="Vencimiento contrato" type="date" value={form.contractExpiry} onChange={(e) => setForm({ ...form, contractExpiry: e.target.value })} />
-        <Select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={statusOptions} />
+        <Input
+          label="Código *"
+          value={form.code}
+          onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+          placeholder="Se genera si se deja vacío"
+        />
+        <Input
+          label="Nombre *"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          className="md:col-span-2"
+        />
+        <Input
+          label="País *"
+          value={form.country}
+          onChange={(e) => setForm({ ...form, country: e.target.value })}
+        />
+        <Input
+          label="Contacto *"
+          value={form.contact}
+          onChange={(e) => setForm({ ...form, contact: e.target.value })}
+        />
+        <Input
+          label="Email"
+          value={form.email}
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+          placeholder="opcional"
+        />
+        <Input
+          label="Teléfono"
+          value={form.phone}
+          onChange={(e) => setForm({ ...form, phone: e.target.value })}
+          placeholder="opcional"
+        />
+        <Select
+          label="Tipo de Contrato *"
+          value={form.contractType}
+          onChange={(e) => setForm({ ...form, contractType: e.target.value })}
+          options={contractTypes.map((t) => ({ value: t, label: t }))}
+        />
+        <Input
+          label="Vencimiento contrato"
+          type="date"
+          value={form.contractExpiry}
+          onChange={(e) => setForm({ ...form, contractExpiry: e.target.value })}
+        />
+        <Select
+          label="Estado"
+          value={form.status}
+          onChange={(e) => setForm({ ...form, status: e.target.value })}
+          options={statusOptions}
+        />
       </div>
     </AdminFormLayout>
   )
@@ -211,7 +263,7 @@ export function PublisherDetailPage() {
         return
       }
       try {
-        const row = (await editorialesApi.getById(id)) as Publisher
+        const row = await editorialesApi.getById(id)
         if (!cancelled) setPublisher(row)
       } catch {
         if (!cancelled) setNotFound(true)
@@ -234,7 +286,7 @@ export function PublisherDetailPage() {
     if (!publisher) return
     const next = publisher.status === 'active' ? 'inactive' : 'active'
     try {
-      const updated = (await editorialesApi.setEstado(publisher.id, next)) as Publisher
+      const updated = await editorialesApi.setEstado(publisher.id, next)
       setPublisher(updated)
       showSuccess(next === 'active' ? 'Editorial activada' : 'Editorial desactivada')
     } catch (err) {
@@ -252,7 +304,11 @@ export function PublisherDetailPage() {
       ]}
       title={publisher.name}
       subtitle={publisher.code}
-      statusBadge={<Badge variant={publisher.status === 'active' ? 'success' : 'neutral'}>{publisher.status === 'active' ? 'Activo' : 'Inactivo'}</Badge>}
+      statusBadge={
+        <Badge variant={publisher.status === 'active' ? 'success' : 'neutral'}>
+          {publisher.status === 'active' ? 'Activo' : 'Inactivo'}
+        </Badge>
+      }
     >
       <div className="flex justify-end mb-4">
         <button type="button" className="text-sm font-medium text-corporate hover:underline" onClick={() => void toggleEstado()}>
@@ -263,13 +319,36 @@ export function PublisherDetailPage() {
         <DetailSection title="Datos Generales">
           <dl>
             <DetailRow label="Código" value={<Badge variant="gold">{publisher.code}</Badge>} />
-            <DetailRow label="País" value={<div className="flex items-center gap-1.5"><Globe size={14} className="text-gray-400" />{publisher.country}</div>} />
-            <DetailRow label="Contacto" value={<div className="flex items-center gap-1.5"><Mail size={14} className="text-gray-400" />{publisher.contact}</div>} />
-            <DetailRow label="Teléfono" value={publisher.phone} />
-            <DetailRow label="Tipo de Contrato" value={<Badge variant="gold">{publisher.contractType}</Badge>} />
-            <DetailRow label="Vencimiento" value={publisher.contractExpiry || '—'} />
+            <DetailRow
+              label="País"
+              value={
+                <div className="flex items-center gap-1.5">
+                  <Globe size={14} className="text-gray-400" />
+                  {publisher.country || '—'}
+                </div>
+              }
+            />
+            <DetailRow
+              label="Contacto"
+              value={
+                <div className="flex items-center gap-1.5">
+                  <Mail size={14} className="text-gray-400" />
+                  {publisher.contact || '—'}
+                </div>
+              }
+            />
+            <DetailRow label="Email" value={publisher.email || '—'} />
+            <DetailRow label="Teléfono" value={publisher.phone || '—'} />
+            <DetailRow label="Tipo de Contrato" value={<Badge variant="gold">{publisher.contractType || '—'}</Badge>} />
+            <DetailRow
+              label="Vencimiento"
+              value={<span className="tabular-nums">{formatEditorialDate(publisher.contractExpiry)}</span>}
+            />
             <DetailRow label="Estado del contrato" value={<Badge variant={contractBadge.variant}>{contractBadge.label}</Badge>} />
-            <DetailRow label="Productos asociados" value={<span className="font-bold text-corporate">{publisher.productCount}</span>} />
+            <DetailRow
+              label="Productos asociados"
+              value={<span className="font-bold text-corporate">{publisher.productCount}</span>}
+            />
           </dl>
         </DetailSection>
       </div>
@@ -293,7 +372,7 @@ export function PublisherDeletePage() {
         return
       }
       try {
-        const row = (await editorialesApi.getById(id)) as Publisher
+        const row = await editorialesApi.getById(id)
         if (!cancelled) setPublisher(row)
       } catch {
         if (!cancelled) setNotFound(true)
@@ -321,7 +400,7 @@ export function PublisherDeletePage() {
       recordSummary={[
         { label: 'Contacto', value: publisher.contact },
         { label: 'Productos', value: String(publisher.productCount) },
-        { label: 'Contrato', value: publisher.contractType },
+        { label: 'Contrato', value: publisher.contractType || '—' },
         { label: 'Estado', value: publisher.status === 'active' ? 'Activo' : 'Inactivo' },
       ]}
       onConfirm={async () => {

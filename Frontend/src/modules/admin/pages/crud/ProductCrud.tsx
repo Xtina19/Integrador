@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { AdminFormLayout } from '@/modules/admin/components/AdminFormLayout'
 import { AdminDetailLayout, AdminDeleteLayout } from '@/modules/admin/components/AdminDetailLayout'
 import { DetailSection, DetailRow } from '@/modules/admin/components/AdminDetailSection'
-import { Input, Select, Textarea } from '@/components/ui/Input'
+import { Input, Select } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { RecordNotFound } from '@/modules/admin/components/RecordNotFound'
 import { ADMIN_MODULES } from '@/lib/adminConfig'
@@ -52,7 +52,6 @@ const emptyForm = {
   price: '',
   currency: 'DOP',
   status: 'active',
-  notes: '',
 }
 
 export function ProductFormPage() {
@@ -98,7 +97,6 @@ export function ProductFormPage() {
             price: String(found.price),
             currency: found.currency || 'DOP',
             status: found.status,
-            notes: '',
           })
         }
       } catch {
@@ -193,7 +191,7 @@ export function ProductFormPage() {
         { label: isEdit ? config.editTitle : config.createTitle },
       ]}
       title={isEdit ? config.editTitle : config.createTitle}
-      subtitle={isEdit ? `Modificando ${existing!.code}` : 'Registro en catálogo maestro'}
+      subtitle={isEdit ? `Modificando ${existing!.code}` : 'Catálogo maestro único — usado por Inventario, Compras, Ventas y Eventos'}
       listPath={config.basePath}
       saveDisabled={!validation.valid}
       onSave={saveForm}
@@ -211,10 +209,9 @@ export function ProductFormPage() {
         <Input label="Autor" value={form.author} onChange={(e) => update('author', e.target.value)} className="md:col-span-2" />
         <Select label="Categoría *" value={form.categoryId} onChange={(e) => update('categoryId', e.target.value)} options={categories.map((c) => ({ value: c.id, label: c.name }))} />
         <Select label="Editorial *" value={form.publisherId} onChange={(e) => update('publisherId', e.target.value)} options={publishers.map((p) => ({ value: p.id, label: p.name }))} />
-        <Input label="Precio *" type="number" min={0} step="0.01" value={form.price} onChange={(e) => update('price', e.target.value)} />
+        <Input label="Precio de venta *" type="number" min={0} step="0.01" value={form.price} onChange={(e) => update('price', e.target.value)} />
         <Input label="Moneda" value={form.currency} disabled />
         <Select label="Estado" value={form.status} onChange={(e) => update('status', e.target.value)} options={statusOptions} />
-        <Textarea label="Notas internas" value={form.notes} onChange={(e) => update('notes', e.target.value)} className="md:col-span-2" rows={3} />
       </div>
     </AdminFormLayout>
   )

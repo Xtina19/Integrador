@@ -9,7 +9,7 @@ import { GlobalSearchNavigationProvider } from '../../context/GlobalSearchNaviga
 const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/': { title: 'Dashboard', subtitle: 'Resumen general del sistema' },
   '/inventario': { title: 'Gestión de Inventario', subtitle: 'Control de productos y stock' },
-  '/inventario/nuevo': { title: 'Nuevo Producto', subtitle: 'Registro en inventario' },
+  '/inventario/nuevo': { title: 'Registrar existencia', subtitle: 'Producto del catálogo maestro × almacén' },
   '/inventario/ajustes/nuevo': { title: 'Nuevo Ajuste', subtitle: 'Ajuste de inventario' },
   '/inventario/conteos/nuevo': { title: 'Crear Conteo Físico', subtitle: 'Programación y alcance del conteo' },
   '/inventario/descartes/nuevo': { title: 'Crear Descarte', subtitle: 'Baja formal de inventario' },

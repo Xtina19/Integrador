@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Input, Select } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
-import { POS_CATALOG } from '../data/posCatalog'
+import { buildPosCatalogDesdeMaestro } from '../data/posCatalog'
+import { useProductosMaestro } from '@/hooks/useProductosMaestro'
 import type { FormaPagoDto, VentaDetalleDto, VentaLineaDto } from '@/services/api/ventasApi'
 import { formatDop } from '../utils/ventasUi'
 
@@ -49,6 +50,11 @@ function precioLineaFactura(linea: VentaLineaDto): number {
  * La diferencia se calcula siempre; el cajero no la edita.
  */
 export function CambioAsistente({ venta, busy, onCancel, onSubmit }: CambioAsistenteProps) {
+  const { productos: productosMaestro } = useProductosMaestro()
+  const catalog = useMemo(
+    () => buildPosCatalogDesdeMaestro(productosMaestro),
+    [productosMaestro],
+  )
   const [step, setStep] = useState<Step>(1)
   const [devueltas, setDevueltas] = useState<DevLine[]>([
     { productoId: venta.lineas[0]?.productoId ?? '', cantidad: 1 },
@@ -81,7 +87,7 @@ export function CambioAsistente({ venta, busy, onCancel, onSubmit }: CambioAsist
     const detalleNew: Array<{ titulo: string; cantidad: number; importe: number }> = []
     for (const n of nuevas) {
       if (!n.productoId || n.cantidad < 1) continue
-      const cat = POS_CATALOG.find((p) => p.id === n.productoId)
+      const cat = catalog.find((p) => p.id === n.productoId)
       if (!cat) continue
       const importe = cat.precioSugerido * n.cantidad
       valorNuevo += importe
@@ -90,14 +96,14 @@ export function CambioAsistente({ venta, busy, onCancel, onSubmit }: CambioAsist
 
     const diferencia = valorNuevo - valorDevuelto
     return { valorDevuelto, valorNuevo, diferencia, detalleDev, detalleNew }
-  }, [devueltas, nuevas, lineasDisponibles])
+  }, [devueltas, nuevas, lineasDisponibles, catalog])
 
   const productOptions = lineasDisponibles.map((l) => ({
     value: l.productoId,
     label: `${l.descripcionSnapshot} — ${formatDop(l.precioUnitario)} (facturada)`,
   }))
 
-  const catalogOptions = POS_CATALOG.map((p) => ({
+  const catalogOptions = catalog.map((p) => ({
     value: p.id,
     label: `${p.titulo} — ${formatDop(p.precioSugerido)}`,
   }))
@@ -142,7 +148,7 @@ export function CambioAsistente({ venta, busy, onCancel, onSubmit }: CambioAsist
         : nuevas
             .filter((n) => n.productoId && n.cantidad >= 1)
             .map((n) => {
-              const cat = POS_CATALOG.find((p) => p.id === n.productoId)!
+              const cat = catalog.find((p) => p.id === n.productoId)!
               return {
                 productoId: n.productoId,
                 cantidad: n.cantidad,
@@ -262,7 +268,7 @@ export function CambioAsistente({ venta, busy, onCancel, onSubmit }: CambioAsist
                   setSoloDevolver(checked)
                   if (checked) setNuevas([])
                   else if (nuevas.length === 0) {
-                    setNuevas([{ productoId: POS_CATALOG[0]?.id ?? '', cantidad: 1 }])
+                    setNuevas([{ productoId: catalog[0]?.id ?? '', cantidad: 1 }])
                   }
                 }}
               />
@@ -314,7 +320,7 @@ export function CambioAsistente({ venta, busy, onCancel, onSubmit }: CambioAsist
                   size="sm"
                   variant="outline"
                   onClick={() =>
-                    setNuevas([...nuevas, { productoId: POS_CATALOG[0]?.id ?? '', cantidad: 1 }])
+                    setNuevas([...nuevas, { productoId: catalog[0]?.id ?? '', cantidad: 1 }])
                   }
                 >
                   Agregar producto nuevo

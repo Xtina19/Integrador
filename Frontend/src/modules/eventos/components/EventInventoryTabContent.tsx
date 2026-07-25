@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input, Select } from '@/components/ui/Input'
 import { Table } from '@/components/ui/Table'
-import { posProducts } from '@/mocks/mockVentas'
-import { branches } from '@/mocks/mockCore'
+import { useProductosMaestro } from '@/hooks/useProductosMaestro'
+import { almacenesApi } from '@/services/api/almacenesApi'
 import type { EventInventoryItem } from '@/modules/eventos/types/eventExtended'
 
 interface EventInventoryTabContentProps {
@@ -14,20 +14,49 @@ interface EventInventoryTabContentProps {
 }
 
 export function EventInventoryTabContent({ items, onChange, readOnly = false }: EventInventoryTabContentProps) {
+  const { productos } = useProductosMaestro()
+  const [sucursales, setSucursales] = useState<Array<{ id: string; name: string }>>([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [productId, setProductId] = useState(posProducts[0]?.id ?? '')
+  const [productId, setProductId] = useState('')
   const [qty, setQty] = useState('1')
-  const [originBranch, setOriginBranch] = useState(branches[0]?.name ?? '')
+  const [originBranch, setOriginBranch] = useState('')
 
-  const selectedProduct = posProducts.find((p) => p.id === productId)
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const rows = await almacenesApi.list()
+        if (cancelled) return
+        const list = (rows as Record<string, unknown>[])
+          .map((r) => ({
+            id: String(r.id ?? ''),
+            name: String(r.nombre ?? r.name ?? r.id ?? ''),
+          }))
+          .filter((a) => a.id)
+        setSucursales(list)
+        if (list[0] && !originBranch) setOriginBranch(list[0].name)
+      } catch {
+        /* catálogo opcional en eventos prototype */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [originBranch])
+
+  useEffect(() => {
+    if (!productId && productos[0]) setProductId(productos[0].id)
+  }, [productos, productId])
+
+  const selectedProduct = productos.find((p) => p.id === productId)
 
   function resetForm() {
     setShowForm(false)
     setEditingId(null)
-    setProductId(posProducts[0]?.id ?? '')
+    setProductId(productos[0]?.id ?? '')
     setQty('1')
-    setOriginBranch(branches[0]?.name ?? '')
+    setOriginBranch(sucursales[0]?.name ?? '')
   }
 
   function handleSave() {
@@ -77,7 +106,9 @@ export function EventInventoryTabContent({ items, onChange, readOnly = false }: 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h4 className="text-sm font-semibold text-gray-900">Inventario destinado al evento</h4>
-          <p className="text-xs text-gray-500 mt-0.5">Productos que serán enviados a la feria (datos simulados)</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Productos del catálogo maestro que serán enviados a la feria
+          </p>
         </div>
         {!readOnly && (
           <Button size="sm" icon={Plus} onClick={() => { resetForm(); setShowForm(true) }}>
@@ -92,7 +123,7 @@ export function EventInventoryTabContent({ items, onChange, readOnly = false }: 
             label="Producto"
             value={productId}
             onChange={(e) => setProductId(e.target.value)}
-            options={posProducts.map((p) => ({ value: p.id, label: p.title }))}
+            options={productos.map((p) => ({ value: p.id, label: p.title }))}
             className="md:col-span-2"
           />
           <Input label="Cantidad" type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} />
@@ -100,11 +131,13 @@ export function EventInventoryTabContent({ items, onChange, readOnly = false }: 
             label="Sucursal origen"
             value={originBranch}
             onChange={(e) => setOriginBranch(e.target.value)}
-            options={branches.map((b) => ({ value: b.name, label: b.name }))}
+            options={sucursales.map((b) => ({ value: b.name, label: b.name }))}
           />
           <div className="md:col-span-4 flex gap-2 justify-end">
             <Button variant="outline" size="sm" onClick={resetForm}>Cancelar</Button>
-            <Button size="sm" onClick={handleSave}>{editingId ? 'Actualizar' : 'Agregar'}</Button>
+            <Button size="sm" onClick={handleSave} disabled={!selectedProduct}>
+              {editingId ? 'Actualizar' : 'Agregar'}
+            </Button>
           </div>
         </div>
       )}
@@ -118,34 +151,30 @@ export function EventInventoryTabContent({ items, onChange, readOnly = false }: 
           { key: 'isbn', header: 'ISBN', render: (r) => r.isbn || '—' },
           { key: 'qty', header: 'Cantidad' },
           { key: 'originBranch', header: 'Sucursal' },
-          ...(!readOnly
-            ? [
+          ...(readOnly
+            ? []
+            : [
                 {
                   key: 'actions',
-                  header: 'Acciones',
-                  render: (r: EventInventoryItem) => (
-                    <div className="flex gap-1">
-                      <button type="button" onClick={() => startEdit(r)} className="p-1.5 rounded text-gray-400 hover:text-corporate hover:bg-corporate/5" aria-label="Editar">
-                        <Pencil size={14} />
+                  header: '',
+                  render: (r: EventInventoryItem & Record<string, unknown>) => (
+                    <div className="flex gap-1 justify-end">
+                      <button type="button" className="p-1.5 rounded hover:bg-gray-100" onClick={() => startEdit(r as EventInventoryItem)}>
+                        <Pencil className="w-3.5 h-3.5 text-gray-500" />
                       </button>
                       <button
                         type="button"
+                        className="p-1.5 rounded hover:bg-red-50"
                         onClick={() => onChange(items.filter((i) => i.id !== r.id))}
-                        className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"
-                        aria-label="Eliminar"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 className="w-3.5 h-3.5 text-red-500" />
                       </button>
                     </div>
                   ),
                 },
-              ]
-            : []),
+              ]),
         ]}
       />
-      {items.length === 0 && (
-        <p className="text-sm text-gray-400 text-center py-6">No hay productos asignados al evento</p>
-      )}
     </div>
   )
 }

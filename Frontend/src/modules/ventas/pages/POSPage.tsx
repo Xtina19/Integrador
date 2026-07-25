@@ -9,7 +9,8 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/context/ToastContext'
 import { useClientesCatalog } from '@/context/ClientesCatalogContext'
 import { VentasApiRequiredBanner } from '../components/VentasApiRequiredBanner'
-import { POS_CATALOG, POS_DEFAULTS } from '../data/posCatalog'
+import { POS_DEFAULTS, buildPosCatalogDesdeMaestro, type PosCatalogProduct } from '../data/posCatalog'
+import { useProductosMaestro } from '@/hooks/useProductosMaestro'
 import {
   ventasApi,
   type FormaPagoDto,
@@ -61,6 +62,11 @@ export function POSPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { showSuccess, showError } = useToast()
   const { buscarActivos, getById } = useClientesCatalog()
+  const { productos: productosMaestro } = useProductosMaestro()
+  const catalog = useMemo(
+    () => buildPosCatalogDesdeMaestro(productosMaestro),
+    [productosMaestro],
+  )
   const [search, setSearch] = useState('')
   const [cart, setCart] = useState<CartLine[]>([])
   const [tipoVenta, setTipoVenta] = useState<TipoVentaDto>('consumidor_final')
@@ -113,16 +119,20 @@ export function POSPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return POS_CATALOG
-    return POS_CATALOG.filter(
-      (p) => p.titulo.toLowerCase().includes(q) || p.id.toLowerCase().includes(q),
+    if (!q) return catalog
+    return catalog.filter(
+      (p) =>
+        p.titulo.toLowerCase().includes(q) ||
+        p.id.toLowerCase().includes(q) ||
+        (p.isbn ?? '').toLowerCase().includes(q) ||
+        (p.codigo ?? '').toLowerCase().includes(q),
     )
-  }, [search])
+  }, [search, catalog])
 
   const cartDetails = useMemo(() => {
     return cart
       .map((line) => {
-        const product = POS_CATALOG.find((p) => p.id === line.productId)
+        const product = catalog.find((p) => p.id === line.productId)
         if (!product) return null
         const bruto = product.precioSugerido * line.qty
         const desc = roundMoney((bruto * line.discountPct) / 100)
@@ -136,13 +146,13 @@ export function POSPage() {
       })
       .filter(Boolean) as Array<
       CartLine & {
-        product: (typeof POS_CATALOG)[0]
+        product: PosCatalogProduct
         bruto: number
         desc: number
         neto: number
       }
     >
-  }, [cart])
+  }, [cart, catalog])
 
   const totalEstimado = cartDetails.reduce((s, l) => s + l.neto, 0)
 

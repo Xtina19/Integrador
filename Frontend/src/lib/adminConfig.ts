@@ -68,9 +68,9 @@ export const ADMIN_MODULES: Record<AdminModuleKey, AdminModuleConfig> = {
     detailTitle: 'Detalle de Editorial',
     deleteTitle: 'Eliminar Editorial',
     deleteConsequences: [
-      'Se perderá la vinculación con todos los productos de esta editorial.',
-      'Los contratos activos quedarían sin referencia en el sistema.',
-      'Las órdenes de compra pendientes podrían verse afectadas.',
+      'La editorial se desactivará (no se borra físicamente para preservar integridad con productos).',
+      'Los productos asociados conservarán la referencia a esta editorial.',
+      'Los contratos y reportes seguirán mostrando el histórico.',
     ],
   },
   sucursales: {

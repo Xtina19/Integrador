@@ -7,7 +7,8 @@ import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Input, Select } from '@/components/ui/Input'
 import { Table } from '@/components/ui/Table'
 import { Badge } from '@/components/ui/Badge'
-import { branches, categories, products } from '@/mocks/mockCore'
+import { branches } from '@/mocks/mockCore'
+import { useProductosMaestro } from '@/hooks/useProductosMaestro'
 import { conteosApi } from '@/services/api/conteosApi'
 import { getFriendlyErrorMessage } from '@/services/http'
 import { useToast } from '@/context/ToastContext'
@@ -35,12 +36,10 @@ function nextCodigo(): string {
   return `CF-${stamp}-${seq}`
 }
 
-const editoriales = [...new Set(products.map((p) => p.publisher))]
-const ubicaciones = [...new Set(products.map((p) => p.location.split(' - ')[0] ?? p.location))]
-
 export function NuevoConteoPage() {
   const navigate = useNavigate()
   const { showSuccess, showError } = useToast()
+  const { productos } = useProductosMaestro()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [codigo] = useState(nextCodigo)
@@ -62,18 +61,28 @@ export function NuevoConteoPage() {
     productoBusqueda: '',
   })
 
+  const editoriales = useMemo(
+    () => [...new Set(productos.map((p) => p.publisher).filter(Boolean))],
+    [productos],
+  )
+  const categoriasMaestro = useMemo(
+    () => [...new Set(productos.map((p) => p.category).filter(Boolean))],
+    [productos],
+  )
+  const ubicaciones = useMemo(() => ['Pasillo A', 'Pasillo B', 'Depósito', 'Mostrador'], [])
+
   const sucursalNombre = branches.find((b) => b.id === form.sucursalId)?.name ?? form.sucursalId
 
   const productosBase = useMemo((): ProductoAlcanceRow[] => {
-    let list = products.map((p) => ({
+    let list = productos.map((p) => ({
       productoId: p.id,
       isbn: p.isbn,
       titulo: p.title,
       categoria: p.category,
       editorial: p.publisher,
-      ubicacion: p.location,
-      existenciaActual: p.stock,
-      stockMinimo: 10,
+      ubicacion: '—',
+      existenciaActual: 0,
+      stockMinimo: 0,
       seleccionado: true,
     }))
 
@@ -89,13 +98,13 @@ export function NuevoConteoPage() {
         list = list.filter(
           (p) =>
             p.titulo.toLowerCase().includes(q) ||
-            p.isbn.includes(q) ||
+            p.isbn.toLowerCase().includes(q) ||
             p.productoId.toLowerCase().includes(q),
         )
       }
     }
     return list
-  }, [form.alcanceTipo, form.alcanceValor, form.productoBusqueda])
+  }, [form.alcanceTipo, form.alcanceValor, form.productoBusqueda, productos])
 
   const [excluidos, setExcluidos] = useState<Set<string>>(new Set())
   const [seleccionManual, setSeleccionManual] = useState<Set<string>>(new Set())
@@ -312,7 +321,7 @@ export function NuevoConteoPage() {
                 onChange={(e) => setForm({ ...form, alcanceValor: e.target.value })}
                 options={[
                   { value: '', label: 'Seleccione…' },
-                  ...categories.map((c) => ({ value: c, label: c })),
+                  ...categoriasMaestro.map((c) => ({ value: c, label: c })),
                 ]}
               />
             )}

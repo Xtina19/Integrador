@@ -356,7 +356,10 @@ export function Inventory() {
         return (
           <>
             <Button icon={Plus} onClick={() => navigate('/inventario/nuevo')}>
-              Nuevo producto
+              Registrar existencia
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/inventario/productos')}>
+              Catálogo de productos
             </Button>
             <Button variant="outline" icon={Calculator} onClick={() => navigate('/inventario/costeo/nuevo')}>
               Costeo

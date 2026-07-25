@@ -1,15 +1,20 @@
 /**
- * Catálogo POS = subset del Master Data (mismos títulos/precios que `productos`).
- * No duplica artículos: IDs de dominio mapean al maestro ERP vía ventas_ref / Engine.
+ * Catálogo POS — proyección del Catálogo Maestro (Administración → productos).
+ * El fallback estático solo se usa si la API no responde, para no romper el POS.
  */
+import type { ProductoMaestro } from '@/hooks/useProductosMaestro'
+
 export interface PosCatalogProduct {
   id: string
   titulo: string
   precioSugerido: number
   moneda: 'DOP' | 'USD' | 'EUR'
+  isbn?: string
+  codigo?: string
 }
 
-export const POS_CATALOG: PosCatalogProduct[] = [
+/** Fallback operativo (mismos IDs que el seed de Ventas) si el maestro no está disponible. */
+export const POS_CATALOG_FALLBACK: PosCatalogProduct[] = [
   { id: 'prod-cien', titulo: 'Cien años de soledad', precioSugerido: 895.0, moneda: 'DOP' },
   { id: 'prod-sombra', titulo: 'La sombra del viento', precioSugerido: 780.0, moneda: 'DOP' },
   { id: 'prod-quijote', titulo: 'Don Quijote de la Mancha', precioSugerido: 950.0, moneda: 'DOP' },
@@ -28,8 +33,35 @@ export const POS_CATALOG: PosCatalogProduct[] = [
   { id: 'prod-booklight', titulo: 'Book light LED clip', precioSugerido: 450.0, moneda: 'DOP' },
 ]
 
+/** @deprecated Preferir buildPosCatalogDesdeMaestro — alias del fallback. */
+export const POS_CATALOG = POS_CATALOG_FALLBACK
+
 export const POS_DEFAULTS = {
   sucursalId: 'suc-central',
   almacenId: 'alm-central',
   moneda: 'DOP' as const,
+}
+
+export function mapMaestroToPos(p: ProductoMaestro): PosCatalogProduct {
+  const moneda = (p.currency === 'USD' || p.currency === 'EUR' ? p.currency : 'DOP') as
+    | 'DOP'
+    | 'USD'
+    | 'EUR'
+  return {
+    id: p.id,
+    titulo: p.title,
+    precioSugerido: p.price,
+    moneda,
+    isbn: p.isbn,
+    codigo: p.code,
+  }
+}
+
+/**
+ * Construye el catálogo POS desde el maestro.
+ * Si el maestro está vacío, conserva el fallback para no romper ventas sembradas.
+ */
+export function buildPosCatalogDesdeMaestro(maestro: ProductoMaestro[]): PosCatalogProduct[] {
+  if (!maestro.length) return POS_CATALOG_FALLBACK
+  return maestro.map(mapMaestroToPos)
 }

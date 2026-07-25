@@ -31,6 +31,7 @@ Ejecutar en SQL Server Management Studio o `sqlcmd`, **en este orden**, sobre un
 | 9 | `09_StoredProcedures.sql` | Funciones, SPs de Inventario, triggers |
 | 10 | `10_Indexes.sql` | Índices de búsqueda y compuestos |
 | 11 | `11_SeedData.sql` | Datos iniciales (roles, maestros, productos, stock, clientes POS) |
+| 12 | `12_Editoriales.sql` | Constraints + SPs del módulo Editoriales (`sp_Editorial_*`) |
 
 ### Ejemplo con sqlcmd
 
@@ -46,6 +47,7 @@ sqlcmd -S localhost -E -I -d LibroSys -i "08_Views.sql"
 sqlcmd -S localhost -E -I -d LibroSys -i "09_StoredProcedures.sql"
 sqlcmd -S localhost -E -I -d LibroSys -i "10_Indexes.sql"
 sqlcmd -S localhost -E -I -d LibroSys -i "11_SeedData.sql"
+sqlcmd -S localhost -E -I -d LibroSys -i "12_Editoriales.sql"
 ```
 
 > **Importante:** la bandera `-I` activa `QUOTED_IDENTIFIER ON` (requerido por índices filtrados). Los scripts también incluyen `SET QUOTED_IDENTIFIER ON` / `SET ANSI_NULLS ON` tras `USE LibroSys`.

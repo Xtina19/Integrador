@@ -365,3 +365,35 @@ export function validateCrearAjuste(body: unknown) {
     }),
   }
 }
+
+/** Alta operativa de existencia (producto_id del catálogo maestro × almacén). */
+export function validateRegistrarExistencia(body: unknown) {
+  const b = body as Record<string, unknown>
+  const stockInicial = requireNumber(b.stockInicial, 'stockInicial')
+  const stockMinimo =
+    b.stockMinimo === undefined ? 0 : requireNumber(b.stockMinimo, 'stockMinimo')
+  if (!Number.isInteger(stockInicial) || stockInicial < 0) {
+    throw new ValidationError('stockInicial debe ser un entero ≥ 0.')
+  }
+  if (!Number.isInteger(stockMinimo) || stockMinimo < 0) {
+    throw new ValidationError('stockMinimo debe ser un entero ≥ 0.')
+  }
+  return {
+    productoId: requireString(b.productoId, 'productoId'),
+    almacenId: requireString(b.almacenId, 'almacenId'),
+    stockInicial,
+    stockMinimo,
+    ubicacion: typeof b.ubicacion === 'string' ? b.ubicacion.trim() : undefined,
+    codigo: typeof b.codigo === 'string' ? b.codigo.trim() : undefined,
+    isbn: typeof b.isbn === 'string' ? b.isbn.trim() : undefined,
+    titulo: typeof b.titulo === 'string' ? b.titulo.trim() : undefined,
+    autor: typeof b.autor === 'string' ? b.autor.trim() : undefined,
+    categoria: typeof b.categoria === 'string' ? b.categoria.trim() : undefined,
+    editorial: typeof b.editorial === 'string' ? b.editorial.trim() : undefined,
+    costoReferencia:
+      b.costoReferencia === undefined
+        ? undefined
+        : requireNumber(b.costoReferencia, 'costoReferencia'),
+    precio: b.precio === undefined ? undefined : requireNumber(b.precio, 'precio'),
+  }
+}

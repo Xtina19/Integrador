@@ -6,7 +6,7 @@ import { ValidationError } from '../validators/inputValidators'
 import * as V from '../validators/inputValidators'
 import { traceCommand } from '../../../observability/requestContext'
 import { classifyApplicationResult } from '../../../observability/classifyResult'
-import { ApplicationResult, ok } from '../../../../application/results/ApplicationResult'
+import { ApplicationResult, fail, ok } from '../../../../application/results/ApplicationResult'
 
 function getAuth(req: Request): AuthContext {
   const userId = String(req.header('x-user-id') ?? '')
@@ -704,6 +704,71 @@ export function createInventarioRouter(composition: InventarioComposition): Rout
         composition.queryService.listProductosVista(),
       )
       sendApplicationResult(res, result)
+    }),
+  )
+
+  /**
+   * Registra existencia producto × almacén usando productoId del Catálogo Maestro.
+   * No crea una entidad Producto nueva: sincroniza metadatos en el Engine y abre saldo.
+   */
+  router.post(
+    '/existencias',
+    asyncHandler(async (req, res) => {
+      const auth = await ensurePermission(composition, req, res, 'ajustes:crear')
+      if (!auth) return
+      const dto = V.validateRegistrarExistencia(req.body)
+      const result = await trackedCommand(req, 'RegistrarExistencia', async () => {
+        const db = composition.db
+        const key = `${dto.productoId}::${dto.almacenId}`
+        if (db.tables.existencias.has(key)) {
+          return fail(
+            'CONFLICT',
+            'Ya existe existencia para este producto en el almacén indicado.',
+          )
+        }
+
+        if (!db.tables.almacenes.has(dto.almacenId)) {
+          db.seedAlmacen({ id: dto.almacenId, bloqueadoPorConteo: false })
+        }
+
+        const existingProducto = db.tables.productos.get(dto.productoId)
+        db.seedProducto({
+          id: dto.productoId,
+          activo: true,
+          codigo: dto.codigo ?? existingProducto?.codigo,
+          isbn: dto.isbn ?? existingProducto?.isbn,
+          titulo: dto.titulo ?? existingProducto?.titulo ?? dto.productoId,
+          autor: dto.autor ?? existingProducto?.autor,
+          categoria: dto.categoria ?? existingProducto?.categoria,
+          editorial: dto.editorial ?? existingProducto?.editorial,
+          costoReferencia:
+            dto.costoReferencia ??
+            dto.precio ??
+            Number(existingProducto?.costoReferencia ?? 0),
+        })
+
+        const existenciaId = `ex-${dto.productoId}-${dto.almacenId}`
+        db.seedExistencia({
+          id: existenciaId,
+          productoId: dto.productoId,
+          almacenId: dto.almacenId,
+          saldo: dto.stockInicial,
+          version: 1,
+          stockMinimo: dto.stockMinimo,
+          ubicacion: dto.ubicacion ?? null,
+        })
+
+        return ok({
+          id: existenciaId,
+          productoId: dto.productoId,
+          almacenId: dto.almacenId,
+          saldo: dto.stockInicial,
+          stockMinimo: dto.stockMinimo,
+          ubicacion: dto.ubicacion,
+          version: 1,
+        })
+      })
+      sendApplicationResult(res, result, 201)
     }),
   )
 

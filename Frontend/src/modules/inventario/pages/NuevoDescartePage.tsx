@@ -7,7 +7,8 @@ import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Input, Select } from '@/components/ui/Input'
 import { Table } from '@/components/ui/Table'
 import { Badge } from '@/components/ui/Badge'
-import { branches, products } from '@/mocks/mockCore'
+import { branches } from '@/mocks/mockCore'
+import { useProductosMaestro } from '@/hooks/useProductosMaestro'
 import { descartesApi, type MotivoDescarteCodigo } from '@/services/api/descartesApi'
 import { getFriendlyErrorMessage } from '@/services/http'
 import { useToast } from '@/context/ToastContext'
@@ -51,6 +52,7 @@ function nextCodigo(): string {
 export function NuevoDescartePage() {
   const navigate = useNavigate()
   const { showSuccess, showError } = useToast()
+  const { productos } = useProductosMaestro()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [codigo] = useState(nextCodigo)
@@ -71,14 +73,15 @@ export function NuevoDescartePage() {
 
   const productosFiltrados = useMemo(() => {
     const q = busqueda.toLowerCase().trim()
-    if (!q) return products.slice(0, 8)
-    return products.filter(
+    if (!q) return productos.slice(0, 8)
+    return productos.filter(
       (p) =>
         p.title.toLowerCase().includes(q) ||
-        p.isbn.includes(q) ||
-        p.id.toLowerCase().includes(q),
+        p.isbn.toLowerCase().includes(q) ||
+        p.id.toLowerCase().includes(q) ||
+        p.code.toLowerCase().includes(q),
     )
-  }, [busqueda])
+  }, [busqueda, productos])
 
   const validationErrors = useMemo(() => {
     const errs: string[] = []
@@ -105,7 +108,7 @@ export function NuevoDescartePage() {
   }, [form, lineas])
 
   function agregarProducto(productId: string) {
-    const p = products.find((x) => x.id === productId)
+    const p = productos.find((x) => x.id === productId)
     if (!p) return
     if (lineas.some((l) => l.productoId === p.id)) {
       setError('El producto ya está en el descarte.')
@@ -119,9 +122,9 @@ export function NuevoDescartePage() {
         productoId: p.id,
         isbn: p.isbn,
         titulo: p.title,
-        existenciaActual: p.stock,
+        existenciaActual: 100,
         cantidad: '1',
-        costo: '0',
+        costo: String(p.cost || 0),
         motivoEspecifico: '',
         observacion: '',
       },
@@ -303,7 +306,7 @@ export function NuevoDescartePage() {
                 <span>
                   <span className="font-mono text-xs text-slate-400">{p.isbn}</span>{' '}
                   <span className="font-medium">{p.title}</span>
-                  <span className="ml-2 text-xs text-slate-500">Stock {p.stock}</span>
+                  <span className="ml-2 text-xs text-slate-500">{p.code || p.isbn}</span>
                 </span>
                 <Plus size={14} className="text-corporate" />
               </button>
