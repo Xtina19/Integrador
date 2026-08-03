@@ -117,14 +117,14 @@ export function RecepcionTransferenciaPage() {
     <DetailPageShell
       breadcrumbs={[
         { label: 'Inventario', to: '/inventario' },
-        { label: 'Transferencias', to: '/inventario?tab=movimientos&filtro=transferencias' },
+        { label: 'Transferencias', to: '/inventario?tab=transferencias' },
         { label: data?.codigo ?? id, to: data ? `/inventario/transferencias/${data.id}` : undefined },
         { label: 'Recepción' },
       ]}
-      backPath={data ? `/inventario/transferencias/${data.id}` : '/inventario?tab=movimientos&filtro=transferencias'}
+      backPath={data ? `/inventario/transferencias/${data.id}` : '/inventario?tab=transferencias'}
       title="Registrar recepción"
       loading={loading}
-      error={error || validationErrors[0] || null}
+      error={error}
     >
       {data && (
         <div className="space-y-6">
@@ -200,6 +200,11 @@ export function RecepcionTransferenciaPage() {
               {saving ? 'Guardando…' : 'Confirmar recepción'}
             </Button>
           </div>
+        </div>
+      )}
+      {validationErrors.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+          {validationErrors[0]}
         </div>
       )}
     </DetailPageShell>

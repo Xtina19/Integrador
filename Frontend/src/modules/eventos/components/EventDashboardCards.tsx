@@ -12,7 +12,6 @@ import { computeEventBudgetSummary } from '@/modules/eventos/utils/eventBudget'
 import type { LibroSysEvent } from '@/types/domain'
 import type { EventExtendedData } from '@/modules/eventos/types/eventExtended'
 import { eventStatusLabels } from '@/constants/stateMachines'
-import { formatDop } from '@/lib/money'
 
 interface EventDashboardCardsProps {
   event: LibroSysEvent
@@ -52,20 +51,20 @@ export function EventDashboardCards({ event, extended, salesTotal, staffCount }:
       />
       <StatCard
         title="Ventas realizadas"
-        value={formatDop(salesTotal)}
+        value={`RD$${salesTotal.toLocaleString()}`}
         detail="En feria (simulado)"
         icon={<DollarSign size={20} />}
       />
       <StatCard
         title="Costo acumulado"
-        value={formatDop(budget.totalSpent)}
+        value={`RD$${budget.totalSpent.toLocaleString()}`}
         detail="Utensilios + operativo"
         icon={<Wallet size={20} />}
       />
       <StatCard
         title="Presupuesto restante"
-        value={formatDop(budget.available)}
-        detail={`De ${formatDop(budget.budget)}`}
+        value={`RD$${budget.available.toLocaleString()}`}
+        detail={`De RD$${budget.budget.toLocaleString()}`}
         icon={<Wallet size={20} />}
       />
       <StatCard

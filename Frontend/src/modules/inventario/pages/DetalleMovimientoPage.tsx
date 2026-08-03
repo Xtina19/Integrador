@@ -11,6 +11,7 @@ import { DetailPageShell } from '@/compartido/Components/DetailPageShell'
 
 function documentoRoute(tipo: string, id: string): string | null {
   const t = tipo.toLowerCase()
+  if (t === 'existencia_inicial') { return null }
   if (t.includes('transfer')) return `/inventario/transferencias/${id}`
   if (t.includes('descarte')) return `/inventario/descartes/${id}`
   if (t.includes('ajuste')) return `/inventario/ajustes/${id}`
@@ -50,6 +51,47 @@ export function DetalleMovimientoPage() {
 
   const docRoute = data ? documentoRoute(data.documentoTipo, data.documentoId) : null
 
+  const TIPO_LABEL: Record<string, string> = {
+    entrada: 'Entrada',
+    salida: 'Salida',
+    transferencia_salida: 'Transferencia (salida)',
+    transferencia_entrada: 'Transferencia (entrada)',
+    ajuste: 'Ajuste',
+    descarte: 'Descarte',
+    compensacion: 'Compensación',
+    venta: 'Venta',
+    recepcion: 'Recepción',
+  }
+
+  const DOCUMENTO_LABEL: Record<string, string> = {
+    existencia_inicial: 'Existencia inicial',
+    transferencia: 'Transferencia',
+    ajuste: 'Ajuste',
+    descarte: 'Descarte',
+    conteo: 'Conteo',
+    venta: 'Venta',
+    recepcion: 'Recepción',
+    compensacion: 'Compensación',
+  }
+
+  function formatFecha(value: string): string {
+    if (!value) return '—'
+
+    const date = new Date(value)
+
+    if (Number.isNaN(date.getTime())) {
+      return value
+    }
+
+    return date.toLocaleString('es-DO', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
   return (
     <DetailPageShell
       breadcrumbs={[
@@ -81,21 +123,100 @@ export function DetalleMovimientoPage() {
           <CardHeader title="Detalle del movimiento" />
           <CardBody>
             <div className="grid gap-3 sm:grid-cols-2">
-              <DetailRow label="Fecha" value={data.fecha} />
-              <DetailRow label="Tipo" value={<Badge variant={data.cantidad < 0 ? 'warning' : 'success'}>{data.tipo}</Badge>} />
-              <DetailRow label="Producto" value={data.productoTitulo ?? data.productoId} />
-              <DetailRow label="Almacén" value={data.almacenNombre ?? data.almacenId} />
+              <DetailRow
+                label="Fecha"
+                value={formatFecha(data.fecha)}
+              />
+
+              <DetailRow
+                label="Tipo"
+                value={
+                  <Badge
+                    variant={
+                      data.cantidad < 0
+                        ? 'warning'
+                        : 'success'
+                    }
+                  >
+                    {TIPO_LABEL[data.tipo] ?? data.tipo}
+                  </Badge>
+                }
+              />
+
+              <DetailRow
+                label="Producto"
+                value={
+                  data.productoTitulo ??
+                  data.productoId
+                }
+              />
+
+              <DetailRow
+                label="ISBN"
+                value={data.isbn || '—'}
+              />
+
+              <DetailRow
+                label="Almacén"
+                value={
+                  data.almacenNombre ??
+                  data.almacenId
+                }
+              />
+
+              <DetailRow
+                label="Sucursal"
+                value={data.sucursal ?? '—'}
+              />
+
               <DetailRow
                 label="Cantidad"
                 value={
-                  <span className={`font-semibold tabular-nums ${data.cantidad < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
-                    {data.cantidad > 0 ? `+${data.cantidad}` : data.cantidad}
+                  <span
+                    className={
+                      `font-semibold tabular-nums ${data.cantidad < 0
+                        ? 'text-red-600'
+                        : 'text-emerald-700'
+                      }`
+                    }
+                  >
+                    {data.cantidad > 0
+                      ? `+${data.cantidad}`
+                      : data.cantidad}
                   </span>
                 }
               />
-              <DetailRow label="Saldo" value={`${data.saldoAnterior} → ${data.saldoPosterior}`} />
-              <DetailRow label="Documento origen" value={`${data.documentoTipo} · ${data.documentoId}`} />
-              <DetailRow label="Usuario" value={data.usuario} />
+
+              <DetailRow
+                label="Saldo"
+                value={
+                  `${data.saldoAnterior} → ${data.saldoPosterior}`
+                }
+              />
+
+              <DetailRow
+                label="Documento origen"
+                value={
+                  `${DOCUMENTO_LABEL[data.documentoTipo] ??
+                  data.documentoTipo
+                  } · ${data.documentoId}`
+                }
+              />
+
+              <DetailRow
+                label="Usuario"
+                value={data.usuario}
+              />
+
+              <DetailRow
+                label="Motivo"
+                value={data.motivoCodigo ?? '—'}
+              />
+
+              <DetailRow
+                label="Observación"
+                value={data.observacion ?? '—'}
+              />
             </div>
           </CardBody>
         </Card>

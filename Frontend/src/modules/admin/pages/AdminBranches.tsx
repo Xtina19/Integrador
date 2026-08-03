@@ -1,66 +1,44 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
-import { Card, CardHeader, CardBody } from '@/components/ui/Card'
+import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Input, Select } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { Table } from '@/components/ui/Table'
 import { TableActions } from '@/components/ui/TableActions'
-import { FormDialog, DetailRow } from '@/components/ui/FormDialog'
-import { adminPath } from '@/lib/adminConfig'
-import { trim } from '@/utils/formValidation'
-import { almacenesApi } from '@/services/api/almacenesApi'
+import { Input, Select } from '@/components/ui/Input'
+import {
+  almacenesApi,
+  type AlmacenDto,
+  type AlmacenEstado,
+} from '@/services/api/almacenesApi'
 import { getFriendlyErrorMessage } from '@/services/http'
 import { useToast } from '@/context/ToastContext'
 
-type Almacen = {
-  id: string
-  code: string
-  name: string
-  type: string
-  status: string
-}
-
-const statusMap: Record<string, { label: string; variant: 'success' | 'neutral' }> = {
-  active: { label: 'Activo', variant: 'success' },
-  inactive: { label: 'Inactivo', variant: 'neutral' },
-}
-
-const statusOptions = [
-  { value: 'active', label: 'Activo' },
-  { value: 'inactive', label: 'Inactivo' },
-]
-
-const typeOptions = [
-  { value: 'central', label: 'Central' },
-  { value: 'sucursal', label: 'Sucursal' },
-  { value: 'transito', label: 'Tránsito' },
-  { value: 'evento', label: 'Evento' },
-]
-
-const typeLabels: Record<string, string> = {
-  central: 'Central',
-  sucursal: 'Sucursal',
-  transito: 'Tránsito',
-  evento: 'Evento',
+const ESTADO_LABEL: Record<AlmacenEstado, string> = {
+  Activo: 'Activo',
+  Inactivo: 'Inactivo',
 }
 
 export function AdminBranches() {
   const navigate = useNavigate()
   const { showSuccess, showError } = useToast()
-  const [almacenes, setAlmacenes] = useState<Almacen[]>([])
+
+  const [almacenes, setAlmacenes] = useState<AlmacenDto[]>([])
   const [loading, setLoading] = useState(true)
-  const [dialog, setDialog] = useState<{ id: string; mode: 'view' | 'edit' } | null>(null)
-  const [form, setForm] = useState({ code: '', name: '', type: 'sucursal', status: 'active' })
+  const [search, setSearch] = useState('')
+  const [estado, setEstado] = useState<'Todos' | AlmacenEstado>('Todos')
+  const [changingId, setChangingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
+
     try {
-      const list = (await almacenesApi.list()) as Almacen[]
+      const list = await almacenesApi.list()
       setAlmacenes(list)
     } catch (err) {
       showError(getFriendlyErrorMessage(err))
+      setAlmacenes([])
     } finally {
       setLoading(false)
     }
@@ -70,138 +48,247 @@ export function AdminBranches() {
     void load()
   }, [load])
 
-  const selected = dialog ? almacenes.find((b) => b.id === dialog.id) ?? null : null
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase()
 
-  useEffect(() => {
-    if (selected && dialog?.mode === 'edit') {
-      setForm({
-        code: selected.code,
-        name: selected.name,
-        type: selected.type || 'sucursal',
-        status: selected.status,
-      })
-    }
-  }, [selected, dialog?.mode, dialog?.id])
+    return almacenes.filter((almacen) => {
+      const matchSearch =
+        !query ||
+        almacen.codigo.toLowerCase().includes(query) ||
+        almacen.nombre.toLowerCase().includes(query) ||
+        almacen.sucursalNombre?.toLowerCase().includes(query) ||
+        almacen.ciudad.toLowerCase().includes(query) ||
+        almacen.responsable.toLowerCase().includes(query)
 
-  const validation = useMemo(() => {
-    const name = trim(form.name)
-    if (!name) return { valid: false, errors: ['Nombre es obligatorio'] }
-    return { valid: true, errors: [] as string[] }
-  }, [form.name])
+      const matchEstado =
+        estado === 'Todos' || almacen.estado === estado
 
-  async function handleSave() {
-    if (!selected || !validation.valid) return false
+      return matchSearch && matchEstado
+    })
+  }, [almacenes, search, estado])
+
+  async function toggleEstado(almacen: AlmacenDto) {
+    const nuevoEstado: AlmacenEstado =
+      almacen.estado === 'Activo'
+        ? 'Inactivo'
+        : 'Activo'
+
+    setChangingId(almacen.id)
+
     try {
-      await almacenesApi.update(selected.id, {
-        code: trim(form.code) || selected.code,
-        name: trim(form.name),
-        type: form.type,
-        status: form.status,
-      })
-      showSuccess('Almacén actualizado')
-      setDialog(null)
+      await almacenesApi.setEstado(almacen.id, nuevoEstado)
+
+      showSuccess(
+        nuevoEstado === 'Activo'
+          ? 'Almacén activado'
+          : 'Almacén desactivado',
+      )
+
       await load()
     } catch (err) {
       showError(getFriendlyErrorMessage(err))
-      return false
-    }
-  }
-
-  async function toggle(a: Almacen) {
-    try {
-      await almacenesApi.setEstado(a.id, a.status === 'active' ? 'inactive' : 'active')
-      showSuccess(a.status === 'active' ? 'Almacén desactivado' : 'Almacén activado')
-      await load()
-    } catch (err) {
-      showError(getFriendlyErrorMessage(err))
+    } finally {
+      setChangingId(null)
     }
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2 text-sm text-gray-500">
-          <Link to="/inventario" className="text-corporate hover:underline">Inventario</Link>
+          <Link
+            to="/inventario"
+            className="text-corporate hover:underline"
+          >
+            Inventario
+          </Link>
+
           <span>/</span>
           <span>Almacenes</span>
-          <span className="ml-2">— {loading ? '…' : `${almacenes.length} registros`}</span>
+
+          <span className="ml-2">
+            — {loading ? '…' : `${almacenes.length} registros`}
+          </span>
         </div>
-        <Button icon={Plus} onClick={() => navigate(adminPath('sucursales', 'nuevo'))}>
-          Registrar Almacén
+
+        <Button
+          icon={Plus}
+          onClick={() =>
+            navigate('/inventario/almacenes/nuevo')
+          }
+        >
+          Registrar almacén
         </Button>
       </div>
 
       <Card>
-        <CardHeader title="Catálogo de Almacenes" subtitle="Ubicaciones de inventario por tipo" />
+        <CardHeader
+          title="Catálogo de almacenes"
+          subtitle="Ubicaciones donde se administran las existencias"
+        />
+
         <CardBody className="!p-0">
+          <div className="grid grid-cols-1 gap-4 border-b border-gray-100 p-4 md:grid-cols-2">
+            <Input
+              label="Buscar"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Código, nombre, sucursal o responsable..."
+            />
+
+            <Select
+              label="Estado"
+              value={estado}
+              onChange={(event) =>
+                setEstado(
+                  event.target.value as
+                    | 'Todos'
+                    | AlmacenEstado,
+                )
+              }
+              options={[
+                { value: 'Todos', label: 'Todos' },
+                { value: 'Activo', label: 'Activos' },
+                { value: 'Inactivo', label: 'Inactivos' },
+              ]}
+            />
+          </div>
+
           <Table
             keyField="id"
-            data={almacenes}
+            data={filtered}
             columns={[
-              { key: 'code', header: 'Código', render: (b) => <Badge variant="gold">{b.code}</Badge> },
-              { key: 'name', header: 'Nombre', render: (b) => <span className="font-medium text-gray-900">{b.name}</span> },
-              { key: 'type', header: 'Tipo', render: (b) => <Badge variant="neutral">{typeLabels[b.type] || b.type}</Badge> },
               {
-                key: 'status',
+                key: 'codigo',
+                header: 'Código',
+                render: (almacen) => (
+                  <Badge variant="gold">
+                    {almacen.codigo}
+                  </Badge>
+                ),
+              },
+              {
+                key: 'nombre',
+                header: 'Nombre',
+                render: (almacen) => (
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      {almacen.nombre}
+                    </p>
+
+                    {almacen.ciudad && (
+                      <p className="text-xs text-gray-500">
+                        {almacen.ciudad}
+                      </p>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                key: 'sucursalNombre',
+                header: 'Sucursal',
+                render: (almacen) => (
+                  <span className="text-sm text-gray-600">
+                    {almacen.sucursalNombre ?? 'Sin sucursal'}
+                  </span>
+                ),
+              },
+              {
+                key: 'tipoAlmacen',
+                header: 'Tipo',
+                render: (almacen) => (
+                  <Badge variant="neutral">
+                    {almacen.tipoAlmacen || 'No especificado'}
+                  </Badge>
+                ),
+              },
+              {
+                key: 'responsable',
+                header: 'Responsable',
+                render: (almacen) => (
+                  <span className="text-sm text-gray-600">
+                    {almacen.responsable || '—'}
+                  </span>
+                ),
+              },
+              {
+                key: 'estado',
                 header: 'Estado',
-                render: (b) => {
-                  const s = statusMap[b.status] || statusMap.inactive
-                  return <Badge variant={s.variant}>{s.label}</Badge>
-                },
+                render: (almacen) => (
+                  <div className="space-y-1">
+                    <Badge
+                      variant={
+                        almacen.estado === 'Activo'
+                          ? 'success'
+                          : 'neutral'
+                      }
+                    >
+                      {ESTADO_LABEL[almacen.estado]}
+                    </Badge>
+
+                    {almacen.bloqueado && (
+                      <div>
+                        <Badge variant="warning">
+                          Bloqueado
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                ),
               },
               {
                 key: 'actions',
                 header: 'Acciones',
-                render: (b) => (
+                render: (almacen) => (
                   <div className="flex items-center gap-2">
-                    <button type="button" className="text-xs font-medium text-corporate hover:underline" onClick={() => void toggle(b)}>
-                      {b.status === 'active' ? 'Desactivar' : 'Activar'}
+                    <button
+                      type="button"
+                      disabled={changingId === almacen.id}
+                      className="text-xs font-medium text-corporate hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => void toggleEstado(almacen)}
+                    >
+                      {changingId === almacen.id
+                        ? 'Procesando...'
+                        : almacen.estado === 'Activo'
+                          ? 'Desactivar'
+                          : 'Activar'}
                     </button>
+
                     <TableActions
-                      onView={() => navigate(adminPath('sucursales', 'ver', b.id))}
-                      onEdit={() => navigate(adminPath('sucursales', 'editar', b.id))}
+                      onView={() =>
+                        navigate(
+                          `/inventario/almacenes/ver/${almacen.id}`,
+                        )
+                      }
+                      onEdit={() =>
+                        navigate(
+                          `/inventario/almacenes/editar/${almacen.id}`,
+                        )
+                      }
                     />
                   </div>
                 ),
               },
             ]}
           />
-        </CardBody>
-      </Card>
 
-      <FormDialog
-        open={Boolean(dialog && selected)}
-        onClose={() => setDialog(null)}
-        title={dialog?.mode === 'edit' ? 'Editar Almacén' : 'Detalle de Almacén'}
-        subtitle={selected?.code}
-        mode={dialog?.mode ?? 'view'}
-        onEdit={() => setDialog((d) => (d ? { ...d, mode: 'edit' } : null))}
-        onSave={() => void handleSave()}
-        saveDisabled={!validation.valid}
-      >
-        {selected && dialog?.mode === 'view' ? (
-          <>
-            <DetailRow label="Código" value={<Badge variant="gold">{selected.code}</Badge>} />
-            <DetailRow label="Nombre" value={selected.name} />
-            <DetailRow label="Tipo" value={<Badge variant="neutral">{typeLabels[selected.type] || selected.type}</Badge>} />
-            <DetailRow label="Estado" value={<Badge variant={statusMap[selected.status]?.variant || 'neutral'}>{statusMap[selected.status]?.label}</Badge>} />
-          </>
-        ) : selected ? (
-          <>
-          {!validation.valid && (
-            <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
-              {validation.errors[0]}
+          {!loading && filtered.length === 0 && (
+            <div className="px-6 py-10 text-center">
+              <p className="text-sm text-gray-500">
+                No se encontraron almacenes.
+              </p>
             </div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input label="Código" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} />
-            <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <Select label="Tipo" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} options={typeOptions} />
-            <Select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={statusOptions} />
-          </div>
-          </>
-        ) : null}
-      </FormDialog>
+
+          {loading && (
+            <div className="px-6 py-10 text-center">
+              <p className="text-sm text-gray-500">
+                Cargando almacenes...
+              </p>
+            </div>
+          )}
+        </CardBody>
+      </Card>
     </div>
   )
 }

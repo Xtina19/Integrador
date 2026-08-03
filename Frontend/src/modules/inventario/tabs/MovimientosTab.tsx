@@ -17,14 +17,14 @@ const tipoGroups: {
   tipos?: MovimientoTipoUi[]
   documentoTipos?: MovimientoVista['documentoTipo'][]
 }[] = [
-  { id: 'entradas', label: 'Entradas', tipos: ['entrada', 'recepcion', 'transferencia_entrada'] },
-  { id: 'salidas', label: 'Salidas', tipos: ['salida', 'venta', 'transferencia_salida'] },
-  { id: 'transferencias', label: 'Transferencias', tipos: ['transferencia_salida', 'transferencia_entrada'] },
-  { id: 'conteos', label: 'Conteos', documentoTipos: ['conteo'] },
-  { id: 'ajustes', label: 'Ajustes', tipos: ['ajuste'] },
-  { id: 'descartes', label: 'Descartes', tipos: ['descarte'] },
-  { id: 'compensaciones', label: 'Compensaciones', tipos: ['compensacion'] },
-]
+    { id: 'entradas', label: 'Entradas', tipos: ['entrada', 'recepcion', 'transferencia_entrada'] },
+    { id: 'salidas', label: 'Salidas', tipos: ['salida', 'venta', 'transferencia_salida'] },
+    { id: 'transferencias', label: 'Transferencias', tipos: ['transferencia_salida', 'transferencia_entrada'] },
+    { id: 'conteos', label: 'Conteos', documentoTipos: ['conteo'] },
+    { id: 'ajustes', label: 'Ajustes', tipos: ['ajuste'] },
+    { id: 'descartes', label: 'Descartes', tipos: ['descarte'] },
+    { id: 'compensaciones', label: 'Compensaciones', tipos: ['compensacion'] },
+  ]
 
 interface Props {
   movimientos: MovimientoVista[]
@@ -168,7 +168,22 @@ export function MovimientosTab({
                 <button
                   type="button"
                   className="text-left text-xs font-medium text-corporate hover:underline"
-                  onClick={() => onOpenDocumento(m.documentoTipo, m.documentoId)}
+                  onClick={() => {
+                    if (
+                      m.documentoTipo ===
+                      'existencia_inicial'
+                    ) {
+                      navigate(
+                        `/inventario/movimientos/${m.id}`,
+                      )
+                      return
+                    }
+
+                    onOpenDocumento(
+                      m.documentoTipo,
+                      m.documentoId,
+                    )
+                  }}
                 >
                   {m.documentoId}
                   <span className="block font-normal text-slate-400">{m.documentoTipo}</span>
@@ -207,11 +222,10 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
-        active
+      className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${active
           ? 'border-corporate bg-corporate text-white'
           : 'border-slate-200 bg-white text-slate-600 hover:border-corporate/40'
-      }`}
+        }`}
     >
       {label}
     </button>

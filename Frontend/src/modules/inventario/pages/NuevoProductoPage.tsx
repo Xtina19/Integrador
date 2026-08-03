@@ -12,13 +12,14 @@ import { existenciasApi } from '@/services/api/existenciasApi'
 import { getFriendlyErrorMessage } from '@/services/http'
 import { useToast } from '@/context/ToastContext'
 import { trim } from '@/utils/formValidation'
-
-type AlmacenOption = { id: string; nombre: string }
+import {
+  type AlmacenDto,
+} from '@/services/api/almacenesApi'
 
 export function NuevoProductoPage() {
   const { showSuccess, showError } = useToast()
   const { productos, loading: loadingProductos, error: catalogError } = useProductosMaestro()
-  const [almacenes, setAlmacenes] = useState<AlmacenOption[]>([])
+  const [almacenes, setAlmacenes] = useState<AlmacenDto[]>([])
   const [loadingAlmacenes, setLoadingAlmacenes] = useState(true)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
@@ -31,27 +32,41 @@ export function NuevoProductoPage() {
 
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
-      setLoadingAlmacenes(true)
-      try {
-        const rows = await almacenesApi.list()
-        if (cancelled) return
-        const list = (rows as Record<string, unknown>[])
-          .map((r) => ({
-            id: String(r.id ?? ''),
-            nombre: String(r.nombre ?? r.name ?? r.id ?? ''),
-          }))
-          .filter((a) => a.id)
-        setAlmacenes(list)
-        if (list[0] && !form.almacenId) {
-          setForm((f) => ({ ...f, almacenId: list[0].id }))
+      ; (async () => {
+        setLoadingAlmacenes(true)
+        try {
+          const rows = await almacenesApi.list({
+            estado: 'Activo',
+          })
+
+          if (cancelled) return
+
+          const disponibles = rows.filter(
+            (almacen) =>
+              almacen.estado === 'Activo' &&
+              !almacen.bloqueado,
+          )
+
+          setAlmacenes(disponibles)
+
+          if (disponibles[0]) {
+            setForm((current) =>
+              current.almacenId
+                ? current
+                : {
+                  ...current,
+                  almacenId: disponibles[0].id,
+                },
+            )
+          }
+        } catch (e) {
+          if (!cancelled) {
+            setError(getFriendlyErrorMessage(e))
+          }
+        } finally {
+          if (!cancelled) setLoadingAlmacenes(false)
         }
-      } catch (e) {
-        if (!cancelled) setError(getFriendlyErrorMessage(e))
-      } finally {
-        if (!cancelled) setLoadingAlmacenes(false)
-      }
-    })()
+      })()
     return () => {
       cancelled = true
     }
@@ -109,17 +124,9 @@ export function NuevoProductoPage() {
           await existenciasApi.registrar({
             productoId: selected.id,
             almacenId: form.almacenId,
-            stockInicial: Number(form.stockInicial) || 0,
-            stockMinimo: Number(form.stockMinimo) || 0,
+            stockInicial: Number(form.stockInicial),
+            stockMinimo: Number(form.stockMinimo),
             ubicacion: trim(form.ubicacion),
-            codigo: selected.code,
-            isbn: selected.isbn,
-            titulo: selected.title,
-            autor: selected.author,
-            categoria: selected.category,
-            editorial: selected.publisher,
-            costoReferencia: selected.cost || selected.price,
-            precio: selected.price,
           })
           showSuccess('Existencia registrada')
           return true
@@ -186,8 +193,21 @@ export function NuevoProductoPage() {
             label="Almacén *"
             value={form.almacenId}
             onChange={(e) => setForm({ ...form, almacenId: e.target.value })}
-            options={almacenes.map((a) => ({ value: a.id, label: a.nombre }))}
-          />
+            options={[
+              {
+                value: '',
+                label:
+                  almacenes.length === 0
+                    ? 'No hay almacenes disponibles'
+                    : 'Seleccione un almacén...',
+              },
+              ...almacenes.map((almacen) => ({
+                value: almacen.id,
+                label: almacen.sucursalNombre
+                  ? `${almacen.codigo} · ${almacen.nombre} — ${almacen.sucursalNombre}`
+                  : `${almacen.codigo} · ${almacen.nombre}`,
+              })),
+            ]} />
           <Input
             label="Ubicación *"
             value={form.ubicacion}

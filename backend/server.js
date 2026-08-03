@@ -1,22 +1,22 @@
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
-
-const { traceId } = require('./middlewares/traceId');
-const { authPlaceholder } = require('./middlewares/authPlaceholder');
-const { errorHandler } = require('./middlewares/errorHandler');
+const productosRoutes = require('./routes/productos');
+const eventosRoutes = require('./routes/eventos');
+const inventoryRoutes = require('./routes/inventario');
+const almacenesRoutes = require('./routes/almacenes');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(traceId);
 
-const { getConnection } = require('./db');
+const { sql, getConnection } = require('./db');
 
+// Endpoint de prueba para verificar que el servidor responde
 app.get('/', (req, res) => {
   res.send('Backend funcionando 🚀');
 });
 
+// Endpoint de prueba para verificar la conexión a SQL Server
 app.get('/api/test-db', async (req, res) => {
   try {
     const pool = await getConnection();
@@ -27,37 +27,14 @@ app.get('/api/test-db', async (req, res) => {
   }
 });
 
-app.use('/api/monedas', require('./routes/monedas.routes'));
-app.use('/api/categorias', require('./routes/categorias.routes'));
-app.use('/api/editoriales', require('./routes/editoriales.routes'));
-app.use('/api/productos', require('./routes/productos.routes'));
-app.use('/api/almacenes', require('./routes/almacenes.routes'));
-app.use('/api/proveedores', require('./routes/proveedores.routes'));
-app.use('/api/clientes', require('./routes/clientes.routes'));
-app.use('/api/roles', require('./routes/roles.routes'));
-app.use('/api/usuarios', require('./routes/usuarios.routes'));
-app.use('/api/formas-pago', require('./routes/formasPago.routes'));
-app.use('/api/tasas-cambio', require('./routes/tasasCambio.routes'));
-app.use('/api/productos-legacy', require('./routes/productos'));
-
-app.use('/api/compras', authPlaceholder, require('./routes/compras'));
-// Alias REST alineado a Ventas (/api/v1/…) — mismo router, sin lógica duplicada
-app.use('/api/v1/compras', authPlaceholder, require('./routes/compras'));
-
-// Módulo Inventario (DDD / TypeScript) — conteos, transferencias, descartes, ajustes
-const { register } = require('tsx/cjs/api');
-register();
-const {
-  mountInventarioModule,
-} = require('./src/modules/inventario/infrastructure/bootstrap/mountInventarioModule.ts');
-const inventarioComposition = mountInventarioModule(app);
-
-const {
-  mountVentasModule,
-} = require('./src/modules/ventas/infrastructure/bootstrap/mountVentasModule.ts');
-mountVentasModule(app, inventarioComposition);
-
-app.use(errorHandler);
+app.use('/api/productos', productosRoutes);
+app.use('/api/eventos', eventosRoutes);
+app.use('/api/inventario', inventoryRoutes);
+app.use('/api/almacenes', almacenesRoutes);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));
+
+// server.on('error', (err) => {
+//   console.error('Error iniciando el servidor:', err);
+// });

@@ -1,6 +1,11 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
-import { eventExtendedSeed } from '@/mocks/mockEventos'
-import type { EventExtendedData, EventInventoryItem, EventUtensil } from '@/modules/eventos/types/eventExtended'
+// import { eventExtendedSeed } from '@/mocks/mockEventos'
+import type {
+  EventExtendedData,
+  EventInventoryItem,
+  EventUtensil,
+  EventStaffMember,
+} from '@/modules/eventos/types/eventExtended'
 
 function emptyExtended(eventId: string): EventExtendedData {
   return {
@@ -11,6 +16,7 @@ function emptyExtended(eventId: string): EventExtendedData {
     operationalCost: 0,
     inventory: [],
     utensils: [],
+    staff: [],
   }
 }
 
@@ -19,19 +25,24 @@ interface EventExtendedContextValue {
   saveExtended: (data: EventExtendedData) => void
   updateInventory: (eventId: string, inventory: EventInventoryItem[]) => void
   updateUtensils: (eventId: string, utensils: EventUtensil[]) => void
+  updateStaff: (eventId: string, staff: EventStaffMember[]) => void
 }
 
 const EventExtendedContext = createContext<EventExtendedContextValue | null>(null)
 
 export function EventExtendedProvider({ children }: { children: React.ReactNode }) {
-  const [records, setRecords] = useState<EventExtendedData[]>(() =>
-    eventExtendedSeed.map((r) => ({ ...r, inventory: [...r.inventory], utensils: [...r.utensils], publishers: [...r.publishers] }))
-  )
+  const [records, setRecords] = useState<EventExtendedData[]>([])
 
   const getExtended = useCallback(
     (eventId: string): EventExtendedData => {
       const found = records.find((r) => r.eventId === eventId)
-      if (found) return { ...found, inventory: [...found.inventory], utensils: [...found.utensils], publishers: [...found.publishers] }
+      if (found) return {
+        ...found,
+        inventory: [...found.inventory],
+        utensils: [...found.utensils],
+        publishers: [...found.publishers],
+        staff: [...(found.staff ?? [])],
+      }
       return emptyExtended(eventId)
     },
     [records]
@@ -40,7 +51,13 @@ export function EventExtendedProvider({ children }: { children: React.ReactNode 
   const saveExtended = useCallback((data: EventExtendedData) => {
     setRecords((prev) => {
       const idx = prev.findIndex((r) => r.eventId === data.eventId)
-      const copy = { ...data, inventory: [...data.inventory], utensils: [...data.utensils], publishers: [...data.publishers] }
+      const copy = {
+        ...data,
+        inventory: [...data.inventory],
+        utensils: [...data.utensils],
+        publishers: [...data.publishers],
+        staff: [...(data.staff ?? [])],
+      }
       if (idx >= 0) {
         const next = [...prev]
         next[idx] = copy
@@ -70,9 +87,43 @@ export function EventExtendedProvider({ children }: { children: React.ReactNode 
     })
   }, [])
 
+  const updateStaff = useCallback(
+    (eventId: string, staff: EventStaffMember[]) => {
+      setRecords((prev) => {
+        const idx = prev.findIndex((r) => r.eventId === eventId)
+
+        if (idx < 0) {
+          return [...prev, { ...emptyExtended(eventId), staff }]
+        }
+
+        const next = [...prev]
+
+        next[idx] = {
+          ...next[idx],
+          staff: [...staff],
+        }
+
+        return next
+      })
+    },
+    []
+  )
+
   const value = useMemo(
-    () => ({ getExtended, saveExtended, updateInventory, updateUtensils }),
-    [getExtended, saveExtended, updateInventory, updateUtensils]
+    () => ({
+      getExtended,
+      saveExtended,
+      updateInventory,
+      updateUtensils,
+      updateStaff,
+    }),
+    [
+      getExtended,
+      saveExtended,
+      updateInventory,
+      updateUtensils,
+      updateStaff,
+    ]
   )
 
   return <EventExtendedContext.Provider value={value}>{children}</EventExtendedContext.Provider>

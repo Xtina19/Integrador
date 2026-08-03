@@ -21,16 +21,7 @@ export interface RegistrarExistenciaRequest {
   almacenId: string
   stockInicial: number
   stockMinimo: number
-  ubicacion?: string
-  /** Metadatos del catálogo maestro para sincronizar el Engine sin duplicar entidad. */
-  codigo?: string
-  isbn?: string
-  titulo?: string
-  autor?: string
-  categoria?: string
-  editorial?: string
-  costoReferencia?: number
-  precio?: number
+  ubicacion: string
 }
 
 export interface ExistenciaRegistradaDto {
@@ -44,15 +35,24 @@ export interface ExistenciaRegistradaDto {
 }
 
 export const existenciasApi = {
-  async registrar(body: RegistrarExistenciaRequest): Promise<ExistenciaRegistradaDto> {
-    const res = await httpPost<ApiEnvelope<ExistenciaRegistradaDto>>(
+  async registrar(
+    body: RegistrarExistenciaRequest,
+  ): Promise<ExistenciaRegistradaDto> {
+    const res = await httpPost<
+      ApiEnvelope<ExistenciaRegistradaDto>
+    >(
       '/api/inventario/existencias',
       body,
       withAuth(),
     )
+
     if (!res.success || !res.data) {
-      throw new Error(res.error?.message ?? 'No se pudo registrar la existencia.')
+      throw new Error(
+        res.error?.message ??
+        'No se pudo registrar la existencia.',
+      )
     }
+
     return res.data
   },
 }

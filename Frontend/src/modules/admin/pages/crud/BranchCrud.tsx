@@ -1,44 +1,85 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AdminFormLayout } from '@/modules/admin/components/AdminFormLayout'
-import { AdminDetailLayout, AdminDeleteLayout } from '@/modules/admin/components/AdminDetailLayout'
-import { DetailSection, DetailRow } from '@/modules/admin/components/AdminDetailSection'
+import {
+  AdminDetailLayout,
+  AdminDeleteLayout,
+} from '@/modules/admin/components/AdminDetailLayout'
+import {
+  DetailSection,
+  DetailRow,
+} from '@/modules/admin/components/AdminDetailSection'
 import { Input, Select } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { RecordNotFound } from '@/modules/admin/components/RecordNotFound'
 import { ADMIN_MODULES } from '@/lib/adminConfig'
 import { trim } from '@/utils/formValidation'
-import { almacenesApi } from '@/services/api/almacenesApi'
+import {
+  almacenesApi,
+  type AlmacenDto,
+  type GuardarAlmacenRequest,
+  type SucursalOptionDto,
+} from '@/services/api/almacenesApi'
 import { ensureCode } from '@/services/api/httpList'
 import { getFriendlyErrorMessage } from '@/services/http'
 import { useToast } from '@/context/ToastContext'
 
 const config = ADMIN_MODULES.sucursales
-const statusOptions = [
-  { value: 'active', label: 'Activo' },
-  { value: 'inactive', label: 'Inactivo' },
-]
 
 const typeOptions = [
-  { value: 'central', label: 'Central' },
-  { value: 'sucursal', label: 'Sucursal' },
-  { value: 'transito', label: 'Tránsito' },
-  { value: 'evento', label: 'Evento' },
+  { value: 'Principal', label: 'Principal' },
+  { value: 'Sucursal', label: 'Sucursal' },
+  { value: 'Transito', label: 'Tránsito' },
+  { value: 'Evento', label: 'Evento' },
 ]
 
-const typeLabels: Record<string, string> = {
-  central: 'Central',
-  sucursal: 'Sucursal',
-  transito: 'Tránsito',
-  evento: 'Evento',
+interface AlmacenFormState {
+  sucursalId: string
+  codigo: string
+  nombre: string
+  tipoAlmacen: string
+  direccion: string
+  ciudad: string
+  responsable: string
+  telefono: string
 }
 
-type Almacen = {
-  id: string
-  code: string
-  name: string
-  type: string
-  status: string
+const EMPTY_FORM: AlmacenFormState = {
+  sucursalId: '',
+  codigo: '',
+  nombre: '',
+  tipoAlmacen: 'Sucursal',
+  direccion: '',
+  ciudad: '',
+  responsable: '',
+  telefono: '',
+}
+
+function toForm(almacen: AlmacenDto): AlmacenFormState {
+  return {
+    sucursalId: almacen.sucursalId ?? '',
+    codigo: almacen.codigo,
+    nombre: almacen.nombre,
+    tipoAlmacen: almacen.tipoAlmacen || 'Sucursal',
+    direccion: almacen.direccion,
+    ciudad: almacen.ciudad,
+    responsable: almacen.responsable,
+    telefono: almacen.telefono,
+  }
+}
+
+function statusBadge(almacen: AlmacenDto) {
+  return (
+    <Badge
+      variant={
+        almacen.estado === 'Activo'
+          ? 'success'
+          : 'neutral'
+      }
+    >
+      {almacen.estado}
+    </Badge>
+  )
 }
 
 export function BranchFormPage() {
@@ -46,122 +87,330 @@ export function BranchFormPage() {
   const isEdit = Boolean(id)
   const navigate = useNavigate()
   const { showSuccess, showError } = useToast()
-  const [existing, setExisting] = useState<Almacen | null>(null)
-  const [loading, setLoading] = useState(isEdit)
+
+  const [existing, setExisting] =
+    useState<AlmacenDto | null>(null)
+
+  const [almacenes, setAlmacenes] =
+    useState<AlmacenDto[]>([])
+
+  const [sucursales, setSucursales] =
+    useState<SucursalOptionDto[]>([])
+
+  const [form, setForm] =
+    useState<AlmacenFormState>(EMPTY_FORM)
+
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [notFound, setNotFound] = useState(false)
-  const [allCodes, setAllCodes] = useState<string[]>([])
-  const [form, setForm] = useState({ code: '', name: '', type: 'sucursal', status: 'active' })
 
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
+
+    async function load() {
+      setLoading(true)
+
       try {
-        const list = (await almacenesApi.list()) as Almacen[]
+        const [almacenesList, sucursalesList] =
+          await Promise.all([
+            almacenesApi.list(),
+            almacenesApi.listSucursales(),
+          ])
+
         if (cancelled) return
-        setAllCodes(list.map((b) => b.code))
+
+        setAlmacenes(almacenesList)
+        setSucursales(sucursalesList)
+
         if (isEdit && id) {
-          const found = list.find((b) => b.id === id) ?? ((await almacenesApi.getById(id)) as Almacen)
+          const almacen =
+            almacenesList.find((row) => row.id === id) ??
+            (await almacenesApi.getById(id))
+
           if (cancelled) return
-          setExisting(found)
-          setForm({
-            code: found.code,
-            name: found.name,
-            type: found.type || 'sucursal',
-            status: found.status,
-          })
+
+          if (!almacen) {
+            setNotFound(true)
+            return
+          }
+
+          setExisting(almacen)
+          setForm(toForm(almacen))
         }
-      } catch {
-        if (isEdit) setNotFound(true)
+      } catch (err) {
+        if (isEdit) {
+          setNotFound(true)
+        }
+
+        showError(getFriendlyErrorMessage(err))
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
-    })()
+    }
+
+    void load()
+
     return () => {
       cancelled = true
     }
-  }, [id, isEdit])
+  }, [id, isEdit, showError])
 
   const validation = useMemo(() => {
-    if (!trim(form.name)) return { valid: false, errors: ['Nombre es obligatorio'] }
-    return { valid: true, errors: [] as string[] }
-  }, [form.name])
+    const errors: string[] = []
 
-  const empty = { code: '', name: '', type: 'sucursal', status: 'active' }
+    if (!trim(form.nombre)) {
+      errors.push('El nombre es obligatorio.')
+    }
 
-  if (isEdit && !loading && (notFound || !existing)) {
-    return <RecordNotFound moduleLabel="almacén" listPath={config.basePath} />
+    if (!form.sucursalId) {
+      errors.push('Seleccione una sucursal.')
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+    }
+  }, [form.nombre, form.sucursalId])
+
+  function buildPayload(): GuardarAlmacenRequest {
+    const otherCodes = almacenes
+      .filter((almacen) => almacen.id !== id)
+      .map((almacen) => almacen.codigo)
+
+    const codigo = ensureCode(
+      'ALM',
+      trim(form.nombre),
+      trim(form.codigo),
+      otherCodes,
+    )
+
+    return {
+      sucursalId: form.sucursalId
+        ? Number(form.sucursalId)
+        : null,
+      codigo,
+      nombre: trim(form.nombre),
+      tipoAlmacen: form.tipoAlmacen,
+      direccion: trim(form.direccion),
+      ciudad: trim(form.ciudad),
+      responsable: trim(form.responsable),
+      telefono: trim(form.telefono),
+    }
   }
 
-  if (isEdit && loading) {
-    return <p className="text-sm text-gray-500">Cargando almacén…</p>
-  }
-
-  const buildPayload = () => ({
-    code: ensureCode('ALM', trim(form.name), trim(form.code) || existing?.code, allCodes),
-    name: trim(form.name),
-    type: form.type,
-    status: form.status,
-  })
-
-  const saveForm = () => {
-    if (!validation.valid) return false
-    void (async () => {
-      try {
-        const payload = buildPayload()
-        if (isEdit && id) {
-          await almacenesApi.update(id, payload)
-          showSuccess('Almacén actualizado')
-        } else {
-          await almacenesApi.create(payload)
-          showSuccess('Almacén creado')
-        }
-        navigate(config.basePath)
-      } catch (err) {
-        showError(getFriendlyErrorMessage(err))
-      }
-    })()
+  function save() {
+  if (!validation.valid || saving) {
     return false
   }
 
-  const saveContinue = () => {
-    if (!validation.valid) return false
+  setSaving(true)
+
+  void (async () => {
+    try {
+      const payload = buildPayload()
+
+      if (isEdit && id) {
+        await almacenesApi.update(id, payload)
+        showSuccess('Almacén actualizado')
+      } else {
+        await almacenesApi.create(payload)
+        showSuccess('Almacén creado')
+      }
+
+      navigate(config.basePath)
+    } catch (err) {
+      showError(getFriendlyErrorMessage(err))
+    } finally {
+      setSaving(false)
+    }
+  })()
+
+  return false
+}
+
+  function saveAndContinue() {
+    if (!validation.valid || saving) {
+      return false
+    }
+
+    setSaving(true)
+
     void (async () => {
       try {
         await almacenesApi.create(buildPayload())
         showSuccess('Almacén creado')
-        setForm(empty)
-        const list = (await almacenesApi.list()) as Almacen[]
-        setAllCodes(list.map((b) => b.code))
+
+        const refreshed = await almacenesApi.list()
+        setAlmacenes(refreshed)
+        setForm(EMPTY_FORM)
       } catch (err) {
         showError(getFriendlyErrorMessage(err))
+      } finally {
+        setSaving(false)
       }
     })()
+
     return false
+  }
+
+  if (isEdit && !loading && (notFound || !existing)) {
+    return (
+      <RecordNotFound
+        moduleLabel="almacén"
+        listPath={config.basePath}
+      />
+    )
+  }
+
+  if (loading) {
+    return (
+      <p className="text-sm text-gray-500">
+        Cargando almacén...
+      </p>
+    )
   }
 
   return (
     <AdminFormLayout
       breadcrumbs={[
-        { label: 'Almacenes', to: config.basePath },
-        { label: isEdit ? 'Editar Almacén' : 'Registrar Almacén' },
+        {
+          label: 'Almacenes',
+          to: config.basePath,
+        },
+        {
+          label: isEdit
+            ? 'Editar almacén'
+            : 'Registrar almacén',
+        },
       ]}
-      title={isEdit ? 'Editar Almacén' : 'Registrar Almacén'}
-      subtitle={isEdit ? `Modificando ${existing!.name}` : 'Nueva ubicación de inventario'}
+      title={
+        isEdit
+          ? 'Editar almacén'
+          : 'Registrar almacén'
+      }
+      subtitle={
+        isEdit
+          ? `Modificando ${existing?.nombre ?? ''}`
+          : 'Nueva ubicación de inventario'
+      }
       listPath={config.basePath}
-      saveDisabled={!validation.valid}
-      onSave={saveForm}
-      onSaveContinue={!isEdit ? saveContinue : undefined}
+      saveDisabled={!validation.valid || saving}
+      onSave={save}
+      onSaveContinue={
+        !isEdit
+          ? saveAndContinue
+          : undefined
+      }
     >
       {!validation.valid && (
-        <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2 mb-4">
+        <div className="mb-4 rounded-lg border border-amber-100 bg-amber-50 px-4 py-2 text-sm text-amber-800">
           {validation.errors[0]}
         </div>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Input label="Código" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="Se genera si se deja vacío" />
-        <Input label="Nombre *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="md:col-span-2" />
-        <Select label="Tipo" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} options={typeOptions} />
-        <Select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={statusOptions} />
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <Select
+          label="Sucursal *"
+          value={form.sucursalId}
+          onChange={(event) =>
+            setForm({
+              ...form,
+              sucursalId: event.target.value,
+            })
+          }
+          options={[
+            {
+              value: '',
+              label: 'Seleccione una sucursal...',
+            },
+            ...sucursales.map((sucursal) => ({
+              value: sucursal.id,
+              label:
+                `${sucursal.codigo} · ${sucursal.nombre}`,
+            })),
+          ]}
+        />
+
+        <Select
+          label="Tipo de almacén *"
+          value={form.tipoAlmacen}
+          onChange={(event) =>
+            setForm({
+              ...form,
+              tipoAlmacen: event.target.value,
+            })
+          }
+          options={typeOptions}
+        />
+
+        <Input
+          label="Código"
+          value={form.codigo}
+          onChange={(event) =>
+            setForm({
+              ...form,
+              codigo: event.target.value.toUpperCase(),
+            })
+          }
+          placeholder="Se genera si se deja vacío"
+        />
+
+        <Input
+          label="Nombre *"
+          value={form.nombre}
+          onChange={(event) =>
+            setForm({
+              ...form,
+              nombre: event.target.value,
+            })
+          }
+        />
+
+        <Input
+          label="Dirección"
+          value={form.direccion}
+          onChange={(event) =>
+            setForm({
+              ...form,
+              direccion: event.target.value,
+            })
+          }
+        />
+
+        <Input
+          label="Ciudad"
+          value={form.ciudad}
+          onChange={(event) =>
+            setForm({
+              ...form,
+              ciudad: event.target.value,
+            })
+          }
+        />
+
+        <Input
+          label="Responsable"
+          value={form.responsable}
+          onChange={(event) =>
+            setForm({
+              ...form,
+              responsable: event.target.value,
+            })
+          }
+        />
+
+        <Input
+          label="Teléfono"
+          value={form.telefono}
+          onChange={(event) =>
+            setForm({
+              ...form,
+              telefono: event.target.value,
+            })
+          }
+        />
       </div>
     </AdminFormLayout>
   )
@@ -170,68 +419,219 @@ export function BranchFormPage() {
 export function BranchDetailPage() {
   const { id } = useParams()
   const { showSuccess, showError } = useToast()
-  const [branch, setBranch] = useState<Almacen | null>(null)
+
+  const [almacen, setAlmacen] =
+    useState<AlmacenDto | null>(null)
+
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [changing, setChanging] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
+
+    async function load() {
       if (!id) {
         setNotFound(true)
         setLoading(false)
         return
       }
+
       try {
-        const row = (await almacenesApi.getById(id)) as Almacen
-        if (!cancelled) setBranch(row)
+        const row = await almacenesApi.getById(id)
+
+        if (cancelled) return
+
+        if (!row) {
+          setNotFound(true)
+          return
+        }
+
+        setAlmacen(row)
       } catch {
-        if (!cancelled) setNotFound(true)
+        if (!cancelled) {
+          setNotFound(true)
+        }
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
-    })()
+    }
+
+    void load()
+
     return () => {
       cancelled = true
     }
   }, [id])
 
-  if (loading) return <p className="text-sm text-gray-500">Cargando almacén…</p>
-  if (notFound || !branch) return <RecordNotFound moduleLabel="almacén" listPath={config.basePath} />
-
   async function toggleEstado() {
-    if (!branch) return
-    const next = branch.status === 'active' ? 'inactive' : 'active'
+    if (!almacen || changing) return
+
+    const nuevoEstado =
+      almacen.estado === 'Activo'
+        ? 'Inactivo'
+        : 'Activo'
+
+    setChanging(true)
+
     try {
-      const updated = (await almacenesApi.setEstado(branch.id, next)) as Almacen
-      setBranch(updated)
-      showSuccess(next === 'active' ? 'Almacén activado' : 'Almacén desactivado')
+      await almacenesApi.setEstado(
+        almacen.id,
+        nuevoEstado,
+      )
+
+      setAlmacen((current) =>
+        current
+          ? {
+            ...current,
+            estado: nuevoEstado,
+          }
+          : current,
+      )
+
+      showSuccess(
+        nuevoEstado === 'Activo'
+          ? 'Almacén activado'
+          : 'Almacén desactivado',
+      )
     } catch (err) {
       showError(getFriendlyErrorMessage(err))
+    } finally {
+      setChanging(false)
     }
+  }
+
+  if (loading) {
+    return (
+      <p className="text-sm text-gray-500">
+        Cargando almacén...
+      </p>
+    )
+  }
+
+  if (notFound || !almacen) {
+    return (
+      <RecordNotFound
+        moduleLabel="almacén"
+        listPath={config.basePath}
+      />
+    )
   }
 
   return (
     <AdminDetailLayout
       config={config}
-      id={branch.id}
-      breadcrumbs={[{ label: 'Almacenes', to: config.basePath }, { label: 'Detalle de Almacén' }]}
-      title={branch.name}
-      subtitle={branch.code}
-      statusBadge={<Badge variant={branch.status === 'active' ? 'success' : 'neutral'}>{branch.status === 'active' ? 'Activo' : 'Inactivo'}</Badge>}
+      id={almacen.id}
+      breadcrumbs={[
+        {
+          label: 'Almacenes',
+          to: config.basePath,
+        },
+        {
+          label: 'Detalle de almacén',
+        },
+      ]}
+      title={almacen.nombre}
+      subtitle={almacen.codigo}
+      statusBadge={statusBadge(almacen)}
     >
-      <div className="flex justify-end mb-4">
-        <button type="button" className="text-sm font-medium text-corporate hover:underline" onClick={() => void toggleEstado()}>
-          {branch.status === 'active' ? 'Desactivar' : 'Activar'}
+      <div className="mb-4 flex justify-end">
+        <button
+          type="button"
+          disabled={changing}
+          className="text-sm font-medium text-corporate hover:underline disabled:opacity-50"
+          onClick={() => void toggleEstado()}
+        >
+          {changing
+            ? 'Procesando...'
+            : almacen.estado === 'Activo'
+              ? 'Desactivar'
+              : 'Activar'}
         </button>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <DetailSection title="Información General">
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <DetailSection title="Información general">
           <dl>
-            <DetailRow label="Código" value={<Badge variant="gold">{branch.code}</Badge>} />
-            <DetailRow label="Nombre" value={branch.name} />
-            <DetailRow label="Tipo" value={<Badge variant="neutral">{typeLabels[branch.type] || branch.type}</Badge>} />
-            <DetailRow label="Estado" value={<Badge variant={branch.status === 'active' ? 'success' : 'neutral'}>{branch.status === 'active' ? 'Activo' : 'Inactivo'}</Badge>} />
+            <DetailRow
+              label="Código"
+              value={
+                <Badge variant="gold">
+                  {almacen.codigo}
+                </Badge>
+              }
+            />
+
+            <DetailRow
+              label="Nombre"
+              value={almacen.nombre}
+            />
+
+            <DetailRow
+              label="Tipo"
+              value={
+                <Badge variant="neutral">
+                  {almacen.tipoAlmacen || '—'}
+                </Badge>
+              }
+            />
+
+            <DetailRow
+              label="Sucursal"
+              value={
+                almacen.sucursalNombre ?? 'Sin sucursal'
+              }
+            />
+
+            <DetailRow
+              label="Estado"
+              value={statusBadge(almacen)}
+            />
+          </dl>
+        </DetailSection>
+
+        <DetailSection title="Ubicación y contacto">
+          <dl>
+            <DetailRow
+              label="Dirección"
+              value={almacen.direccion || '—'}
+            />
+
+            <DetailRow
+              label="Ciudad"
+              value={almacen.ciudad || '—'}
+            />
+
+            <DetailRow
+              label="Responsable"
+              value={almacen.responsable || '—'}
+            />
+
+            <DetailRow
+              label="Teléfono"
+              value={almacen.telefono || '—'}
+            />
+          </dl>
+        </DetailSection>
+
+        <DetailSection title="Estado operativo">
+          <dl>
+            <DetailRow
+              label="Bloqueado"
+              value={almacen.bloqueado ? 'Sí' : 'No'}
+            />
+
+            <DetailRow
+              label="Motivo del bloqueo"
+              value={almacen.motivoBloqueo || '—'}
+            />
+
+            <DetailRow
+              label="Fecha de bloqueo"
+              value={almacen.fechaBloqueo ?? '—'}
+            />
           </dl>
         </DetailSection>
       </div>
@@ -242,48 +642,104 @@ export function BranchDetailPage() {
 export function BranchDeletePage() {
   const { id } = useParams()
   const { showSuccess, showError } = useToast()
-  const [branch, setBranch] = useState<Almacen | null>(null)
+
+  const [almacen, setAlmacen] =
+    useState<AlmacenDto | null>(null)
+
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
+
+    async function load() {
       if (!id) {
         setNotFound(true)
         setLoading(false)
         return
       }
+
       try {
-        const row = (await almacenesApi.getById(id)) as Almacen
-        if (!cancelled) setBranch(row)
+        const row = await almacenesApi.getById(id)
+
+        if (cancelled) return
+
+        if (!row) {
+          setNotFound(true)
+          return
+        }
+
+        setAlmacen(row)
       } catch {
-        if (!cancelled) setNotFound(true)
+        if (!cancelled) {
+          setNotFound(true)
+        }
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
-    })()
+    }
+
+    void load()
+
     return () => {
       cancelled = true
     }
   }, [id])
 
-  if (loading) return <p className="text-sm text-gray-500">Cargando almacén…</p>
-  if (notFound || !branch) return <RecordNotFound moduleLabel="almacén" listPath={config.basePath} />
+  if (loading) {
+    return (
+      <p className="text-sm text-gray-500">
+        Cargando almacén...
+      </p>
+    )
+  }
+
+  if (notFound || !almacen) {
+    return (
+      <RecordNotFound
+        moduleLabel="almacén"
+        listPath={config.basePath}
+      />
+    )
+  }
 
   return (
     <AdminDeleteLayout
       config={config}
-      breadcrumbs={[{ label: 'Almacenes', to: config.basePath }, { label: config.deleteTitle }]}
-      recordTitle={branch.name}
-      recordSubtitle={branch.code}
+      breadcrumbs={[
+        {
+          label: 'Almacenes',
+          to: config.basePath,
+        },
+        {
+          label: config.deleteTitle,
+        },
+      ]}
+      recordTitle={almacen.nombre}
+      recordSubtitle={almacen.codigo}
       recordSummary={[
-        { label: 'Tipo', value: typeLabels[branch.type] || branch.type },
-        { label: 'Estado', value: branch.status === 'active' ? 'Activo' : 'Inactivo' },
+        {
+          label: 'Sucursal',
+          value: almacen.sucursalNombre ?? 'Sin sucursal',
+        },
+        {
+          label: 'Tipo',
+          value: almacen.tipoAlmacen || '—',
+        },
+        {
+          label: 'Estado',
+          value: almacen.estado,
+        },
       ]}
       onConfirm={async () => {
         try {
-          await almacenesApi.setEstado(branch.id, 'inactive')
+          await almacenesApi.setEstado(
+            almacen.id,
+            'Inactivo',
+          )
+
           showSuccess('Almacén desactivado')
           return true
         } catch (err) {

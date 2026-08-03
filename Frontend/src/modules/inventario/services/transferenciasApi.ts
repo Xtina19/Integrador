@@ -11,8 +11,6 @@ export type TransferenciaEstadoDto =
 
 export interface CrearTransferenciaLineaDto {
   productoId: string
-  isbn?: string
-  titulo?: string
   cantidadSolicitada: number
 }
 
@@ -48,6 +46,9 @@ export interface TransferenciaListItemDto {
   fecha: string
   cantidadTotal: number
   productoResumen: string
+  almacenOrigenNombre: string
+  almacenDestinoNombre: string
+  solicitanteNombre: string
 }
 
 export interface TransferenciaDetalleDto extends TransferenciaListItemDto {
@@ -66,23 +67,56 @@ interface TransferenciaBackendDto {
   version: number
   lineas: TransferenciaLineaDto[]
   observacion?: string
+  almacenOrigenNombre: string
+  almacenDestinoNombre: string
+  solicitanteNombre: string
+  fecha: string
 }
 
-function toListItem(t: TransferenciaBackendDto): TransferenciaDetalleDto {
-  const cantidadTotal = t.lineas.reduce((sum, l) => sum + l.cantidadSolicitada, 0)
+function toListItem(
+  transferencia: TransferenciaBackendDto,
+): TransferenciaDetalleDto {
+  const lineas =
+    transferencia.lineas ?? []
+
+  const cantidadTotal = lineas.reduce(
+    (total, linea) =>
+      total +
+      linea.cantidadSolicitada,
+    0,
+  )
+
   return {
-    id: t.id,
-    codigo: t.codigo,
-    almacenOrigenId: t.almacenOrigenId,
-    almacenDestinoId: t.almacenDestinoId,
-    estado: t.estado,
-    solicitanteId: t.solicitanteId,
-    version: t.version,
-    fecha: '',
+    id: transferencia.id,
+    codigo: transferencia.codigo,
+
+    almacenOrigenId:
+      transferencia.almacenOrigenId,
+    almacenOrigenNombre:
+      transferencia.almacenOrigenNombre,
+
+    almacenDestinoId:
+      transferencia.almacenDestinoId,
+    almacenDestinoNombre:
+      transferencia.almacenDestinoNombre,
+
+    estado: transferencia.estado,
+
+    solicitanteId:
+      transferencia.solicitanteId,
+    solicitanteNombre:
+      transferencia.solicitanteNombre,
+
+    version: transferencia.version,
+    fecha: transferencia.fecha,
+
     cantidadTotal,
-    productoResumen: `${t.lineas.length} línea(s)`,
-    lineas: t.lineas,
-    observacion: t.observacion,
+    productoResumen:
+      `${lineas.length} línea(s)`,
+
+    lineas,
+    observacion:
+      transferencia.observacion,
   }
 }
 

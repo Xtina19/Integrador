@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Save, Trash2 } from 'lucide-react'
 import { FormBreadcrumb } from '@/components/ui/FormBreadcrumb'
@@ -7,8 +7,9 @@ import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Input, Select } from '@/components/ui/Input'
 import { Table } from '@/components/ui/Table'
 import { Badge } from '@/components/ui/Badge'
-import { branches } from '@/mocks/mockCore'
-import { useProductosMaestro } from '@/hooks/useProductosMaestro'
+import { almacenesApi, type AlmacenDto } from '@/services/api/almacenesApi'
+import { inventarioQueryApi } from '@/services/api/inventarioQueryApi'
+import type { ProductoInventarioVista } from '../types/inventoryUi'
 import { conteosApi } from '@/services/api/conteosApi'
 import { getFriendlyErrorMessage } from '@/services/http'
 import { useToast } from '@/context/ToastContext'
@@ -39,15 +40,17 @@ function nextCodigo(): string {
 export function NuevoConteoPage() {
   const navigate = useNavigate()
   const { showSuccess, showError } = useToast()
-  const { productos } = useProductosMaestro()
+  const [almacenes, setAlmacenes] = useState<AlmacenDto[]>([])
+  const [productos, setProductos] = useState<ProductoInventarioVista[]>([])
+  const [loadingCatalogos, setLoadingCatalogos] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [codigo] = useState(nextCodigo)
   const [form, setForm] = useState({
     nombre: '',
     tipoConteo: 'parcial' as TipoConteo,
-    sucursalId: branches[0]?.id ?? '',
-    almacenId: branches[0]?.id ?? '',
+    sucursalId: '',
+    almacenId: '',
     alcanceTipo: 'todo_almacen' as AlcanceTipo,
     alcanceValor: '',
     fechaProgramada: new Date().toISOString().slice(0, 10),
@@ -61,30 +64,104 @@ export function NuevoConteoPage() {
     productoBusqueda: '',
   })
 
+  useEffect(() => {
+    let cancelled = false
+
+    ;(async () => {
+      setLoadingCatalogos(true)
+      try {
+        const [almacenesResult, productosResult] = await Promise.all([
+          almacenesApi.list({ estado: 'Activo' }),
+          inventarioQueryApi.productosVista(),
+        ])
+
+        if (cancelled) return
+
+        const almacenesDisponibles = almacenesResult.filter(
+          (almacen) => almacen.estado === 'Activo' && !almacen.bloqueado,
+        )
+
+        setAlmacenes(almacenesDisponibles)
+        setProductos(productosResult)
+
+        const primerAlmacenConProductos = almacenesDisponibles.find((almacen) =>
+          productosResult.some((producto) =>
+            producto.porAlmacen.some(
+              (existencia) => existencia.almacenId === almacen.id,
+            ),
+          ),
+        )
+
+        const almacenInicial = primerAlmacenConProductos ?? almacenesDisponibles[0]
+
+        if (almacenInicial) {
+          setForm((actual) => ({
+            ...actual,
+            almacenId: almacenInicial.id,
+            sucursalId: almacenInicial.sucursalId ?? '',
+          }))
+        }
+      } catch (e) {
+        if (!cancelled) {
+          const message = getFriendlyErrorMessage(e)
+          setError(message)
+          showError(message)
+        }
+      } finally {
+        if (!cancelled) setLoadingCatalogos(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [showError])
+
   const editoriales = useMemo(
-    () => [...new Set(productos.map((p) => p.publisher).filter(Boolean))],
+    () => [...new Set(productos.map((p) => p.editorial).filter(Boolean))],
     [productos],
   )
   const categoriasMaestro = useMemo(
-    () => [...new Set(productos.map((p) => p.category).filter(Boolean))],
+    () => [...new Set(productos.map((p) => p.categoria).filter(Boolean))],
     [productos],
   )
-  const ubicaciones = useMemo(() => ['Pasillo A', 'Pasillo B', 'Depósito', 'Mostrador'], [])
+  const ubicaciones = useMemo(
+    () => [
+      ...new Set(
+        productos.flatMap((producto) =>
+          producto.porAlmacen
+            .filter((existencia) => existencia.almacenId === form.almacenId)
+            .map((existencia) => existencia.ubicacion ?? '')
+            .filter(Boolean),
+        ),
+      ),
+    ],
+    [productos, form.almacenId],
+  )
 
-  const sucursalNombre = branches.find((b) => b.id === form.sucursalId)?.name ?? form.sucursalId
+  const almacenSeleccionado = almacenes.find((a) => a.id === form.almacenId)
+  const sucursalNombre = almacenSeleccionado?.sucursalNombre ?? form.sucursalId
 
   const productosBase = useMemo((): ProductoAlcanceRow[] => {
-    let list = productos.map((p) => ({
-      productoId: p.id,
-      isbn: p.isbn,
-      titulo: p.title,
-      categoria: p.category,
-      editorial: p.publisher,
-      ubicacion: '—',
-      existenciaActual: 0,
-      stockMinimo: 0,
-      seleccionado: true,
-    }))
+    let list = productos.flatMap((producto) => {
+      const existencia = producto.porAlmacen.find(
+        (item) => item.almacenId === form.almacenId,
+      )
+
+      if (!existencia) return []
+
+      return [{
+        productoId: producto.id,
+        isbn: producto.isbn,
+        titulo: producto.titulo,
+        categoria: producto.categoria,
+        editorial: producto.editorial ?? '—',
+        ubicacion: existencia.ubicacion ?? '—',
+        existenciaActual: existencia.saldo,
+        stockMinimo: existencia.stockMinimo ?? 0,
+        seleccionado: true,
+      }]
+    })
 
     if (form.alcanceTipo === 'categoria' && form.alcanceValor) {
       list = list.filter((p) => p.categoria === form.alcanceValor)
@@ -104,7 +181,7 @@ export function NuevoConteoPage() {
       }
     }
     return list
-  }, [form.alcanceTipo, form.alcanceValor, form.productoBusqueda, productos])
+  }, [form.alcanceTipo, form.alcanceValor, form.productoBusqueda, form.almacenId, productos])
 
   const [excluidos, setExcluidos] = useState<Set<string>>(new Set())
   const [seleccionManual, setSeleccionManual] = useState<Set<string>>(new Set())
@@ -202,7 +279,7 @@ export function NuevoConteoPage() {
         return
       }
       showSuccess(`Conteo ${res.data.codigo} creado en borrador`)
-      navigate('/inventario?tab=movimientos&filtro=conteos')
+      navigate(`/inventario/conteos/${res.data.id}`)
     } catch (e) {
       const msg = getFriendlyErrorMessage(e)
       setError(msg)
@@ -236,6 +313,12 @@ export function NuevoConteoPage() {
         <h1 className="text-2xl font-bold tracking-tight text-corporate">Crear conteo físico</h1>
       </div>
 
+      {loadingCatalogos && (
+        <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-2 text-sm text-blue-800">
+          Cargando almacenes y existencias desde SQL Server…
+        </div>
+      )}
+
       {(error || validationErrors[0]) && (
         <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700">
           {error || validationErrors[0]}
@@ -266,19 +349,32 @@ export function NuevoConteoPage() {
             <Select
               label="Sucursal *"
               value={form.sucursalId}
-              onChange={(e) => {
-                const id = e.target.value
-                setForm({ ...form, sucursalId: id, almacenId: id })
-              }}
-              options={branches.map((b) => ({ value: b.id, label: b.name }))}
+              disabled
+              onChange={() => undefined}
+              options={
+                form.sucursalId
+                  ? [{ value: form.sucursalId, label: sucursalNombre || form.sucursalId }]
+                  : [{ value: '', label: 'Seleccione un almacén' }]
+              }
             />
             <Select
               label="Almacén *"
               value={form.almacenId}
-              onChange={(e) => setForm({ ...form, almacenId: e.target.value })}
-              options={branches.map((b) => ({
-                value: b.id,
-                label: `${b.name} (almacén)`,
+              onChange={(e) => {
+                const almacen = almacenes.find((item) => item.id === e.target.value)
+                setExcluidos(new Set())
+                setSeleccionManual(new Set())
+                setForm({
+                  ...form,
+                  almacenId: e.target.value,
+                  sucursalId: almacen?.sucursalId ?? '',
+                  alcanceValor: '',
+                  productoBusqueda: '',
+                })
+              }}
+              options={almacenes.map((almacen) => ({
+                value: almacen.id,
+                label: almacen.nombre,
               }))}
             />
             <div className="text-sm text-slate-500 md:col-span-2">
@@ -494,7 +590,7 @@ export function NuevoConteoPage() {
         <Button
           icon={Save}
           onClick={() => void handleSave()}
-          disabled={saving || validationErrors.length > 0}
+          disabled={saving || loadingCatalogos || validationErrors.length > 0}
         >
           {saving ? 'Guardando…' : 'Crear conteo'}
         </Button>

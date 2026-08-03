@@ -1,16 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { Input, Select } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
-import { publisherNames } from '@/mocks/mockAdmin'
 import { isEventDetailLocked } from '@/modules/eventos/utils/eventFieldLock'
 import type { EventStatus } from '@/types/domain'
+import { fetchArray } from '../utils/apiLists'
+
+const API_BASE = 'http://localhost:3001/api'
 
 export interface EventDetailForm {
   code: string
   name: string
   type: string
-  publishers: string[]
+  publishers: string[]       // guardamos nombres para mostrar en los badges
+  publisherIds: number[]     // y los IDs reales, que son los que se envían al backend
   location: string
   startDate: string
   endDate: string
@@ -27,14 +30,6 @@ const eventTypes = [
   { value: 'taller', label: 'Taller' },
 ]
 
-const responsables = [
-  'Laura Méndez',
-  'Carlos Ruiz',
-  'Ana Martínez',
-  'Luis Hernández',
-  'Roberto Sánchez',
-]
-
 interface EventDetailTabContentProps {
   form: EventDetailForm
   onChange: (form: EventDetailForm) => void
@@ -42,29 +37,98 @@ interface EventDetailTabContentProps {
   locked?: boolean
 }
 
+interface EditorialOption {
+  id_editorial: number
+  nombre: string
+}
+
+interface PersonaOption {
+  id_persona: number
+  tipo_persona: string
+  nombre: string
+}
+
 export function EventDetailTabContent({ form, onChange, status, locked }: EventDetailTabContentProps) {
   const fieldsLocked = locked ?? (status ? isEventDetailLocked(status) || status === 'finalized' : false)
   const [publisherPick, setPublisherPick] = useState('')
+  const [editoriales, setEditoriales] = useState<EditorialOption[]>([])
+  const [loadingEditoriales, setLoadingEditoriales] = useState(true)
+  const [responsables, setResponsables] = useState<PersonaOption[]>([])
+  const [loadingResponsables, setLoadingResponsables] = useState(true)
+  const [catalogError, setCatalogError] = useState('')
 
-  function update(field: keyof EventDetailForm, value: string | string[]) {
+  useEffect(() => {
+    async function loadCatalogs() {
+      setLoadingEditoriales(true)
+      setLoadingResponsables(true)
+      setCatalogError('')
+
+      try {
+        const [editorialesData, responsablesData] = await Promise.all([
+          fetchArray<EditorialOption>(
+            `${API_BASE}/eventos/editoriales`
+          ),
+          fetchArray<PersonaOption>(
+            `${API_BASE}/eventos/personas`
+          ),
+        ])
+
+        setEditoriales(editorialesData)
+        setResponsables(responsablesData)
+      } catch (error) {
+        console.error(
+          'Error cargando los catálogos del evento:',
+          error
+        )
+
+        setEditoriales([])
+        setResponsables([])
+        setCatalogError(
+          'No se pudieron cargar las editoriales y los responsables.'
+        )
+      } finally {
+        setLoadingEditoriales(false)
+        setLoadingResponsables(false)
+      }
+    }
+
+    void loadCatalogs()
+  }, [])
+
+  function update(field: keyof EventDetailForm, value: string | string[] | number[]) {
     onChange({ ...form, [field]: value })
   }
 
   function addPublisher() {
-    if (!publisherPick || form.publishers.includes(publisherPick)) return
-    update('publishers', [...form.publishers, publisherPick])
+    if (!publisherPick) return
+    const id = Number(publisherPick)
+    if (form.publisherIds.includes(id)) return
+    const nombre = editoriales.find((e) => e.id_editorial === id)?.nombre ?? publisherPick
+    onChange({
+      ...form,
+      publisherIds: [...form.publisherIds, id],
+      publishers: [...form.publishers, nombre],
+    })
     setPublisherPick('')
   }
 
-  function removePublisher(name: string) {
-    update(
-      'publishers',
-      form.publishers.filter((p) => p !== name)
-    )
+  function removePublisher(id: number) {
+    const idx = form.publisherIds.indexOf(id)
+    if (idx === -1) return
+    onChange({
+      ...form,
+      publisherIds: form.publisherIds.filter((_, i) => i !== idx),
+      publishers: form.publishers.filter((_, i) => i !== idx),
+    })
   }
 
   return (
     <div className="space-y-6">
+      {catalogError && (
+        <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-2.5 text-sm text-red-600">
+          {catalogError}
+        </div>
+      )}
       {fieldsLocked && (
         <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2.5">
           Este evento está en curso. Los datos principales están bloqueados. Puede editar utensilios, observaciones e inventario adicional.
@@ -98,9 +162,10 @@ export function EventDetailTabContent({ form, onChange, status, locked }: EventD
               <Select
                 value={publisherPick}
                 onChange={(e) => setPublisherPick(e.target.value)}
+                disabled={loadingEditoriales}
                 options={[
-                  { value: '', label: 'Seleccione editorial...' },
-                  ...publisherNames.map((p) => ({ value: p, label: p })),
+                  { value: '', label: loadingEditoriales ? 'Cargando editoriales...' : 'Seleccione editorial...' },
+                  ...editoriales.map((e) => ({ value: String(e.id_editorial), label: e.nombre })),
                 ]}
                 className="flex-1"
               />
@@ -115,14 +180,14 @@ export function EventDetailTabContent({ form, onChange, status, locked }: EventD
             </div>
           )}
           <div className="flex flex-wrap gap-2">
-            {form.publishers.length === 0 && (
+            {form.publisherIds.length === 0 && (
               <span className="text-sm text-gray-400">Sin editoriales seleccionadas</span>
             )}
-            {form.publishers.map((p) => (
-              <span key={p} className="inline-flex items-center gap-1">
-                <Badge variant="gold">{p}</Badge>
+            {form.publisherIds.map((id, i) => (
+              <span key={id} className="inline-flex items-center gap-1">
+                <Badge variant="gold">{form.publishers[i]}</Badge>
                 {!fieldsLocked && (
-                  <button type="button" onClick={() => removePublisher(p)} className="text-gray-400 hover:text-red-500">
+                  <button type="button" onClick={() => removePublisher(id)} className="text-gray-400 hover:text-red-500">
                     <X size={14} />
                   </button>
                 )}
@@ -161,9 +226,22 @@ export function EventDetailTabContent({ form, onChange, status, locked }: EventD
         <Select
           label="Responsable *"
           value={form.responsible}
-          disabled={fieldsLocked}
-          onChange={(e) => update('responsible', e.target.value)}
-          options={responsables.map((r) => ({ value: r, label: r }))}
+          disabled={fieldsLocked || loadingResponsables}
+          onChange={(e) =>
+            update('responsible', e.target.value)
+          }
+          options={[
+            {
+              value: '',
+              label: loadingResponsables
+                ? 'Cargando responsables...'
+                : 'Seleccione responsable...',
+            },
+            ...responsables.map((persona) => ({
+              value: persona.nombre,
+              label: persona.nombre,
+            })),
+          ]}
         />
         <Input
           label="Presupuesto asignado *"

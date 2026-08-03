@@ -96,92 +96,10 @@ export interface ConteoDetalleDto extends ConteoListItemDto {
 }
 
 /** GET /conteos/:id devuelve el agregado de dominio (raw, con snapshots) + `meta` del caso "Crear Conteo". */
-interface ConteoAggregateBackendDto {
-  id: string
-  codigo: string
-  almacenId: string
-  tipoConteo: string
-  descripcionAlcance: string
-  estado: string
-  responsableId: string
-  bloqueoActivo: boolean
-  version: number
-  snapshots: { id: string; productoId: string; cantidadTeorica: number; costoReferencia?: number }[]
-  lineas: {
-    id: string
-    productoId: string
-    snapshotId: string
-    cantidadContada?: number
-    cantidadReconteo?: number
-    cantidadAceptada?: number
-    diferencia?: number
-    clasificacion?: ClasificacionDiferenciaDto
-    estadoLinea: EstadoLineaConteoDto
-    regularizacionTipo?: 'ajuste' | 'descarte'
-    regularizacionId?: string
-    observacion?: string
-  }[]
-  meta: {
-    nombre: string
-    sucursalId: string
-    responsableNombre?: string
-    observaciones?: string
-    fase: string
-    productos: { productoId: string; isbn?: string; titulo?: string }[]
-    createdAt: string
-  } | null
-}
-
 interface ApiEnvelope<T> {
   success: boolean
   data?: T
   error?: { code: string; message: string; details?: unknown }
-}
-
-function toConteoDetalle(c: ConteoAggregateBackendDto): ConteoDetalleDto {
-  const meta = c.meta
-  const productoInfo = new Map(meta?.productos.map((p) => [p.productoId, p]) ?? [])
-  const snapshotById = new Map(c.snapshots.map((s) => [s.id, s]))
-  const lineas: LineaConteoDto[] = c.lineas.map((l) => {
-    const snapshot = snapshotById.get(l.snapshotId)
-    const info = productoInfo.get(l.productoId)
-    return {
-      id: l.id,
-      productoId: l.productoId,
-      isbn: info?.isbn,
-      titulo: info?.titulo,
-      snapshotId: l.snapshotId,
-      cantidadTeorica: snapshot?.cantidadTeorica ?? 0,
-      cantidadContada: l.cantidadContada,
-      cantidadReconteo: l.cantidadReconteo,
-      cantidadAceptada: l.cantidadAceptada,
-      diferencia: l.diferencia,
-      clasificacion: l.clasificacion,
-      estadoLinea: l.estadoLinea,
-      regularizacionTipo: l.regularizacionTipo,
-      regularizacionId: l.regularizacionId,
-      observacion: l.observacion,
-    }
-  })
-  return {
-    id: c.id,
-    codigo: c.codigo,
-    nombre: meta?.nombre ?? c.codigo,
-    almacenId: c.almacenId,
-    sucursalId: meta?.sucursalId ?? c.almacenId,
-    tipoConteo: c.tipoConteo,
-    estado: c.estado,
-    fase: meta?.fase ?? c.estado,
-    responsableId: c.responsableId,
-    responsableNombre: meta?.responsableNombre,
-    productosAlcance: meta?.productos.length ?? lineas.length,
-    diferencias: lineas.filter((l) => (l.diferencia ?? 0) !== 0).length,
-    bloqueoActivo: c.bloqueoActivo,
-    fecha: meta?.createdAt ?? '',
-    version: c.version,
-    lineas,
-    observaciones: meta?.observaciones,
-  }
 }
 
 const AUTH_HEADERS = {
@@ -206,17 +124,17 @@ export const conteosApi = {
     return res.data ?? []
   },
 
-  async get(id: string): Promise<ConteoDetalleDto | null> {
-    const res = await httpGet<ApiEnvelope<ConteoAggregateBackendDto>>(
+  async get(
+    id: string,
+  ): Promise<ConteoDetalleDto | null> {
+    const res = await httpGet<
+      ApiEnvelope<ConteoDetalleDto>
+    >(
       `/api/inventario/conteos/${id}`,
       withAuth(),
     )
-    if (!res.data) return null
-    return toConteoDetalle({
-      ...res.data,
-      snapshots: res.data.snapshots ?? [],
-      lineas: res.data.lineas ?? [],
-    })
+
+    return res.data ?? null
   },
 
   async abrir(id: string, expectedVersion: number, productoIds?: string[]) {

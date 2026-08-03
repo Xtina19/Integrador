@@ -1,17 +1,21 @@
-﻿import { useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Save, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Input, Select } from '@/components/ui/Input'
 import { Table } from '@/components/ui/Table'
-import { branches } from '@/mocks/mockCore'
-import { useProductosMaestro } from '@/hooks/useProductosMaestro'
 import { transferenciasApi } from '@/services/api/transferenciasApi'
 import { getFriendlyErrorMessage } from '@/services/http'
 import { useToast } from '@/context/ToastContext'
 import { trim } from '@/utils/formValidation'
 import { DetailPageShell } from '@/compartido/Components/DetailPageShell'
+import {
+  almacenesApi,
+  type AlmacenDto,
+} from '@/services/api/almacenesApi'
+import { inventarioQueryApi } from '@/services/api/inventarioQueryApi'
+import type { ProductoInventarioVista } from '../types/inventoryUi'
 
 interface LineaForm {
   key: string
@@ -30,27 +34,77 @@ function nextCodigo(): string {
 export function NuevaTransferenciaPage() {
   const navigate = useNavigate()
   const { showSuccess, showError } = useToast()
-  const { productos } = useProductosMaestro()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [codigo] = useState(nextCodigo)
   const [busqueda, setBusqueda] = useState('')
-  const [almacenOrigenId, setAlmacenOrigenId] = useState(branches[0]?.id ?? '')
-  const [almacenDestinoId, setAlmacenDestinoId] = useState(branches[1]?.id ?? branches[0]?.id ?? '')
+  const [almacenes, setAlmacenes] =
+    useState<AlmacenDto[]>([])
+
+  const [productos, setProductos] =
+    useState<ProductoInventarioVista[]>([])
+
+  const [loadingData, setLoadingData] =
+    useState(true)
+
+  const [almacenOrigenId, setAlmacenOrigenId] =
+    useState('')
+
+  const [
+    almacenDestinoId,
+    setAlmacenDestinoId,
+  ] = useState('')
   const [observacion, setObservacion] = useState('')
   const [lineas, setLineas] = useState<LineaForm[]>([])
 
+  const productosOrigen = useMemo(() => {
+    if (!almacenOrigenId) {
+      return []
+    }
+
+    return productos
+      .map((producto) => {
+        const existencia =
+          producto.porAlmacen.find(
+            (item) =>
+              item.almacenId ===
+              almacenOrigenId,
+          )
+
+        return {
+          producto,
+          existenciaActual:
+            existencia?.saldo ?? 0,
+        }
+      })
+      .filter(
+        (item) =>
+          item.existenciaActual > 0,
+      )
+  }, [productos, almacenOrigenId])
+
   const productosFiltrados = useMemo(() => {
-    const q = busqueda.toLowerCase().trim()
-    if (!q) return productos.slice(0, 8)
-    return productos.filter(
-      (p) =>
-        p.title.toLowerCase().includes(q) ||
-        p.isbn.toLowerCase().includes(q) ||
-        p.id.toLowerCase().includes(q) ||
-        p.code.toLowerCase().includes(q),
-    )
-  }, [busqueda, productos])
+    const query =
+      busqueda.toLowerCase().trim()
+
+    const rows = !query
+      ? productosOrigen
+      : productosOrigen.filter(
+        ({ producto }) =>
+          producto.titulo
+            .toLowerCase()
+            .includes(query) ||
+          producto.isbn
+            .toLowerCase()
+            .includes(query) ||
+          producto.id
+            .toLowerCase()
+            .includes(query),
+      )
+
+    return rows.slice(0, 20)
+  }, [busqueda, productosOrigen])
+
 
   const validationErrors = useMemo(() => {
     const errs: string[] = []
@@ -61,31 +115,124 @@ export function NuevaTransferenciaPage() {
     }
     if (lineas.length === 0) errs.push('Debe agregar al menos un producto.')
     for (const l of lineas) {
-      const qty = Number(l.cantidadSolicitada)
-      if (!Number.isInteger(qty) || qty <= 0) {
-        errs.push(`Cantidad inválida en ${l.titulo || l.productoId}.`)
+      const qty =
+        Number(l.cantidadSolicitada)
+
+      if (
+        !Number.isInteger(qty) ||
+        qty <= 0
+      ) {
+        errs.push(
+          `Cantidad inválida en ${l.titulo || l.productoId
+          }.`,
+        )
+        break
+      }
+
+      if (qty > l.existenciaActual) {
+        errs.push(
+          `La cantidad de ${l.titulo} supera la existencia disponible (${l.existenciaActual}).`,
+        )
         break
       }
     }
     return errs
   }, [almacenOrigenId, almacenDestinoId, lineas])
 
-  function agregarProducto(productId: string) {
-    const p = productos.find((x) => x.id === productId)
-    if (!p) return
-    if (lineas.some((l) => l.productoId === p.id)) {
-      setError('El producto ya está en la transferencia.')
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      setLoadingData(true)
+
+      try {
+        const [
+          almacenesResult,
+          productosResult,
+        ] = await Promise.all([
+          almacenesApi.list({
+            estado: 'Activo',
+          }),
+          inventarioQueryApi.productosVista(),
+        ])
+
+        if (cancelled) return
+
+        const disponibles =
+          almacenesResult.filter(
+            (almacen) =>
+              almacen.estado === 'Activo' &&
+              !almacen.bloqueado,
+          )
+
+        setAlmacenes(disponibles)
+        setProductos(productosResult)
+
+        setAlmacenOrigenId(
+          disponibles[0]?.id ?? '',
+        )
+
+        setAlmacenDestinoId(
+          disponibles[1]?.id ??
+          disponibles[0]?.id ??
+          '',
+        )
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            getFriendlyErrorMessage(err),
+          )
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingData(false)
+        }
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  function agregarProducto(
+    productoId: string,
+  ) {
+    const encontrado =
+      productosOrigen.find(
+        (item) =>
+          item.producto.id === productoId,
+      )
+
+    if (!encontrado) return
+
+    const producto = encontrado.producto
+
+    if (
+      lineas.some(
+        (linea) =>
+          linea.productoId === producto.id,
+      )
+    ) {
+      setError(
+        'El producto ya está en la transferencia.',
+      )
       return
     }
+
     setError('')
-    setLineas((prev) => [
-      ...prev,
+
+    setLineas((current) => [
+      ...current,
       {
-        key: `${p.id}-${Date.now()}`,
-        productoId: p.id,
-        isbn: p.isbn,
-        titulo: p.title,
-        existenciaActual: 0,
+        key: `${producto.id}-${Date.now()}`,
+        productoId: producto.id,
+        isbn: producto.isbn,
+        titulo: producto.titulo,
+        existenciaActual:
+          encontrado.existenciaActual,
         cantidadSolicitada: '1',
       },
     ])
@@ -103,11 +250,12 @@ export function NuevaTransferenciaPage() {
         codigo,
         almacenOrigenId,
         almacenDestinoId,
-        lineas: lineas.map((l) => ({
-          productoId: l.productoId,
-          isbn: l.isbn,
-          titulo: l.titulo,
-          cantidadSolicitada: Number(l.cantidadSolicitada),
+        lineas: lineas.map((linea) => ({
+          productoId: linea.productoId,
+          cantidadSolicitada:
+            Number(
+              linea.cantidadSolicitada,
+            ),
         })),
         observacion: trim(observacion) || undefined,
       })
@@ -132,10 +280,10 @@ export function NuevaTransferenciaPage() {
     <DetailPageShell
       breadcrumbs={[
         { label: 'Inventario', to: '/inventario' },
-        { label: 'Transferencias', to: '/inventario?tab=movimientos&filtro=transferencias' },
+        { label: 'Transferencias', to: '/inventario?tab=transferencias' },
         { label: 'Nueva transferencia' },
       ]}
-      backPath="/inventario?tab=movimientos&filtro=transferencias"
+      backPath="/inventario?tab=transferencias"
       title="Nueva transferencia"
       error={error || validationErrors[0] || null}
     >
@@ -149,15 +297,50 @@ export function NuevaTransferenciaPage() {
               <Select
                 label="Almacén origen *"
                 value={almacenOrigenId}
-                onChange={(e) => setAlmacenOrigenId(e.target.value)}
-                options={branches.map((b) => ({ value: b.id, label: b.name }))}
-              />
+                onChange={(event) => {
+                  setAlmacenOrigenId(
+                    event.target.value,
+                  )
+
+                  setLineas([])
+                  setBusqueda('')
+                  setError('')
+                }}
+                options={[
+                  {
+                    value: '',
+                    label: loadingData
+                      ? 'Cargando almacenes...'
+                      : 'Seleccione almacén origen...',
+                  },
+                  ...almacenes.map((almacen) => ({
+                    value: almacen.id,
+                    label:
+                      `${almacen.codigo} · ${almacen.nombre}`,
+                  })),
+                ]} />
               <Select
                 label="Almacén destino *"
                 value={almacenDestinoId}
                 onChange={(e) => setAlmacenDestinoId(e.target.value)}
-                options={branches.map((b) => ({ value: b.id, label: b.name }))}
-              />
+                options={[
+                  {
+                    value: '',
+                    label: loadingData
+                      ? 'Cargando almacenes...'
+                      : 'Seleccione almacén destino...',
+                  },
+                  ...almacenes
+                    .filter(
+                      (almacen) =>
+                        almacen.id !== almacenOrigenId,
+                    )
+                    .map((almacen) => ({
+                      value: almacen.id,
+                      label:
+                        `${almacen.codigo} · ${almacen.nombre}`,
+                    })),
+                ]} />
               <div className="md:col-span-2">
                 <label className="mb-1.5 block text-sm font-medium text-gray-700">Observaciones</label>
                 <textarea
@@ -183,21 +366,36 @@ export function NuevaTransferenciaPage() {
               />
             </div>
             <div className="mb-4 max-h-40 overflow-y-auto rounded-lg border border-slate-200">
-              {productosFiltrados.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className="flex w-full items-center justify-between border-b border-slate-100 px-3 py-2 text-left text-sm hover:bg-slate-50"
-                  onClick={() => agregarProducto(p.id)}
-                >
-                  <span>
-                    <span className="font-mono text-xs text-slate-400">{p.isbn}</span>{' '}
-                    <span className="font-medium">{p.title}</span>
-                    <span className="ml-2 text-xs text-slate-500">{p.code || p.isbn}</span>
-                  </span>
-                  <Plus size={14} className="text-corporate" />
-                </button>
-              ))}
+              {productosFiltrados.map(
+                ({ producto, existenciaActual }) => (
+                  <button
+                    key={producto.id}
+                    type="button"
+                    onClick={() =>
+                      agregarProducto(producto.id)
+                    }
+                    className="flex w-full items-center justify-between border-b border-slate-100 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                  >
+                    <span>
+                      <span className="font-mono text-xs text-slate-400">
+                        {producto.isbn}
+                      </span>{' '}
+
+                      <span className="font-medium">
+                        {producto.titulo}
+                      </span>
+
+                      <span className="ml-2 text-xs text-slate-500">
+                        Disponible: {existenciaActual}
+                      </span>
+                    </span>
+
+                    <Plus
+                      size={14}
+                      className="text-corporate"
+                    />
+                  </button>
+                ))}
             </div>
 
             <Table
@@ -252,7 +450,7 @@ export function NuevaTransferenciaPage() {
         </Card>
 
         <div className="flex flex-col items-stretch justify-end gap-3 border-t border-gray-200 pt-2 sm:flex-row sm:items-center">
-          <Button variant="outline" onClick={() => navigate('/inventario?tab=movimientos&filtro=transferencias')}>
+          <Button variant="outline" onClick={() => navigate('/inventario?tab=transferencias')}>
             Cancelar
           </Button>
           <Button icon={Save} onClick={() => void handleSave()} disabled={saving || validationErrors.length > 0}>

@@ -1,0 +1,6316 @@
+-- Espacio Registro de Productos -----------------------------------------------------------------------
+-- =============================
+--  Documento Proyecto Definitivo
+-- =============================
+-- Un libro puede cambiar de precio con el tiempo o sircunstancias
+-- CREATE TABLE Precio ();
+-- =============================================
+-- MODULO CONTACTO (TELÉFONOS Y DIRECCIONES)
+-- =============================================
+CREATE TABLE TipoTelefono (
+    id_tipo_telefono INT PRIMARY KEY IDENTITY,
+    nombre VARCHAR(50) NOT NULL,
+    -- 'Móvil', 'Residencial', 'Oficina', 'WhatsApp'
+    descripcion VARCHAR(150),
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo'
+);
+
+CREATE TABLE Telefono (
+    id_telefono INT PRIMARY KEY IDENTITY,
+    id_tipo_telefono INT NOT NULL,
+    numero VARCHAR(20) NOT NULL,
+    codigo_pais VARCHAR(10) NOT NULL DEFAULT '+1',
+    es_principal BIT NOT NULL DEFAULT 0,
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_tel_tipo FOREIGN KEY (id_tipo_telefono) REFERENCES TipoTelefono(id_tipo_telefono)
+);
+
+CREATE TABLE Pais (
+    id_pais INT PRIMARY KEY IDENTITY,
+    nombre VARCHAR(100) NOT NULL,
+    codigo_iso CHAR(3) NOT NULL UNIQUE,
+    -- ISO 3166-1 alpha-3: 'DOM', 'USA', 'COL'
+    codigo_telefono VARCHAR(10),
+    -- '+1', '+57'
+    moneda VARCHAR(50),
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo'
+);
+
+CREATE TABLE Ciudad (
+    id_ciudad INT PRIMARY KEY IDENTITY,
+    id_pais INT NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    codigo_postal VARCHAR(20),
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
+    CONSTRAINT fk_ciu_pais FOREIGN KEY (id_pais) REFERENCES Pais(id_pais)
+);
+
+CREATE TABLE TipoDireccion (
+    id_tipo_direccion INT PRIMARY KEY IDENTITY,
+    nombre VARCHAR(50) NOT NULL,
+    -- 'Residencial', 'Comercial', 'Fiscal', 'Almacén'
+    descripcion VARCHAR(150),
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo'
+);
+
+CREATE TABLE Direccion (
+    id_direccion INT PRIMARY KEY IDENTITY,
+    id_tipo_direccion INT NOT NULL,
+    id_ciudad INT NOT NULL,
+    calle VARCHAR(200) NOT NULL,
+    numero_exterior VARCHAR(20),
+    numero_interior VARCHAR(20),
+    sector VARCHAR(100),
+    referencia VARCHAR(255),
+    codigo_postal VARCHAR(20),
+    es_principal BIT NOT NULL DEFAULT 0,
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_dir_tipo FOREIGN KEY (id_tipo_direccion) REFERENCES TipoDireccion(id_tipo_direccion),
+    CONSTRAINT fk_dir_ciudad FOREIGN KEY (id_ciudad) REFERENCES Ciudad(id_ciudad)
+);
+
+-- =============================================
+-- MODULO PERSONAS Y ENTIDADES COMERCIALES
+-- =============================================
+CREATE TABLE Persona (
+    id_persona INT PRIMARY KEY IDENTITY,
+    tipo_persona VARCHAR(20) NOT NULL,
+    nombres VARCHAR(100),
+    apellidos VARCHAR(100),
+    razon_social VARCHAR(200),
+    documento_tipo VARCHAR(30) NOT NULL,
+    documento_numero VARCHAR(50) NOT NULL UNIQUE,
+    correo VARCHAR(150),
+    fecha_nacimiento DATE,
+    genero VARCHAR(20),
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE()
+);
+
+CREATE TABLE Persona_Tiene_Telefono (
+    id_persona_telefono INT PRIMARY KEY IDENTITY,
+    id_persona INT NOT NULL,
+    id_telefono INT NOT NULL,
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_ptt_persona FOREIGN KEY (id_persona) REFERENCES Persona(id_persona),
+    CONSTRAINT fk_ptt_telefono FOREIGN KEY (id_telefono) REFERENCES Telefono(id_telefono),
+    CONSTRAINT uq_ptt UNIQUE (id_persona, id_telefono)
+);
+
+CREATE TABLE Persona_Tiene_Direccion (
+    id_persona_direccion INT PRIMARY KEY IDENTITY,
+    id_persona INT NOT NULL,
+    id_direccion INT NOT NULL,
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_ptd_persona FOREIGN KEY (id_persona) REFERENCES Persona(id_persona),
+    CONSTRAINT fk_ptd_direccion FOREIGN KEY (id_direccion) REFERENCES Direccion(id_direccion),
+    CONSTRAINT uq_ptd UNIQUE (id_persona, id_direccion)
+);
+
+CREATE TABLE Usuario (
+    id_usuario INT PRIMARY KEY IDENTITY,
+    id_persona INT,
+    nombre_usuario VARCHAR(80) NOT NULL UNIQUE,
+    correo VARCHAR(150) NOT NULL UNIQUE,
+    contrasena_hash VARCHAR(255) NOT NULL,
+    rol VARCHAR(50) NOT NULL DEFAULT 'usuario',
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
+    ultimo_acceso DATETIME,
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    fecha_actualizacion DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_usuario_persona FOREIGN KEY (id_persona) REFERENCES Persona(id_persona),
+);
+
+CREATE TABLE TipoProveedor (
+    id_tipo_proveedor INT PRIMARY KEY IDENTITY,
+    nombre VARCHAR(100) NOT NULL,
+    -- 'Editorial', 'Importador', 'Servicio Evento', 'Logística'
+    descripcion VARCHAR(255),
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo'
+);
+
+CREATE TABLE Proveedor (
+    id_proveedor INT PRIMARY KEY IDENTITY,
+    id_persona INT NOT NULL,
+    id_tipo_proveedor INT NOT NULL,
+    codigo_proveedor VARCHAR(50) NOT NULL UNIQUE,
+    nombre_comercial VARCHAR(200) NOT NULL,
+    sitio_web VARCHAR(200),
+    condiciones_pago VARCHAR(100),
+    -- 'Contado', '30 días', '60 días'
+    moneda_preferida VARCHAR(10) NOT NULL DEFAULT 'DOP',
+    es_internacional BIT NOT NULL DEFAULT 0,
+    id_pais INT,
+    -- Relevante si es proveedor internacional
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_prov_persona FOREIGN KEY (id_persona) REFERENCES Persona(id_persona),
+    CONSTRAINT fk_prov_tipo FOREIGN KEY (id_tipo_proveedor) REFERENCES TipoProveedor(id_tipo_proveedor),
+    CONSTRAINT fk_prov_pais FOREIGN KEY (id_pais) REFERENCES Pais(id_pais)
+);
+
+-- Un autor puede tener varios libros y un libro puede contener varios autores
+CREATE TABLE Autor (
+    id_autor INT PRIMARY KEY IDENTITY,
+    nombre VARCHAR(100) NOT NULL,
+    apellido VARCHAR(100) NOT NULL,
+    nacionalidad VARCHAR(50),
+    fecha_nacimiento DATE,
+    biografia TEXT,
+    fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE Editorial (
+    id_editorial INT PRIMARY KEY IDENTITY,
+    nombre VARCHAR(150) NOT NULL,
+    pais_origen VARCHAR(50),
+    sitio_web VARCHAR(200),
+    correo_contacto VARCHAR(100),
+    telefono VARCHAR(20),
+    fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE CategoriaProducto (
+    id_categoria INT PRIMARY KEY IDENTITY,
+    nombre_categoria VARCHAR(100) NOT NULL,
+    descripcion VARCHAR(255),
+    estado VARCHAR(20) DEFAULT 'Activo'
+);
+
+CREATE TABLE Producto (
+    id_producto INT PRIMARY KEY IDENTITY,
+    codigo_producto VARCHAR(50) NOT NULL UNIQUE,
+    titulo VARCHAR(200) NOT NULL,
+    isbn VARCHAR(20) NOT NULL UNIQUE,
+    id_autor INT NOT NULL,
+    id_editorial INT NOT NULL,
+    id_categoria INT NOT NULL,
+    costo_referencia DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    precio DECIMAL(10, 2) NOT NULL,
+    idioma VARCHAR(50),
+    numero_paginas INT,
+    fecha_publicacion DATE,
+    edicion VARCHAR(50),
+    sinopsis TEXT,
+    imagen_portada VARCHAR(255),
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_producto_autor FOREIGN KEY (id_autor) REFERENCES Autor(id_autor),
+    CONSTRAINT fk_producto_editorial FOREIGN KEY (id_editorial) REFERENCES Editorial(id_editorial),
+    CONSTRAINT fk_producto_categoria FOREIGN KEY (id_categoria) REFERENCES CategoriaProducto(id_categoria)
+);
+
+-- =============================================
+-- MODULO INVENTARIO
+-- =============================================
+CREATE TABLE Sucursal (
+    id_sucursal INT PRIMARY KEY IDENTITY,
+    id_direccion INT NOT NULL,
+    nombre VARCHAR(150) NOT NULL,
+    codigo_sucursal VARCHAR(30) NOT NULL UNIQUE,
+    telefono VARCHAR(20),
+    correo VARCHAR(150),
+    responsable VARCHAR(150),
+    es_principal BIT NOT NULL DEFAULT 0,
+    -- Sede principal
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_suc_direccion FOREIGN KEY (id_direccion) REFERENCES Direccion(id_direccion)
+);
+
+CREATE TABLE Almacen (
+    id_almacen INT PRIMARY KEY IDENTITY(1, 1),
+    id_sucursal INT,
+    nombre VARCHAR(100) NOT NULL,
+    codigo_almacen VARCHAR(30) NOT NULL UNIQUE,
+    direccion VARCHAR(200),
+    ciudad VARCHAR(100),
+    responsable VARCHAR(150),
+    telefono VARCHAR(20),
+    tipo_almacen VARCHAR(50),
+    bloqueado BIT NOT NULL DEFAULT 0,
+    motivo_bloqueo VARCHAR(255),
+    fecha_bloqueo DATETIME2(0),
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
+    fecha_registro DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT fk_almacen_sucursal FOREIGN KEY (id_sucursal) REFERENCES Sucursal(id_sucursal),
+    CONSTRAINT uq_almacen_nombre_sucursal UNIQUE (id_sucursal, nombre),
+);
+
+CREATE TABLE Inventario (
+    id_inventario INT PRIMARY KEY IDENTITY(1, 1),
+    id_producto INT NOT NULL,
+    id_almacen INT NOT NULL,
+    stock_actual INT NOT NULL DEFAULT 0,
+    stock_minimo INT NOT NULL DEFAULT 0,
+    stock_maximo INT,
+    ubicacion VARCHAR(150) NOT NULL,
+    version INT NOT NULL DEFAULT 1,
+    fecha_actualizacion DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT fk_inv_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto),
+    CONSTRAINT fk_inv_almacen FOREIGN KEY (id_almacen) REFERENCES Almacen(id_almacen),
+    CONSTRAINT uq_inv_producto_almacen UNIQUE (id_producto, id_almacen),
+);
+
+CREATE TABLE CosteoInventario (
+    id_costeo INT PRIMARY KEY IDENTITY(1, 1),
+    id_producto INT NOT NULL,
+    id_usuario INT NOT NULL,
+    costo_anterior DECIMAL(12, 2) NOT NULL,
+    costo_nuevo DECIMAL(12, 2) NOT NULL,
+    tipo_costeo VARCHAR(50) NOT NULL,
+    observacion VARCHAR(255),
+    fecha_costeo DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT fk_costeo_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto),
+    CONSTRAINT fk_costeo_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario),
+);
+
+CREATE TABLE TransferenciaInventario (
+    id_transferencia INT PRIMARY KEY IDENTITY(1, 1),
+    codigo VARCHAR(30) NOT NULL UNIQUE,
+    id_almacen_origen INT NOT NULL,
+    id_almacen_destino INT NOT NULL,
+    id_solicitante INT NOT NULL,
+    estado VARCHAR(30) NOT NULL DEFAULT 'borrador',
+    observacion VARCHAR(255),
+    version INT NOT NULL DEFAULT 1,
+    fecha_registro DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
+    fecha_solicitud DATETIME2(0),
+    fecha_despacho DATETIME2(0),
+    fecha_recepcion DATETIME2(0) NULL,
+    fecha_finalizacion DATETIME2(0),
+    CONSTRAINT fk_transferencia_origen FOREIGN KEY (id_almacen_origen) REFERENCES Almacen(id_almacen),
+    CONSTRAINT fk_transferencia_destino FOREIGN KEY (id_almacen_destino) REFERENCES Almacen(id_almacen),
+    CONSTRAINT fk_transferencia_solicitante FOREIGN KEY (id_solicitante) REFERENCES Usuario(id_usuario),
+    CONSTRAINT chk_transferencia_almacenes CHECK (id_almacen_origen <> id_almacen_destino),
+);
+
+CREATE TABLE DetalleTransferenciaInventario (
+    id_detalle_transferencia INT PRIMARY KEY IDENTITY(1, 1),
+    id_transferencia INT NOT NULL,
+    id_producto INT NOT NULL,
+    cantidad_solicitada INT NOT NULL,
+    cantidad_despachada INT NOT NULL DEFAULT 0,
+    cantidad_recibida INT NOT NULL DEFAULT 0,
+    cantidad_faltante INT NOT NULL DEFAULT 0,
+    cantidad_danada INT NOT NULL DEFAULT 0,
+    observacion VARCHAR(255),
+    CONSTRAINT fk_det_transferencia FOREIGN KEY (id_transferencia) REFERENCES TransferenciaInventario(id_transferencia),
+    CONSTRAINT fk_det_transferencia_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto),
+    CONSTRAINT uq_det_transferencia_producto UNIQUE (id_transferencia, id_producto),
+);
+
+CREATE TABLE RecepcionTransferencia (
+    id_recepcion INT PRIMARY KEY IDENTITY(1, 1),
+    id_transferencia INT NOT NULL,
+    id_usuario INT NOT NULL,
+    clave_idempotencia VARCHAR(100) NOT NULL UNIQUE,
+    observacion VARCHAR(255),
+    fecha_recepcion DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT fk_recepcion_transferencia FOREIGN KEY (id_transferencia) REFERENCES TransferenciaInventario(id_transferencia),
+    CONSTRAINT fk_recepcion_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario)
+);
+
+CREATE TABLE DetalleRecepcionTransferencia (
+    id_detalle_recepcion INT PRIMARY KEY IDENTITY(1, 1),
+    id_recepcion INT NOT NULL,
+    id_detalle_transferencia INT NOT NULL,
+    cantidad_recibida INT NOT NULL DEFAULT 0,
+    cantidad_faltante INT NOT NULL DEFAULT 0,
+    cantidad_danada INT NOT NULL DEFAULT 0,
+    observacion VARCHAR(255),
+    CONSTRAINT fk_det_recepcion FOREIGN KEY (id_recepcion) REFERENCES RecepcionTransferencia(id_recepcion),
+    CONSTRAINT fk_det_recepcion_transferencia FOREIGN KEY (id_detalle_transferencia) REFERENCES DetalleTransferenciaInventario(id_detalle_transferencia),
+    CONSTRAINT uq_det_recepcion_linea UNIQUE (id_recepcion, id_detalle_transferencia)
+);
+
+CREATE TABLE ConteoInventario (
+    id_conteo INT PRIMARY KEY IDENTITY(1, 1),
+    codigo VARCHAR(30) NOT NULL UNIQUE,
+    nombre VARCHAR(150) NOT NULL,
+    id_sucursal INT NOT NULL,
+    id_almacen INT NOT NULL,
+    tipo_conteo VARCHAR(30) NOT NULL,
+    alcance_tipo VARCHAR(30) NOT NULL,
+    alcance_valor VARCHAR(200),
+    fecha_programada DATE,
+    hora_programada TIME(0),
+    id_responsable INT,
+    responsable_nombre VARCHAR(150),
+    observaciones VARCHAR(255),
+    bloquear_almacen_al_abrir BIT NOT NULL DEFAULT 0,
+    permitir_reconteo BIT NOT NULL DEFAULT 1,
+    diferencia_minima_reconteo INT NOT NULL DEFAULT 1,
+    estado VARCHAR(30) NOT NULL DEFAULT 'borrador',
+    fase VARCHAR(30) NOT NULL DEFAULT 'Crear',
+    bloqueo_activo BIT NOT NULL DEFAULT 0,
+    version INT NOT NULL DEFAULT 1,
+    fecha_registro DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
+    fecha_apertura DATETIME2(0),
+    fecha_cierre DATETIME2(0),
+    CONSTRAINT fk_conteo_sucursal FOREIGN KEY (id_sucursal) REFERENCES Sucursal(id_sucursal),
+    CONSTRAINT fk_conteo_almacen FOREIGN KEY (id_almacen) REFERENCES Almacen(id_almacen),
+    CONSTRAINT fk_conteo_responsable FOREIGN KEY (id_responsable) REFERENCES Usuario(id_usuario)
+);
+
+CREATE TABLE SnapshotConteoInventario (
+    id_snapshot INT PRIMARY KEY IDENTITY(1, 1),
+    id_conteo INT NOT NULL,
+    id_producto INT NOT NULL,
+    cantidad_teorica INT NOT NULL,
+    costo_referencia DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    fecha_snapshot DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT fk_snapshot_conteo FOREIGN KEY (id_conteo) REFERENCES ConteoInventario(id_conteo),
+    CONSTRAINT fk_snapshot_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto),
+    CONSTRAINT uq_snapshot_conteo_producto UNIQUE (id_conteo, id_producto)
+);
+
+CREATE TABLE DetalleConteoInventario (
+    id_detalle_conteo INT PRIMARY KEY IDENTITY(1, 1),
+    id_conteo INT NOT NULL,
+    id_snapshot INT NOT NULL,
+    id_producto INT NOT NULL,
+    cantidad_contada INT,
+    cantidad_reconteo INT,
+    cantidad_aceptada INT,
+    diferencia INT,
+    clasificacion VARCHAR(30),
+    estado_linea VARCHAR(30) NOT NULL DEFAULT 'pendiente',
+    regularizacion_tipo VARCHAR(20),
+    regularizacion_id INT,
+    observacion VARCHAR(255),
+    CONSTRAINT fk_det_conteo FOREIGN KEY (id_conteo) REFERENCES ConteoInventario(id_conteo),
+    CONSTRAINT fk_det_conteo_snapshot FOREIGN KEY (id_snapshot) REFERENCES SnapshotConteoInventario(id_snapshot),
+    CONSTRAINT fk_det_conteo_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto),
+    CONSTRAINT uq_det_conteo_producto UNIQUE (id_conteo, id_producto)
+);
+
+CREATE TABLE ProductoAlcanceConteoInventario (
+    id_alcance_conteo INT PRIMARY KEY IDENTITY(1, 1),
+    id_conteo INT NOT NULL,
+    id_producto INT NOT NULL,
+    fecha_registro DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT fk_alcance_conteo FOREIGN KEY (id_conteo) REFERENCES ConteoInventario(id_conteo),
+    CONSTRAINT fk_alcance_conteo_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto),
+    CONSTRAINT uq_alcance_conteo_producto UNIQUE (id_conteo, id_producto)
+);
+
+GO
+    CREATE TABLE AjusteInventario (
+        id_ajuste INT PRIMARY KEY IDENTITY(1, 1),
+        codigo VARCHAR(30) NOT NULL UNIQUE,
+        id_almacen INT NOT NULL,
+        tipo_ajuste VARCHAR(30) NOT NULL,
+        estado VARCHAR(30) NOT NULL DEFAULT 'borrador',
+        id_solicitante INT NOT NULL,
+        id_aprobador INT,
+        observacion VARCHAR(255),
+        documento_origen_tipo VARCHAR(50),
+        documento_origen_id INT,
+        version INT NOT NULL DEFAULT 1,
+        fecha_registro DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
+        fecha_solicitud DATETIME2(0),
+        fecha_aprobacion DATETIME2(0),
+        fecha_aplicacion DATETIME2(0),
+        CONSTRAINT fk_ajuste_almacen FOREIGN KEY (id_almacen) REFERENCES Almacen(id_almacen),
+        CONSTRAINT fk_ajuste_solicitante FOREIGN KEY (id_solicitante) REFERENCES Usuario(id_usuario),
+        CONSTRAINT fk_ajuste_aprobador FOREIGN KEY (id_aprobador) REFERENCES Usuario(id_usuario),
+    );
+
+CREATE TABLE DetalleAjusteInventario (
+    id_detalle_ajuste INT PRIMARY KEY IDENTITY(1, 1),
+    id_ajuste INT NOT NULL,
+    id_producto INT NOT NULL,
+    cantidad_objetivo INT NOT NULL,
+    diferencia INT NOT NULL,
+    existencia_anterior INT NOT NULL,
+    motivo_codigo VARCHAR(50),
+    id_detalle_conteo INT,
+    observacion VARCHAR(255),
+    CONSTRAINT fk_det_ajuste FOREIGN KEY (id_ajuste) REFERENCES AjusteInventario(id_ajuste),
+    CONSTRAINT fk_det_ajuste_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto),
+    CONSTRAINT fk_det_ajuste_conteo FOREIGN KEY (id_detalle_conteo) REFERENCES DetalleConteoInventario(id_detalle_conteo),
+    CONSTRAINT uq_det_ajuste_producto UNIQUE (id_ajuste, id_producto),
+);
+
+CREATE TABLE DescarteInventario (
+    id_descarte INT PRIMARY KEY IDENTITY(1, 1),
+    codigo VARCHAR(30) NOT NULL UNIQUE,
+    fecha DATE NOT NULL,
+    id_sucursal INT NOT NULL,
+    id_almacen INT NOT NULL,
+    id_responsable INT,
+    responsable_nombre VARCHAR(150),
+    motivo_codigo VARCHAR(30) NOT NULL,
+    motivo_descripcion VARCHAR(255),
+    observaciones VARCHAR(255),
+    requiere_aprobacion BIT NOT NULL DEFAULT 1,
+    id_supervisor INT,
+    supervisor_nombre VARCHAR(150),
+    id_solicitante INT NOT NULL,
+    id_aprobador INT,
+    estado VARCHAR(30) NOT NULL DEFAULT 'borrador',
+    documento_origen_tipo VARCHAR(50),
+    documento_origen_id INT,
+    version INT NOT NULL DEFAULT 1,
+    fecha_registro DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
+    fecha_solicitud DATETIME2(0),
+    fecha_aprobacion DATETIME2(0),
+    fecha_aplicacion DATETIME2(0),
+    CONSTRAINT fk_descarte_sucursal FOREIGN KEY (id_sucursal) REFERENCES Sucursal(id_sucursal),
+    CONSTRAINT fk_descarte_almacen FOREIGN KEY (id_almacen) REFERENCES Almacen(id_almacen),
+    CONSTRAINT fk_descarte_responsable FOREIGN KEY (id_responsable) REFERENCES Usuario(id_usuario),
+    CONSTRAINT fk_descarte_supervisor FOREIGN KEY (id_supervisor) REFERENCES Usuario(id_usuario),
+    CONSTRAINT fk_descarte_solicitante FOREIGN KEY (id_solicitante) REFERENCES Usuario(id_usuario),
+    CONSTRAINT fk_descarte_aprobador FOREIGN KEY (id_aprobador) REFERENCES Usuario(id_usuario),
+);
+
+CREATE TABLE DetalleDescarteInventario (
+    id_detalle_descarte INT PRIMARY KEY IDENTITY(1, 1),
+    id_descarte INT NOT NULL,
+    id_producto INT NOT NULL,
+    existencia_actual INT NOT NULL,
+    cantidad INT NOT NULL,
+    costo_unitario DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    motivo_especifico VARCHAR(150),
+    id_detalle_conteo INT,
+    observacion VARCHAR(255),
+    CONSTRAINT fk_det_descarte FOREIGN KEY (id_descarte) REFERENCES DescarteInventario(id_descarte),
+    CONSTRAINT fk_det_descarte_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto),
+    CONSTRAINT fk_det_descarte_conteo FOREIGN KEY (id_detalle_conteo) REFERENCES DetalleConteoInventario(id_detalle_conteo),
+    CONSTRAINT uq_det_descarte_producto UNIQUE (id_descarte, id_producto),
+);
+
+CREATE TABLE EvidenciaDescarteInventario (
+    id_evidencia INT PRIMARY KEY IDENTITY(1, 1),
+    id_descarte INT NOT NULL,
+    tipo VARCHAR(20) NOT NULL,
+    nombre_archivo VARCHAR(255),
+    url_referencia VARCHAR(500),
+    comentario VARCHAR(500),
+    id_usuario INT NOT NULL,
+    fecha_registro DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT fk_evidencia_descarte FOREIGN KEY (id_descarte) REFERENCES DescarteInventario(id_descarte),
+    CONSTRAINT fk_evidencia_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario),
+);
+
+CREATE TABLE MovimientoInventario (
+    id_movimiento INT PRIMARY KEY IDENTITY(1, 1),
+    id_inventario INT NOT NULL,
+    id_producto INT NOT NULL,
+    id_almacen INT NOT NULL,
+    id_usuario INT NOT NULL,
+    tipo_movimiento VARCHAR(30) NOT NULL,
+    cantidad INT NOT NULL,
+    saldo_anterior INT NOT NULL,
+    saldo_posterior INT NOT NULL,
+    documento_tipo VARCHAR(50) NOT NULL,
+    documento_id INT NOT NULL,
+    motivo_codigo VARCHAR(50),
+    observacion VARCHAR(255),
+    fecha_movimiento DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT fk_mov_inventario FOREIGN KEY (id_inventario) REFERENCES Inventario(id_inventario),
+    CONSTRAINT fk_mov_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto),
+    CONSTRAINT fk_mov_almacen FOREIGN KEY (id_almacen) REFERENCES Almacen(id_almacen),
+    CONSTRAINT fk_mov_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario),
+);
+
+CREATE TABLE AuditoriaInventario (
+    id_auditoria INT PRIMARY KEY IDENTITY(1, 1),
+    id_usuario INT NOT NULL,
+    tipo_accion VARCHAR(100) NOT NULL,
+    id_movimiento INT,
+    documento_tipo VARCHAR(50),
+    documento_id INT,
+    id_producto INT,
+    id_almacen INT,
+    direccion_ip VARCHAR(45),
+    resultado VARCHAR(20) NOT NULL,
+    detalle VARCHAR(MAX),
+    fecha DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT fk_auditoria_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario),
+    CONSTRAINT fk_auditoria_movimiento FOREIGN KEY (id_movimiento) REFERENCES MovimientoInventario(id_movimiento),
+    CONSTRAINT fk_auditoria_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto),
+    CONSTRAINT fk_auditoria_almacen FOREIGN KEY (id_almacen) REFERENCES Almacen(id_almacen),
+    CONSTRAINT chk_auditoria_resultado CHECK (resultado IN ('OK', 'RECHAZADO', 'ERROR')),
+);
+
+CREATE TABLE OperacionIdempotenteInventario (
+    id_operacion INT PRIMARY KEY IDENTITY(1, 1),
+    clave_idempotencia VARCHAR(100) NOT NULL UNIQUE,
+    tipo_operacion VARCHAR(50) NOT NULL,
+    documento_tipo VARCHAR(50) NOT NULL,
+    documento_id INT NOT NULL,
+    id_usuario INT NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'procesada',
+    respuesta NVARCHAR(MAX),
+    fecha_registro DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT fk_operacion_idempotente_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario),
+    CONSTRAINT chk_operacion_idempotente_estado CHECK (estado IN ('procesando', 'procesada', 'fallida'))
+);
+
+-- =============================================
+-- MODULO IMPORTACIONES / EMBARQUES
+-- =============================================
+CREATE TABLE Embarque (
+    id_embarque INT PRIMARY KEY IDENTITY,
+    codigo_embarque VARCHAR(50) NOT NULL UNIQUE,
+    proveedor VARCHAR(150) NOT NULL,
+    pais_origen VARCHAR(100) NOT NULL,
+    fecha_despacho DATE,
+    fecha_llegada_est DATE,
+    -- Fecha estimada de llegada
+    fecha_llegada_real DATE,
+    tipo_transporte VARCHAR(50),
+    -- 'Aéreo', 'Marítimo', 'Terrestre'
+    numero_tracking VARCHAR(100),
+    estado VARCHAR(50) NOT NULL DEFAULT 'En Tránsito',
+    -- 'En Tránsito', 'En Aduana', 'Recibido'
+    observacion VARCHAR(255),
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE()
+);
+
+CREATE TABLE CostoEmbarque (
+    id_costo_embarque INT PRIMARY KEY IDENTITY,
+    id_embarque INT NOT NULL,
+    concepto VARCHAR(150) NOT NULL,
+    -- 'Flete', 'Seguro', 'Aduana', 'Almacenaje', etc.
+    monto DECIMAL(12, 2) NOT NULL,
+    moneda VARCHAR(10) NOT NULL DEFAULT 'USD',
+    tasa_cambio DECIMAL(10, 4),
+    -- Tasa al momento del registro
+    monto_local DECIMAL(12, 2),
+    -- Monto convertido a moneda local
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_ce_embarque FOREIGN KEY (id_embarque) REFERENCES Embarque(id_embarque)
+);
+
+CREATE TABLE FacturaInternacional (
+    id_factura_int INT PRIMARY KEY IDENTITY,
+    id_embarque INT NOT NULL,
+    numero_factura VARCHAR(100) NOT NULL UNIQUE,
+    proveedor VARCHAR(150) NOT NULL,
+    pais_emisor VARCHAR(100),
+    fecha_emision DATE NOT NULL,
+    moneda VARCHAR(10) NOT NULL DEFAULT 'USD',
+    tasa_cambio DECIMAL(10, 4),
+    subtotal DECIMAL(12, 2) NOT NULL,
+    impuestos DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    total DECIMAL(12, 2) NOT NULL,
+    total_local DECIMAL(12, 2),
+    -- Total en moneda local
+    estado VARCHAR(50) NOT NULL DEFAULT 'Pendiente',
+    -- 'Pendiente', 'Pagada', 'Anulada'
+    observacion VARCHAR(255),
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_fi_embarque FOREIGN KEY (id_embarque) REFERENCES Embarque(id_embarque)
+);
+
+CREATE TABLE DetalleFacturaInternacional (
+    id_detalle_fi INT PRIMARY KEY IDENTITY,
+    id_factura_int INT NOT NULL,
+    id_producto INT NOT NULL,
+    descripcion VARCHAR(200),
+    cantidad INT NOT NULL,
+    precio_unitario DECIMAL(12, 2) NOT NULL,
+    subtotal DECIMAL(12, 2) NOT NULL,
+    cantidad_recibida INT NOT NULL DEFAULT 0,
+    -- Lo que efectivamente llegó del embarque
+    diferencia AS (cantidad - cantidad_recibida),
+    -- Columna calculada
+    observacion VARCHAR(255),
+    CONSTRAINT fk_dfi_factura FOREIGN KEY (id_factura_int) REFERENCES FacturaInternacional(id_factura_int),
+    CONSTRAINT fk_dfi_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto)
+);
+
+CREATE TABLE Consolidacion (
+    id_consolidacion INT PRIMARY KEY IDENTITY,
+    codigo_consolidacion VARCHAR(50) NOT NULL UNIQUE,
+    id_embarque INT NOT NULL,
+    id_almacen_destino INT NOT NULL,
+    fecha_consolidacion DATE NOT NULL,
+    total_bultos INT,
+    peso_total_kg DECIMAL(10, 2),
+    volumen_total_m3 DECIMAL(10, 2),
+    estado VARCHAR(50) NOT NULL DEFAULT 'Pendiente',
+    -- 'Pendiente', 'Procesado', 'Cerrado'
+    observacion VARCHAR(255),
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_cons_embarque FOREIGN KEY (id_embarque) REFERENCES Embarque(id_embarque),
+    CONSTRAINT fk_cons_almacen FOREIGN KEY (id_almacen_destino) REFERENCES Almacen(id_almacen)
+);
+
+-- =============================================
+-- MODULO TRANSFERENCIAS
+-- =============================================
+CREATE TABLE TipoTransferencia (
+    id_tipo_transferencia INT PRIMARY KEY IDENTITY,
+    nombre VARCHAR(100) NOT NULL,
+    -- 'Sucursal', 'Descarte', 'Oferta', 'Despacho', 'Al por mayor', 'Contado'
+    descripcion VARCHAR(255),
+    aplica_a VARCHAR(50),
+    -- 'Almacen', 'Sucursal', 'Ambos'
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo'
+);
+
+CREATE TABLE Transferencia (
+    id_transferencia INT PRIMARY KEY IDENTITY,
+    codigo_transferencia VARCHAR(50) NOT NULL UNIQUE,
+    id_tipo_transferencia INT NOT NULL,
+    id_almacen_origen INT NOT NULL,
+    id_almacen_destino INT NOT NULL,
+    id_usuario_solicita INT NOT NULL,
+    motivo VARCHAR(255),
+    estado VARCHAR(50) NOT NULL DEFAULT 'Pendiente',
+    -- 'Pendiente', 'En Tránsito', 'Recibido', 'Cancelado'
+    fecha_solicitud DATETIME NOT NULL DEFAULT GETDATE(),
+    fecha_despacho DATETIME,
+    observacion VARCHAR(255),
+    CONSTRAINT fk_tr_tipo FOREIGN KEY (id_tipo_transferencia) REFERENCES TipoTransferencia(id_tipo_transferencia),
+    CONSTRAINT fk_tr_origen FOREIGN KEY (id_almacen_origen) REFERENCES Almacen(id_almacen),
+    CONSTRAINT fk_tr_destino FOREIGN KEY (id_almacen_destino) REFERENCES Almacen(id_almacen),
+    CONSTRAINT chk_tr_almacen CHECK (id_almacen_origen <> id_almacen_destino)
+);
+
+CREATE TABLE DetalleTransferencia (
+    id_detalle_transferencia INT PRIMARY KEY IDENTITY,
+    id_transferencia INT NOT NULL,
+    id_producto INT NOT NULL,
+    cantidad_solicitada INT NOT NULL,
+    cantidad_despachada INT NOT NULL DEFAULT 0,
+    observacion VARCHAR(255),
+    CONSTRAINT fk_dt_transferencia FOREIGN KEY (id_transferencia) REFERENCES Transferencia(id_transferencia),
+    CONSTRAINT fk_dt_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto)
+);
+
+CREATE TABLE RecibimientoTransferencias (
+    id_recibimiento INT PRIMARY KEY IDENTITY,
+    id_transferencia INT NOT NULL,
+    id_almacen_receptor INT NOT NULL,
+    id_usuario_recibe INT NOT NULL,
+    estado VARCHAR(50) NOT NULL DEFAULT 'Recibido',
+    -- 'Recibido', 'Recibido Parcial', 'Rechazado'
+    observacion VARCHAR(255),
+    fecha_recibimiento DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_rt_transferencia FOREIGN KEY (id_transferencia) REFERENCES Transferencia(id_transferencia),
+    CONSTRAINT fk_rt_almacen FOREIGN KEY (id_almacen_receptor) REFERENCES Almacen(id_almacen)
+);
+
+CREATE TABLE DetalleRecibimientoMercancia (
+    id_detalle_recibimiento INT PRIMARY KEY IDENTITY,
+    id_recibimiento INT NOT NULL,
+    id_producto INT NOT NULL,
+    cantidad_esperada INT NOT NULL,
+    cantidad_recibida INT NOT NULL,
+    cantidad_con_dano INT NOT NULL DEFAULT 0,
+    observacion VARCHAR(255),
+    CONSTRAINT fk_drm_recibimiento FOREIGN KEY (id_recibimiento) REFERENCES RecibimientoTransferencias(id_recibimiento),
+    CONSTRAINT fk_drm_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto)
+);
+
+-- =============================================
+-- MODULO COMPRAS Y FINANCIERO
+-- =============================================
+CREATE TABLE OrdenCompra (
+    id_orden_compra INT PRIMARY KEY IDENTITY,
+    codigo_orden VARCHAR(50) NOT NULL UNIQUE,
+    id_almacen INT NOT NULL,
+    proveedor VARCHAR(150) NOT NULL,
+    contacto_proveedor VARCHAR(100),
+    fecha_emision DATE NOT NULL DEFAULT CAST(GETDATE() AS DATE),
+    fecha_entrega_est DATE,
+    subtotal DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    impuestos DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    total DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    estado VARCHAR(50) NOT NULL DEFAULT 'Pendiente',
+    -- 'Pendiente', 'Aprobada', 'Recibida', 'Cancelada'
+    observacion VARCHAR(255),
+    id_usuario INT NOT NULL,
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_oc_almacen FOREIGN KEY (id_almacen) REFERENCES Almacen(id_almacen)
+);
+
+CREATE TABLE DetalleOrdenCompra (
+    id_detalle_oc INT PRIMARY KEY IDENTITY,
+    id_orden_compra INT NOT NULL,
+    id_producto INT NOT NULL,
+    cantidad INT NOT NULL,
+    precio_unitario DECIMAL(12, 2) NOT NULL,
+    subtotal DECIMAL(12, 2) NOT NULL,
+    observacion VARCHAR(255),
+    CONSTRAINT fk_doc_orden FOREIGN KEY (id_orden_compra) REFERENCES OrdenCompra(id_orden_compra),
+    CONSTRAINT fk_doc_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto)
+);
+
+CREATE TABLE RecepcionOrdenCompra (
+    id_recepcion INT PRIMARY KEY IDENTITY,
+    id_orden_compra INT NOT NULL,
+    id_almacen INT NOT NULL,
+    id_usuario_recibe INT NOT NULL,
+    estado VARCHAR(50) NOT NULL DEFAULT 'Recibido',
+    -- 'Recibido', 'Recibido Parcial', 'Rechazado'
+    observacion VARCHAR(255),
+    fecha_recepcion DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_roc_orden FOREIGN KEY (id_orden_compra) REFERENCES OrdenCompra(id_orden_compra),
+    CONSTRAINT fk_roc_almacen FOREIGN KEY (id_almacen) REFERENCES Almacen(id_almacen)
+);
+
+CREATE TABLE DetalleRecepcionOrdenCompra (
+    id_detalle_recepcion INT PRIMARY KEY IDENTITY,
+    id_recepcion INT NOT NULL,
+    id_producto INT NOT NULL,
+    cantidad_esperada INT NOT NULL,
+    cantidad_recibida INT NOT NULL,
+    cantidad_con_dano INT NOT NULL DEFAULT 0,
+    precio_unitario DECIMAL(12, 2) NOT NULL,
+    observacion VARCHAR(255),
+    CONSTRAINT fk_droc_recepcion FOREIGN KEY (id_recepcion) REFERENCES RecepcionOrdenCompra(id_recepcion),
+    CONSTRAINT fk_droc_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto)
+);
+
+CREATE TABLE FacturaProveedores (
+    id_factura_prov INT PRIMARY KEY IDENTITY,
+    id_orden_compra INT NOT NULL,
+    numero_factura VARCHAR(100) NOT NULL UNIQUE,
+    proveedor VARCHAR(150) NOT NULL,
+    fecha_emision DATE NOT NULL,
+    fecha_vencimiento DATE NOT NULL,
+    subtotal DECIMAL(12, 2) NOT NULL,
+    impuestos DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    total DECIMAL(12, 2) NOT NULL,
+    estado VARCHAR(50) NOT NULL DEFAULT 'Pendiente',
+    -- 'Pendiente', 'Pagada', 'Vencida', 'Anulada'
+    observacion VARCHAR(255),
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_fp_orden FOREIGN KEY (id_orden_compra) REFERENCES OrdenCompra(id_orden_compra)
+);
+
+CREATE TABLE CuentasPorPagar (
+    id_cuenta_pagar INT PRIMARY KEY IDENTITY,
+    id_factura_prov INT NOT NULL,
+    monto_total DECIMAL(12, 2) NOT NULL,
+    monto_pagado DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    monto_pendiente AS (monto_total - monto_pagado),
+    -- Columna calculada
+    fecha_vencimiento DATE NOT NULL,
+    estado VARCHAR(50) NOT NULL DEFAULT 'Pendiente',
+    -- 'Pendiente', 'Pagado Parcial', 'Pagado', 'Vencido'
+    fecha_ultimo_pago DATETIME,
+    observacion VARCHAR(255),
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_cpp_factura FOREIGN KEY (id_factura_prov) REFERENCES FacturaProveedores(id_factura_prov)
+);
+
+CREATE TABLE CuentasPorCobrar (
+    id_cuenta_cobrar INT PRIMARY KEY IDENTITY,
+    id_referencia INT NOT NULL,
+    -- ID de la venta o pedido
+    tipo_referencia VARCHAR(50) NOT NULL,
+    -- 'Venta', 'Pedido', 'Transferencia'
+    cliente VARCHAR(150) NOT NULL,
+    monto_total DECIMAL(12, 2) NOT NULL,
+    monto_cobrado DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    monto_pendiente AS (monto_total - monto_cobrado),
+    -- Columna calculada
+    fecha_vencimiento DATE NOT NULL,
+    estado VARCHAR(50) NOT NULL DEFAULT 'Pendiente',
+    -- 'Pendiente', 'Cobrado Parcial', 'Cobrado', 'Vencido'
+    fecha_ultimo_cobro DATETIME,
+    observacion VARCHAR(255),
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE()
+);
+
+-- Fin Modulos Financieros
+-- Bloque Siguiente
+-- Espacio Registro de Personas o Entidades Comerciales -----------------------------------------------------------------------
+-- =============================================
+-- MODULO EVENTOS
+-- =============================================
+CREATE TABLE Evento (
+    id_evento INT PRIMARY KEY IDENTITY,
+    nombre VARCHAR(200) NOT NULL,
+    descripcion TEXT,
+    id_sucursal INT NOT NULL,
+    -- Sucursal o sede donde ocurre
+    id_direccion INT,
+    -- Si es en un lugar externo
+    fecha_inicio DATETIME NOT NULL,
+    fecha_fin DATETIME NOT NULL,
+    capacidad_esperada INT,
+    -- Cantidad de personas esperadas
+    presupuesto DECIMAL(12, 2),
+    costo_real DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    tipo_evento VARCHAR(100),
+    -- 'Feria del libro', 'Presentación', 'Taller', 'Firma'
+    estado VARCHAR(50) NOT NULL DEFAULT 'Planificado',
+    -- 'Planificado', 'En Curso', 'Finalizado', 'Cancelado'
+    observacion VARCHAR(255),
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_ev_sucursal FOREIGN KEY (id_sucursal) REFERENCES Sucursal(id_sucursal),
+    CONSTRAINT fk_ev_direccion FOREIGN KEY (id_direccion) REFERENCES Direccion(id_direccion),
+    CONSTRAINT chk_ev_fechas CHECK (fecha_fin >= fecha_inicio)
+);
+
+CREATE TABLE Material (
+    id_material INT PRIMARY KEY IDENTITY,
+    nombre VARCHAR(150) NOT NULL,
+    descripcion VARCHAR(255),
+    categoria VARCHAR(100),
+    -- 'Alimentos', 'Mobiliario', 'Papelería', 'Audiovisual', 'Decoración'
+    unidad_medida VARCHAR(30),
+    -- 'Unidad', 'Caja', 'Kg', 'Litro'
+    costo_estimado DECIMAL(10, 2),
+    es_consumible BIT NOT NULL DEFAULT 1,
+    -- 1: gastable (agua, papel), 0: reutilizable (sillas, mesas)
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE()
+);
+
+CREATE TABLE PersonalEvento (
+    id_personal_evento INT PRIMARY KEY IDENTITY,
+    id_evento INT NOT NULL,
+    id_persona INT NOT NULL,
+    rol VARCHAR(100) NOT NULL,
+    -- 'Coordinador', 'Seguridad', 'Logística', 'Recepción'
+    hora_entrada DATETIME,
+    hora_salida DATETIME,
+    costo DECIMAL(10, 2),
+    observacion VARCHAR(255),
+    estado VARCHAR(20) NOT NULL DEFAULT 'Confirmado',
+    -- 'Confirmado', 'Asistió', 'Ausente'
+    CONSTRAINT fk_pe_evento FOREIGN KEY (id_evento) REFERENCES Evento(id_evento),
+    CONSTRAINT fk_pe_persona FOREIGN KEY (id_persona) REFERENCES Persona(id_persona)
+);
+
+CREATE TABLE EditorialEvento (
+    id_editorial_evento INT PRIMARY KEY IDENTITY,
+    id_editorial INT NOT NULL,
+    nombre_contacto VARCHAR(150),
+    correo_contacto VARCHAR(150),
+    telefono_contacto VARCHAR(20),
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_ee_editorial FOREIGN KEY (id_editorial) REFERENCES Editorial(id_editorial)
+);
+
+CREATE TABLE EventoTieneEditorialEvento (
+    id_evento_editorial INT PRIMARY KEY IDENTITY,
+    id_evento INT NOT NULL,
+    id_editorial_evento INT NOT NULL,
+    rol_en_evento VARCHAR(150),
+    -- 'Patrocinador', 'Expositor', 'Invitado'
+    stand VARCHAR(50),
+    -- Número o código de stand asignado
+    confirmado BIT NOT NULL DEFAULT 0,
+    observacion VARCHAR(255),
+    CONSTRAINT fk_etee_evento FOREIGN KEY (id_evento) REFERENCES Evento(id_evento),
+    CONSTRAINT fk_etee_editorial FOREIGN KEY (id_editorial_evento) REFERENCES EditorialEvento(id_editorial_evento),
+    CONSTRAINT uq_etee UNIQUE (id_evento, id_editorial_evento)
+);
+
+CREATE TABLE EventoTieneProveedorEvento (
+    id_evento_proveedor INT PRIMARY KEY IDENTITY,
+    id_evento INT NOT NULL,
+    id_proveedor INT NOT NULL,
+    servicio_ofrecido VARCHAR(200),
+    -- 'Catering', 'Sonido', 'Mobiliario', 'Seguridad'
+    presupuesto_asignado DECIMAL(12, 2),
+    estado VARCHAR(50) NOT NULL DEFAULT 'Pendiente',
+    -- 'Pendiente', 'Confirmado', 'Finalizado'
+    observacion VARCHAR(255),
+    CONSTRAINT fk_etpe_evento FOREIGN KEY (id_evento) REFERENCES Evento(id_evento),
+    CONSTRAINT fk_etpe_proveedor FOREIGN KEY (id_proveedor) REFERENCES Proveedor(id_proveedor),
+    CONSTRAINT uq_etpe UNIQUE (id_evento, id_proveedor)
+);
+
+CREATE TABLE DetalleProveedorEvento (
+    id_detalle_prov_evento INT PRIMARY KEY IDENTITY,
+    id_evento_proveedor INT NOT NULL,
+    id_material INT NOT NULL,
+    cantidad INT NOT NULL,
+    unidad_medida VARCHAR(30),
+    costo_unitario DECIMAL(10, 2) NOT NULL,
+    subtotal AS (cantidad * costo_unitario),
+    -- Columna calculada
+    fecha_entrega DATETIME,
+    estado_entrega VARCHAR(50) NOT NULL DEFAULT 'Pendiente',
+    -- 'Pendiente', 'Entregado', 'Con Daño', 'Faltante'
+    observacion VARCHAR(255),
+    CONSTRAINT fk_dpe_ev_prov FOREIGN KEY (id_evento_proveedor) REFERENCES EventoTieneProveedorEvento(id_evento_proveedor),
+    CONSTRAINT fk_dpe_material FOREIGN KEY (id_material) REFERENCES Material(id_material)
+);
+
+-- Apartado de Facturacion de Productos
+-- CREATE TABLE Factura () CREATE TABLE DetalleFactura ();
+-- ======================================================
+-- SECCION DE INDICES PARA OPTIMIZACION DE CONSULTAS
+-- ======================================================
+CREATE INDEX ix_inventario_almacen ON Inventario(id_almacen);
+
+CREATE INDEX ix_movimiento_inventario_fecha ON MovimientoInventario(
+    id_inventario,
+    fecha_movimiento DESC
+);
+
+CREATE INDEX ix_movimiento_tipo_fecha ON MovimientoInventario(
+    tipo_movimiento,
+    fecha_movimiento DESC
+);
+
+-- ======================================================
+-- DATOS DE PRUEBAS PARA EL SISTEMA.
+-- ======================================================
+-- Tabla: TipoTelefono
+-- Depende de: ninguna
+INSERT INTO
+    TipoTelefono (nombre, descripcion, estado)
+VALUES
+    ('Móvil', 'Teléfono móvil personal', 'Activo'),
+    (
+        'Residencial',
+        'Teléfono fijo residencial',
+        'Activo'
+    ),
+    ('Oficina', 'Teléfono de oficina', 'Activo'),
+    (
+        'WhatsApp',
+        'Número habilitado para WhatsApp',
+        'Activo'
+    ),
+    (
+        'Emergencia',
+        'Contacto para emergencias',
+        'Activo'
+    ),
+    ('Fax', 'Número de fax', 'Activo'),
+    ('Soporte', 'Línea de soporte técnico', 'Activo'),
+    (
+        'Ventas',
+        'Línea del departamento de ventas',
+        'Activo'
+    ),
+    (
+        'Cobros',
+        'Línea del departamento de cobros',
+        'Activo'
+    ),
+    (
+        'Internacional',
+        'Número de contacto internacional',
+        'Activo'
+    );
+
+-- Tabla: Pais
+-- Depende de: ninguna
+INSERT INTO
+    Pais (
+        nombre,
+        codigo_iso,
+        codigo_telefono,
+        moneda,
+        estado
+    )
+VALUES
+    (
+        'República Dominicana',
+        'DOM',
+        '+1',
+        'DOP',
+        'Activo'
+    ),
+    ('Estados Unidos', 'USA', '+1', 'USD', 'Activo'),
+    ('Colombia', 'COL', '+57', 'COP', 'Activo'),
+    ('España', 'ESP', '+34', 'EUR', 'Activo'),
+    ('Reino Unido', 'GBR', '+44', 'GBP', 'Activo'),
+    ('México', 'MEX', '+52', 'MXN', 'Activo'),
+    ('Argentina', 'ARG', '+54', 'ARS', 'Activo'),
+    ('Chile', 'CHL', '+56', 'CLP', 'Activo'),
+    ('Perú', 'PER', '+51', 'PEN', 'Activo'),
+    ('Brasil', 'BRA', '+55', 'BRL', 'Activo');
+
+-- Tabla: TipoDireccion
+-- Depende de: ninguna
+INSERT INTO
+    TipoDireccion (nombre, descripcion, estado)
+VALUES
+    (
+        'Residencial',
+        'Dirección particular de una persona',
+        'Activo'
+    ),
+    (
+        'Comercial',
+        'Dirección de establecimiento comercial',
+        'Activo'
+    ),
+    (
+        'Fiscal',
+        'Dirección registrada para fines tributarios',
+        'Activo'
+    ),
+    (
+        'Almacén',
+        'Dirección destinada a almacenamiento',
+        'Activo'
+    ),
+    (
+        'Sucursal',
+        'Dirección de una sucursal',
+        'Activo'
+    ),
+    (
+        'Entrega',
+        'Dirección usada para entrega de mercancía',
+        'Activo'
+    ),
+    (
+        'Facturación',
+        'Dirección de facturación',
+        'Activo'
+    ),
+    (
+        'Evento',
+        'Ubicación externa para eventos',
+        'Activo'
+    ),
+    (
+        'Temporal',
+        'Dirección de uso temporal',
+        'Activo'
+    ),
+    ('Oficina', 'Dirección administrativa', 'Activo');
+
+-- Tabla: Persona
+-- Depende de: ninguna
+INSERT INTO
+    Persona (
+        tipo_persona,
+        nombres,
+        apellidos,
+        razon_social,
+        documento_tipo,
+        documento_numero,
+        correo,
+        fecha_nacimiento,
+        genero,
+        estado
+    )
+VALUES
+    (
+        'Natural',
+        'Carlos',
+        'Méndez',
+        NULL,
+        'Cédula',
+        '001-0000001-1',
+        'carlos.mendez@libreria.test',
+        '1985-02-14',
+        'Masculino',
+        'Activo'
+    ),
+    (
+        'Natural',
+        'Ana',
+        'Reyes',
+        NULL,
+        'Cédula',
+        '001-0000002-2',
+        'ana.reyes@libreria.test',
+        '1990-06-18',
+        'Femenino',
+        'Activo'
+    ),
+    (
+        'Natural',
+        'Luis',
+        'Fernández',
+        NULL,
+        'Cédula',
+        '001-0000003-3',
+        'luis.fernandez@libreria.test',
+        '1987-11-03',
+        'Masculino',
+        'Activo'
+    ),
+    (
+        'Natural',
+        'María',
+        'González',
+        NULL,
+        'Cédula',
+        '001-0000004-4',
+        'maria.gonzalez@libreria.test',
+        '1992-04-21',
+        'Femenino',
+        'Activo'
+    ),
+    (
+        'Natural',
+        'Roberto',
+        'Castillo',
+        NULL,
+        'Cédula',
+        '001-0000005-5',
+        'roberto.castillo@libreria.test',
+        '1983-09-30',
+        'Masculino',
+        'Activo'
+    ),
+    (
+        'Natural',
+        'Elena',
+        'Santos',
+        NULL,
+        'Cédula',
+        '001-0000006-6',
+        'elena.santos@libreria.test',
+        '1995-01-09',
+        'Femenino',
+        'Activo'
+    ),
+    (
+        'Jurídica',
+        NULL,
+        NULL,
+        'Distribuidora Nacional del Libro SRL',
+        'RNC',
+        '101000001',
+        'contacto@dnl.test',
+        NULL,
+        NULL,
+        'Activo'
+    ),
+    (
+        'Jurídica',
+        NULL,
+        NULL,
+        'Editorial Planeta Dominicana SRL',
+        'RNC',
+        '101000002',
+        'contacto@planeta.test',
+        NULL,
+        NULL,
+        'Activo'
+    ),
+    (
+        'Jurídica',
+        NULL,
+        NULL,
+        'Penguin Random House Latinoamérica',
+        'RNC',
+        '101000003',
+        'ventas@penguin.test',
+        NULL,
+        NULL,
+        'Activo'
+    ),
+    (
+        'Jurídica',
+        NULL,
+        NULL,
+        'Grupo Santillana Colombia',
+        'NIT',
+        '900000004',
+        'ventas@santillana.test',
+        NULL,
+        NULL,
+        'Activo'
+    ),
+    (
+        'Jurídica',
+        NULL,
+        NULL,
+        'Alfaguara España',
+        'CIF',
+        'B00000005',
+        'ventas@alfaguara.test',
+        NULL,
+        NULL,
+        'Activo'
+    ),
+    (
+        'Jurídica',
+        NULL,
+        NULL,
+        'Bloomsbury Publishing UK',
+        'VAT',
+        'GB000000006',
+        'sales@bloomsbury.test',
+        NULL,
+        NULL,
+        'Activo'
+    ),
+    (
+        'Jurídica',
+        NULL,
+        NULL,
+        'Eventos y Servicios del Caribe',
+        'RNC',
+        '101000007',
+        'eventos@caribe.test',
+        NULL,
+        NULL,
+        'Activo'
+    ),
+    (
+        'Jurídica',
+        NULL,
+        NULL,
+        'Mobiliario y Logística Santo Domingo',
+        'RNC',
+        '101000008',
+        'ventas@mobiliario.test',
+        NULL,
+        NULL,
+        'Activo'
+    ),
+    (
+        'Jurídica',
+        NULL,
+        NULL,
+        'Fondo de Cultura Económica México',
+        'RFC',
+        'FCE000000009',
+        'ventas@fce.test',
+        NULL,
+        NULL,
+        'Activo'
+    ),
+    (
+        'Jurídica',
+        NULL,
+        NULL,
+        'Librería y Distribuidora El Saber SRL',
+        'RNC',
+        '101000010',
+        'ventas@elsaber.test',
+        NULL,
+        NULL,
+        'Activo'
+    );
+
+-- Tabla: TipoProveedor
+-- Depende de: ninguna
+INSERT INTO
+    TipoProveedor (nombre, descripcion, estado)
+VALUES
+    (
+        'Distribuidor local',
+        'Proveedor nacional de libros y materiales',
+        'Activo'
+    ),
+    (
+        'Editorial',
+        'Casa editorial y distribuidor directo',
+        'Activo'
+    ),
+    (
+        'Importador',
+        'Proveedor internacional o importador',
+        'Activo'
+    ),
+    (
+        'Servicio de eventos',
+        'Catering, sonido y producción',
+        'Activo'
+    ),
+    (
+        'Logística',
+        'Transporte, mobiliario y montaje',
+        'Activo'
+    ),
+    (
+        'Tecnología',
+        'Equipos audiovisuales y soporte',
+        'Activo'
+    ),
+    (
+        'Papelería',
+        'Material gastable y papelería',
+        'Activo'
+    ),
+    (
+        'Seguridad',
+        'Personal y equipos de seguridad',
+        'Activo'
+    ),
+    (
+        'Publicidad',
+        'Diseño, impresión y promoción',
+        'Activo'
+    ),
+    (
+        'Mantenimiento',
+        'Limpieza y mantenimiento general',
+        'Activo'
+    );
+
+-- Tabla: Autor
+-- Depende de: ninguna
+INSERT INTO
+    Autor (
+        nombre,
+        apellido,
+        nacionalidad,
+        fecha_nacimiento,
+        biografia
+    )
+VALUES
+    (
+        'Gabriel',
+        'García Márquez',
+        'Colombiana',
+        '1927-03-06',
+        'Novelista colombiano y Premio Nobel de Literatura.'
+    ),
+    (
+        'Isabel',
+        'Allende',
+        'Chilena',
+        '1942-08-02',
+        'Novelista chilena reconocida internacionalmente.'
+    ),
+    (
+        'Mario',
+        'Vargas Llosa',
+        'Peruana',
+        '1936-03-28',
+        'Escritor peruano y Premio Nobel de Literatura.'
+    ),
+    (
+        'Jorge Luis',
+        'Borges',
+        'Argentina',
+        '1899-08-24',
+        'Escritor argentino, maestro del cuento y el ensayo.'
+    ),
+    (
+        'J. K.',
+        'Rowling',
+        'Británica',
+        '1965-07-31',
+        'Autora británica de literatura fantástica.'
+    ),
+    (
+        'George R. R.',
+        'Martin',
+        'Estadounidense',
+        '1948-09-20',
+        'Novelista estadounidense de fantasía épica.'
+    ),
+    (
+        'Stephen',
+        'King',
+        'Estadounidense',
+        '1947-09-21',
+        'Autor estadounidense de terror y suspenso.'
+    ),
+    (
+        'Paulo',
+        'Coelho',
+        'Brasileña',
+        '1947-08-24',
+        'Novelista brasileño de alcance internacional.'
+    ),
+    (
+        'Ken',
+        'Follett',
+        'Británica',
+        '1949-06-05',
+        'Autor británico de novela histórica y suspenso.'
+    ),
+    (
+        'Yuval Noah',
+        'Harari',
+        'Israelí',
+        '1976-02-24',
+        'Historiador y escritor de divulgación.'
+    ),
+    (
+        'Dan',
+        'Brown',
+        'Estadounidense',
+        '1964-06-22',
+        'Autor de novelas de misterio y suspenso.'
+    ),
+    (
+        'Jane',
+        'Austen',
+        'Británica',
+        '1775-12-16',
+        'Novelista inglesa de la época georgiana.'
+    ),
+    (
+        'George',
+        'Orwell',
+        'Británica',
+        '1903-06-25',
+        'Escritor y periodista británico.'
+    ),
+    (
+        'J. R. R.',
+        'Tolkien',
+        'Británica',
+        '1892-01-03',
+        'Filólogo y autor de fantasía épica.'
+    ),
+    (
+        'John',
+        'Katzenbach',
+        'Estadounidense',
+        '1950-06-23',
+        'Autor de novelas de suspenso psicológico.'
+    ),
+    (
+        'James',
+        'Clear',
+        'Estadounidense',
+        '1986-01-22',
+        'Autor especializado en hábitos y productividad.'
+    ),
+    (
+        'Antoine',
+        'de Saint-Exupéry',
+        'Francesa',
+        '1900-06-29',
+        'Escritor y aviador francés.'
+    );
+
+-- Tabla: Editorial
+-- Depende de: ninguna
+INSERT INTO
+    Editorial (
+        nombre,
+        pais_origen,
+        sitio_web,
+        correo_contacto,
+        telefono
+    )
+VALUES
+    (
+        'Penguin Random House',
+        'Estados Unidos',
+        'https://penguinrandomhouse.com',
+        'contacto@penguin.test',
+        '+1-212-555-0100'
+    ),
+    (
+        'Editorial Planeta',
+        'España',
+        'https://planetadelibros.com',
+        'info@planeta.test',
+        '+34-93-555-0200'
+    ),
+    (
+        'Alfaguara',
+        'España',
+        'https://alfaguara.com',
+        'contacto@alfaguara.test',
+        '+34-91-555-0300'
+    ),
+    (
+        'Editorial Sudamericana',
+        'Argentina',
+        'https://sudamericana.test',
+        'info@sudamericana.test',
+        '+54-11-555-0400'
+    ),
+    (
+        'Bloomsbury Publishing',
+        'Reino Unido',
+        'https://bloomsbury.com',
+        'contact@bloomsbury.test',
+        '+44-20-555-0500'
+    ),
+    (
+        'Tusquets Editores',
+        'España',
+        'https://tusquets.test',
+        'info@tusquets.test',
+        '+34-93-555-0600'
+    ),
+    (
+        'Debate',
+        'España',
+        'https://debate.test',
+        'contacto@debate.test',
+        '+34-91-555-0700'
+    ),
+    (
+        'Minotauro',
+        'España',
+        'https://minotauro.test',
+        'contacto@minotauro.test',
+        '+34-93-555-0800'
+    ),
+    (
+        'Salamandra',
+        'España',
+        'https://salamandra.test',
+        'contacto@salamandra.test',
+        '+34-91-555-0900'
+    ),
+    (
+        'HarperCollins',
+        'Estados Unidos',
+        'https://harpercollins.com',
+        'contact@harpercollins.test',
+        '+1-212-555-1000'
+    );
+
+-- Tabla: CategoriaProducto
+-- Depende de: ninguna
+INSERT INTO
+    CategoriaProducto (nombre_categoria, descripcion, estado)
+VALUES
+    (
+        'Novela',
+        'Obras narrativas de ficción',
+        'Activo'
+    ),
+    (
+        'Historia',
+        'Libros históricos y de divulgación histórica',
+        'Activo'
+    ),
+    ('Fantasía', 'Narrativa fantástica', 'Activo'),
+    (
+        'Distopía',
+        'Narrativa de sociedades distópicas',
+        'Activo'
+    ),
+    (
+        'Suspenso',
+        'Misterio, thriller y suspenso',
+        'Activo'
+    ),
+    (
+        'Autoayuda',
+        'Desarrollo personal y productividad',
+        'Activo'
+    ),
+    (
+        'Ensayo',
+        'Ensayos y análisis de no ficción',
+        'Activo'
+    ),
+    (
+        'Infantil',
+        'Literatura para público infantil',
+        'Activo'
+    ),
+    ('Terror', 'Narrativa de terror', 'Activo'),
+    (
+        'Biografía',
+        'Relatos biográficos y autobiográficos',
+        'Activo'
+    );
+
+-- Tabla: Embarque
+-- Depende de: ninguna
+INSERT INTO
+    Embarque (
+        codigo_embarque,
+        proveedor,
+        pais_origen,
+        fecha_despacho,
+        fecha_llegada_est,
+        fecha_llegada_real,
+        tipo_transporte,
+        numero_tracking,
+        estado,
+        observacion
+    )
+VALUES
+    (
+        'EMB-001',
+        'Penguin Random House Latinoamérica',
+        'Colombia',
+        '2026-01-05',
+        '2026-01-12',
+        '2026-01-12',
+        'Aéreo',
+        'TRK-001',
+        'Recibido',
+        'Sin novedades'
+    ),
+    (
+        'EMB-002',
+        'Grupo Santillana Colombia',
+        'Colombia',
+        '2026-01-10',
+        '2026-01-18',
+        '2026-01-19',
+        'Aéreo',
+        'TRK-002',
+        'Recibido',
+        'Un día de retraso'
+    ),
+    (
+        'EMB-003',
+        'Bloomsbury Publishing UK',
+        'Reino Unido',
+        '2026-01-15',
+        '2026-02-05',
+        NULL,
+        'Marítimo',
+        'TRK-003',
+        'En Aduana',
+        'Inspección aduanal'
+    ),
+    (
+        'EMB-004',
+        'Fondo de Cultura Económica México',
+        'México',
+        '2026-01-20',
+        '2026-01-30',
+        NULL,
+        'Aéreo',
+        'TRK-004',
+        'En Tránsito',
+        'Ruta normal'
+    ),
+    (
+        'EMB-005',
+        'Alfaguara España',
+        'España',
+        '2026-02-01',
+        '2026-02-20',
+        NULL,
+        'Marítimo',
+        'TRK-005',
+        'En Tránsito',
+        'Contenedor compartido'
+    ),
+    (
+        'EMB-006',
+        'Penguin Random House Latinoamérica',
+        'Argentina',
+        '2026-02-05',
+        '2026-02-18',
+        '2026-02-18',
+        'Aéreo',
+        'TRK-006',
+        'Recibido',
+        'Completo'
+    ),
+    (
+        'EMB-007',
+        'HarperCollins',
+        'Estados Unidos',
+        '2026-02-10',
+        '2026-02-15',
+        '2026-02-15',
+        'Terrestre',
+        'TRK-007',
+        'Recibido',
+        'Ingreso por courier'
+    ),
+    (
+        'EMB-008',
+        'Bloomsbury Publishing UK',
+        'Reino Unido',
+        '2026-02-12',
+        '2026-03-05',
+        NULL,
+        'Marítimo',
+        'TRK-008',
+        'En Aduana',
+        'Pendiente documentación'
+    ),
+    (
+        'EMB-009',
+        'Grupo Santillana Colombia',
+        'Colombia',
+        '2026-02-18',
+        '2026-02-25',
+        NULL,
+        'Aéreo',
+        'TRK-009',
+        'En Tránsito',
+        'Vuelo programado'
+    ),
+    (
+        'EMB-010',
+        'Fondo de Cultura Económica México',
+        'México',
+        '2026-02-22',
+        '2026-03-02',
+        NULL,
+        'Aéreo',
+        'TRK-010',
+        'En Tránsito',
+        'Consolidado regional'
+    );
+
+-- Tabla: TipoTransferencia
+-- Depende de: ninguna
+INSERT INTO
+    TipoTransferencia (nombre, descripcion, aplica_a, estado)
+VALUES
+    (
+        'Reposición Sucursal',
+        'Del almacén central a sucursales',
+        'Sucursal',
+        'Activo'
+    ),
+    (
+        'Descarte',
+        'Movimiento hacia almacén de descarte',
+        'Almacen',
+        'Activo'
+    ),
+    (
+        'Oferta',
+        'Traslado de productos para descuentos',
+        'Ambos',
+        'Activo'
+    ),
+    (
+        'Despacho al por mayor',
+        'Movimiento para venta mayorista',
+        'Ambos',
+        'Activo'
+    ),
+    (
+        'Devolución',
+        'Retorno al almacén central',
+        'Ambos',
+        'Activo'
+    ),
+    (
+        'Importación',
+        'Movimiento desde zona franca',
+        'Almacen',
+        'Activo'
+    ),
+    (
+        'Evento',
+        'Traslado al almacén de eventos',
+        'Ambos',
+        'Activo'
+    ),
+    (
+        'Reubicación',
+        'Cambio de ubicación interna',
+        'Almacen',
+        'Activo'
+    ),
+    (
+        'Préstamo',
+        'Préstamo temporal entre sucursales',
+        'Sucursal',
+        'Activo'
+    ),
+    (
+        'Consignación',
+        'Mercancía bajo consignación',
+        'Ambos',
+        'Activo'
+    );
+
+-- Tabla: CuentasPorCobrar
+-- Depende de: ninguna
+INSERT INTO
+    CuentasPorCobrar (
+        id_referencia,
+        tipo_referencia,
+        cliente,
+        monto_total,
+        monto_cobrado,
+        fecha_vencimiento,
+        estado,
+        fecha_ultimo_cobro,
+        observacion
+    )
+VALUES
+    (
+        1001,
+        'Venta',
+        'Colegio Central',
+        45000,
+        45000,
+        '2026-06-01',
+        'Cobrado',
+        '2026-05-20',
+        'Pagado'
+    ),
+    (
+        1002,
+        'Venta',
+        'Universidad del Caribe',
+        80000,
+        40000,
+        '2026-06-05',
+        'Cobrado Parcial',
+        '2026-05-25',
+        'Abono'
+    ),
+    (
+        1003,
+        'Pedido',
+        'Librería Escolar',
+        35000,
+        0,
+        '2026-06-10',
+        'Pendiente',
+        NULL,
+        'Crédito'
+    ),
+    (
+        1004,
+        'Venta',
+        'Cliente Corporativo A',
+        60000,
+        20000,
+        '2026-06-12',
+        'Cobrado Parcial',
+        '2026-05-30',
+        'Abono'
+    ),
+    (
+        1005,
+        'Pedido',
+        'Fundación Leer',
+        25000,
+        0,
+        '2026-06-15',
+        'Pendiente',
+        NULL,
+        'Donación facturada'
+    ),
+    (
+        1006,
+        'Transferencia',
+        'Sucursal Santiago',
+        18000,
+        18000,
+        '2026-06-16',
+        'Cobrado',
+        '2026-06-10',
+        'Liquidado'
+    ),
+    (
+        1007,
+        'Venta',
+        'Colegio del Este',
+        42000,
+        0,
+        '2026-06-18',
+        'Pendiente',
+        NULL,
+        'Crédito'
+    ),
+    (
+        1008,
+        'Venta',
+        'Instituto Moderno',
+        56000,
+        56000,
+        '2026-06-20',
+        'Cobrado',
+        '2026-06-12',
+        'Pagado'
+    ),
+    (
+        1009,
+        'Pedido',
+        'Biblioteca Municipal',
+        30000,
+        10000,
+        '2026-06-22',
+        'Cobrado Parcial',
+        '2026-06-14',
+        'Abono'
+    ),
+    (
+        1010,
+        'Venta',
+        'Empresa Tecnológica',
+        70000,
+        0,
+        '2026-06-25',
+        'Pendiente',
+        NULL,
+        'Crédito'
+    );
+
+-- Tabla: Material
+-- Depende de: ninguna
+INSERT INTO
+    Material (
+        nombre,
+        descripcion,
+        categoria,
+        unidad_medida,
+        costo_estimado,
+        es_consumible,
+        estado
+    )
+VALUES
+    (
+        'Agua embotellada',
+        'Botellas de 500 ml',
+        'Alimentos',
+        'Caja',
+        850,
+        1,
+        'Activo'
+    ),
+    (
+        'Sillas plegables',
+        'Sillas para asistentes',
+        'Mobiliario',
+        'Unidad',
+        450,
+        0,
+        'Activo'
+    ),
+    (
+        'Mesas rectangulares',
+        'Mesas para stands',
+        'Mobiliario',
+        'Unidad',
+        2500,
+        0,
+        'Activo'
+    ),
+    (
+        'Resmas de papel',
+        'Papel para impresión',
+        'Papelería',
+        'Resma',
+        350,
+        1,
+        'Activo'
+    ),
+    (
+        'Proyector multimedia',
+        'Equipo audiovisual',
+        'Audiovisual',
+        'Unidad',
+        45000,
+        0,
+        'Activo'
+    ),
+    (
+        'Micrófono inalámbrico',
+        'Equipo de audio',
+        'Audiovisual',
+        'Unidad',
+        8500,
+        0,
+        'Activo'
+    ),
+    (
+        'Banners impresos',
+        'Material promocional',
+        'Decoración',
+        'Unidad',
+        1800,
+        1,
+        'Activo'
+    ),
+    (
+        'Café y refrigerios',
+        'Servicio de refrigerio',
+        'Alimentos',
+        'Persona',
+        300,
+        1,
+        'Activo'
+    ),
+    (
+        'Identificaciones',
+        'Credenciales del personal',
+        'Papelería',
+        'Unidad',
+        75,
+        1,
+        'Activo'
+    ),
+    (
+        'Luces decorativas',
+        'Iluminación para eventos',
+        'Decoración',
+        'Juego',
+        12000,
+        0,
+        'Activo'
+    );
+
+-- ===========================================================
+-- NIVEL 1: TABLAS CUYOS PADRES YA FUERON INSERTADOS
+-- ===========================================================
+-- Tabla: Telefono
+-- Depende de: TipoTelefono
+INSERT INTO
+    Telefono (
+        id_tipo_telefono,
+        numero,
+        codigo_pais,
+        es_principal,
+        estado
+    )
+VALUES
+    (1, '8095550101', '+1', 1, 'Activo'),
+    (1, '8095550102', '+1', 1, 'Activo'),
+    (3, '8095550103', '+1', 0, 'Activo'),
+    (4, '8295550104', '+1', 1, 'Activo'),
+    (2, '8095550105', '+1', 0, 'Activo'),
+    (8, '8095550106', '+1', 1, 'Activo'),
+    (7, '8095550107', '+1', 1, 'Activo'),
+    (9, '8095550108', '+1', 0, 'Activo'),
+    (10, '2125550109', '+1', 1, 'Activo'),
+    (3, '8095550110', '+1', 1, 'Activo');
+
+-- Tabla: Ciudad
+-- Depende de: Pais
+INSERT INTO
+    Ciudad (id_pais, nombre, codigo_postal, estado)
+VALUES
+    (1, 'Santo Domingo', '10101', 'Activo'),
+    (
+        1,
+        'Santiago de los Caballeros',
+        '51000',
+        'Activo'
+    ),
+    (1, 'La Romana', '22000', 'Activo'),
+    (1, 'San Pedro de Macorís', '21000', 'Activo'),
+    (1, 'Puerto Plata', '57000', 'Activo'),
+    (2, 'Nueva York', '10001', 'Activo'),
+    (3, 'Bogotá', '110111', 'Activo'),
+    (4, 'Madrid', '28001', 'Activo'),
+    (5, 'Londres', 'SW1A1AA', 'Activo'),
+    (6, 'Ciudad de México', '06000', 'Activo');
+
+-- Tabla: Usuario
+-- Depende de: Persona
+INSERT INTO
+    Usuario (
+        id_persona,
+        nombre_usuario,
+        correo,
+        contrasena_hash,
+        rol,
+        estado,
+        ultimo_acceso
+    )
+VALUES
+    (
+        1,
+        'admin',
+        'admin@libreria.test',
+        '$2b$10$hash_admin_demo',
+        'administrador',
+        'Activo',
+        GETDATE()
+    ),
+    (
+        2,
+        'areyes',
+        'areyes@libreria.test',
+        '$2b$10$hash_areyes_demo',
+        'inventario',
+        'Activo',
+        GETDATE()
+    ),
+    (
+        3,
+        'lfernandez',
+        'lfernandez@libreria.test',
+        '$2b$10$hash_lfernandez_demo',
+        'supervisor',
+        'Activo',
+        GETDATE()
+    ),
+    (
+        4,
+        'mgonzalez',
+        'mgonzalez@libreria.test',
+        '$2b$10$hash_mgonzalez_demo',
+        'compras',
+        'Activo',
+        GETDATE()
+    ),
+    (
+        5,
+        'rcastillo',
+        'rcastillo@libreria.test',
+        '$2b$10$hash_rcastillo_demo',
+        'almacen',
+        'Activo',
+        GETDATE()
+    ),
+    (
+        6,
+        'esantos',
+        'esantos@libreria.test',
+        '$2b$10$hash_esantos_demo',
+        'eventos',
+        'Activo',
+        GETDATE()
+    ),
+    (
+        NULL,
+        'auditor1',
+        'auditor1@libreria.test',
+        '$2b$10$hash_auditor1_demo',
+        'auditor',
+        'Activo',
+        NULL
+    ),
+    (
+        NULL,
+        'cajero1',
+        'cajero1@libreria.test',
+        '$2b$10$hash_cajero1_demo',
+        'cajero',
+        'Activo',
+        NULL
+    ),
+    (
+        NULL,
+        'logistica1',
+        'logistica1@libreria.test',
+        '$2b$10$hash_logistica_demo',
+        'logistica',
+        'Activo',
+        NULL
+    ),
+    (
+        NULL,
+        'consulta1',
+        'consulta1@libreria.test',
+        '$2b$10$hash_consulta_demo',
+        'consulta',
+        'Activo',
+        NULL
+    );
+
+-- Tabla: Proveedor
+-- Depende de: Pais, Persona, TipoProveedor
+INSERT INTO
+    Proveedor (
+        id_persona,
+        id_tipo_proveedor,
+        codigo_proveedor,
+        nombre_comercial,
+        sitio_web,
+        condiciones_pago,
+        moneda_preferida,
+        es_internacional,
+        id_pais,
+        estado
+    )
+VALUES
+    (
+        7,
+        1,
+        'PROV-001',
+        'Distribuidora Nacional del Libro',
+        'https://dnl.test',
+        'Crédito 60 días',
+        'DOP',
+        0,
+        1,
+        'Activo'
+    ),
+    (
+        8,
+        2,
+        'PROV-002',
+        'Editorial Planeta DR',
+        'https://planeta.test',
+        'Crédito 30 días',
+        'DOP',
+        0,
+        1,
+        'Activo'
+    ),
+    (
+        9,
+        3,
+        'PROV-003',
+        'Penguin Random House Latinoamérica',
+        'https://penguin.test',
+        'Crédito 60 días',
+        'USD',
+        1,
+        3,
+        'Activo'
+    ),
+    (
+        10,
+        3,
+        'PROV-004',
+        'Grupo Santillana Colombia',
+        'https://santillana.test',
+        'Crédito 30 días',
+        'USD',
+        1,
+        3,
+        'Activo'
+    ),
+    (
+        11,
+        2,
+        'PROV-005',
+        'Alfaguara España',
+        'https://alfaguara.test',
+        'Crédito 45 días',
+        'EUR',
+        1,
+        4,
+        'Activo'
+    ),
+    (
+        12,
+        2,
+        'PROV-006',
+        'Bloomsbury Publishing UK',
+        'https://bloomsbury.test',
+        'Crédito 60 días',
+        'GBP',
+        1,
+        5,
+        'Activo'
+    ),
+    (
+        13,
+        4,
+        'PROV-007',
+        'Eventos y Servicios del Caribe',
+        'https://eventoscaribe.test',
+        'Contado',
+        'DOP',
+        0,
+        1,
+        'Activo'
+    ),
+    (
+        14,
+        5,
+        'PROV-008',
+        'Mobiliario y Logística Santo Domingo',
+        'https://mobiliario.test',
+        'Contado',
+        'DOP',
+        0,
+        1,
+        'Activo'
+    ),
+    (
+        15,
+        3,
+        'PROV-009',
+        'Fondo de Cultura Económica México',
+        'https://fce.test',
+        'Crédito 30 días',
+        'USD',
+        1,
+        6,
+        'Activo'
+    ),
+    (
+        16,
+        1,
+        'PROV-010',
+        'Librería y Distribuidora El Saber SRL',
+        'https://elsaber.test',
+        'Contado',
+        'DOP',
+        0,
+        1,
+        'Activo'
+    );
+
+-- Tabla: Producto
+-- Depende de: Autor, CategoriaProducto, Editorial
+INSERT INTO
+    Producto (
+        codigo_producto,
+        titulo,
+        isbn,
+        id_autor,
+        id_editorial,
+        id_categoria,
+        costo_referencia,
+        precio,
+        idioma,
+        numero_paginas,
+        fecha_publicacion,
+        edicion,
+        sinopsis,
+        imagen_portada,
+        estado
+    )
+VALUES
+    (
+        'LIB001',
+        'Los pilares de la tierra',
+        '9788497592209',
+        9,
+        3,
+        1,
+        1100.00,
+        1750.00,
+        'Español',
+        1344,
+        '1989-09-01',
+        'Especial',
+        'Novela histórica ambientada en la Inglaterra medieval.',
+        'pilares_tierra.jpg',
+        'Activo'
+    ),
+    (
+        'LIB002',
+        'Sapiens: De animales a dioses',
+        '9788499926223',
+        10,
+        2,
+        2,
+        900.00,
+        1450.00,
+        'Español',
+        496,
+        '2014-09-04',
+        'Primera',
+        'Historia general de la humanidad.',
+        'sapiens.jpg',
+        'Activo'
+    ),
+    (
+        'LIB003',
+        'El código Da Vinci',
+        '9788408172178',
+        11,
+        5,
+        5,
+        875.00,
+        1350.00,
+        'Español',
+        592,
+        '2003-03-18',
+        'Revisada',
+        'Thriller de misterio, historia y simbología.',
+        'codigo_da_vinci.jpg',
+        'Activo'
+    ),
+    (
+        'LIB004',
+        'Orgullo y prejuicio',
+        '9788491050291',
+        12,
+        6,
+        1,
+        625.00,
+        1050.00,
+        'Español',
+        432,
+        '1813-01-28',
+        'Clásica',
+        'Novela clásica de la literatura inglesa.',
+        'orgullo_prejuicio.jpg',
+        'Activo'
+    ),
+    (
+        'LIB005',
+        '1984',
+        '9788499890944',
+        13,
+        4,
+        4,
+        675.00,
+        1150.00,
+        'Español',
+        352,
+        '1949-06-08',
+        'Conmemorativa',
+        'Distopía sobre control y vigilancia.',
+        '1984.jpg',
+        'Activo'
+    ),
+    (
+        'LIB006',
+        'El Hobbit',
+        '9788445000652',
+        14,
+        8,
+        3,
+        950.00,
+        1550.00,
+        'Español',
+        320,
+        '1937-09-21',
+        'Ilustrada',
+        'Aventura fantástica de Bilbo Bolsón.',
+        'hobbit.jpg',
+        'Activo'
+    ),
+    (
+        'LIB007',
+        'El psicoanalista',
+        '9788466332121',
+        15,
+        3,
+        5,
+        800.00,
+        1300.00,
+        'Español',
+        560,
+        '2002-01-01',
+        'Primera',
+        'Suspenso psicológico sobre una amenaza personal.',
+        'psicoanalista.jpg',
+        'Activo'
+    ),
+    (
+        'LIB008',
+        'Hábitos atómicos',
+        '9786077476719',
+        16,
+        2,
+        6,
+        1000.00,
+        1650.00,
+        'Español',
+        328,
+        '2018-10-16',
+        'Primera',
+        'Guía para desarrollar hábitos efectivos.',
+        'habitos_atomicos.jpg',
+        'Activo'
+    ),
+    (
+        'LIB009',
+        'El Principito',
+        '9788498381497',
+        17,
+        9,
+        8,
+        500.00,
+        900.00,
+        'Español',
+        120,
+        '1943-04-06',
+        'Ilustrada',
+        'Clásico sobre la amistad y la vida.',
+        'principito.jpg',
+        'Activo'
+    ),
+    (
+        'LIB010',
+        'Inferno',
+        '9788401343155',
+        11,
+        1,
+        5,
+        975.00,
+        1600.00,
+        'Español',
+        640,
+        '2013-05-14',
+        'Primera',
+        'Robert Langdon investiga un misterio en Florencia.',
+        'inferno.jpg',
+        'Activo'
+    );
+
+-- Tabla: CostoEmbarque
+-- Depende de: Embarque
+INSERT INTO
+    CostoEmbarque (
+        id_embarque,
+        concepto,
+        monto,
+        moneda,
+        tasa_cambio,
+        monto_local
+    )
+VALUES
+    (1, 'Flete aéreo', 1200, 'USD', 60.25, 72300),
+    (2, 'Flete aéreo', 1500, 'USD', 60.30, 90450),
+    (3, 'Flete marítimo', 3800, 'USD', 60.35, 229330),
+    (4, 'Seguro de carga', 300, 'USD', 60.40, 18120),
+    (5, 'Flete marítimo', 4200, 'EUR', 65.00, 273000),
+    (6, 'Gestión aduanal', 450, 'USD', 60.45, 27202.50),
+    (7, 'Courier', 800, 'USD', 60.50, 48400),
+    (8, 'Almacenaje aduana', 600, 'GBP', 76.00, 45600),
+    (9, 'Seguro de carga', 250, 'USD', 60.55, 15137.50),
+    (10, 'Flete aéreo', 1350, 'USD', 60.60, 81810);
+
+-- Tabla: FacturaInternacional
+-- Depende de: Embarque
+INSERT INTO
+    FacturaInternacional (
+        id_embarque,
+        numero_factura,
+        proveedor,
+        pais_emisor,
+        fecha_emision,
+        moneda,
+        tasa_cambio,
+        subtotal,
+        impuestos,
+        total,
+        total_local,
+        estado,
+        observacion
+    )
+VALUES
+    (
+        1,
+        'FINV-001',
+        'Penguin Random House Latinoamérica',
+        'Colombia',
+        '2026-01-03',
+        'USD',
+        60.25,
+        8500,
+        1275,
+        9775,
+        588943.75,
+        'Pagada',
+        'Primer embarque'
+    ),
+    (
+        2,
+        'FINV-002',
+        'Grupo Santillana Colombia',
+        'Colombia',
+        '2026-01-08',
+        'USD',
+        60.30,
+        5200,
+        780,
+        5980,
+        360594,
+        'Pagada',
+        'Reposición'
+    ),
+    (
+        3,
+        'FINV-003',
+        'Bloomsbury Publishing UK',
+        'Reino Unido',
+        '2026-01-13',
+        'GBP',
+        76.00,
+        12000,
+        1800,
+        13800,
+        1048800,
+        'Pendiente',
+        'En aduana'
+    ),
+    (
+        4,
+        'FINV-004',
+        'Fondo de Cultura Económica México',
+        'México',
+        '2026-01-18',
+        'USD',
+        60.40,
+        7300,
+        1095,
+        8395,
+        507058,
+        'Pendiente',
+        'En tránsito'
+    ),
+    (
+        5,
+        'FINV-005',
+        'Alfaguara España',
+        'España',
+        '2026-01-29',
+        'EUR',
+        65.00,
+        9400,
+        1410,
+        10810,
+        702650,
+        'Pendiente',
+        'Marítimo'
+    ),
+    (
+        6,
+        'FINV-006',
+        'Penguin Random House Latinoamérica',
+        'Argentina',
+        '2026-02-03',
+        'USD',
+        60.45,
+        6800,
+        1020,
+        7820,
+        472719,
+        'Pagada',
+        'Recibida'
+    ),
+    (
+        7,
+        'FINV-007',
+        'HarperCollins',
+        'Estados Unidos',
+        '2026-02-08',
+        'USD',
+        60.50,
+        4500,
+        675,
+        5175,
+        313087.50,
+        'Pagada',
+        'Courier'
+    ),
+    (
+        8,
+        'FINV-008',
+        'Bloomsbury Publishing UK',
+        'Reino Unido',
+        '2026-02-10',
+        'GBP',
+        76.20,
+        11000,
+        1650,
+        12650,
+        963930,
+        'Pendiente',
+        'Documentación'
+    ),
+    (
+        9,
+        'FINV-009',
+        'Grupo Santillana Colombia',
+        'Colombia',
+        '2026-02-16',
+        'USD',
+        60.55,
+        5700,
+        855,
+        6555,
+        396950.25,
+        'Pendiente',
+        'En tránsito'
+    ),
+    (
+        10,
+        'FINV-010',
+        'Fondo de Cultura Económica México',
+        'México',
+        '2026-02-20',
+        'USD',
+        60.60,
+        6100,
+        915,
+        7015,
+        425109,
+        'Pendiente',
+        'Consolidado'
+    );
+
+-- Tabla: EditorialEvento
+-- Depende de: Editorial
+INSERT INTO
+    EditorialEvento (
+        id_editorial,
+        nombre_contacto,
+        correo_contacto,
+        telefono_contacto,
+        estado
+    )
+VALUES
+    (
+        1,
+        'Laura Pérez',
+        'laura@penguin.test',
+        '809-555-3001',
+        'Activo'
+    ),
+    (
+        2,
+        'Miguel Torres',
+        'miguel@planeta.test',
+        '809-555-3002',
+        'Activo'
+    ),
+    (
+        3,
+        'Sara Gómez',
+        'sara@alfaguara.test',
+        '809-555-3003',
+        'Activo'
+    ),
+    (
+        4,
+        'Diego Ruiz',
+        'diego@sudamericana.test',
+        '809-555-3004',
+        'Activo'
+    ),
+    (
+        5,
+        'Emma Brown',
+        'emma@bloomsbury.test',
+        '809-555-3005',
+        'Activo'
+    ),
+    (
+        6,
+        'Pablo Martín',
+        'pablo@tusquets.test',
+        '809-555-3006',
+        'Activo'
+    ),
+    (
+        7,
+        'Claudia León',
+        'claudia@debate.test',
+        '809-555-3007',
+        'Activo'
+    ),
+    (
+        8,
+        'Javier Mora',
+        'javier@minotauro.test',
+        '809-555-3008',
+        'Activo'
+    ),
+    (
+        9,
+        'Rosa Díaz',
+        'rosa@salamandra.test',
+        '809-555-3009',
+        'Activo'
+    ),
+    (
+        10,
+        'James Smith',
+        'james@harpercollins.test',
+        '809-555-3010',
+        'Activo'
+    );
+
+-- ===========================================================
+-- NIVEL 2: TABLAS CUYOS PADRES YA FUERON INSERTADOS
+-- ===========================================================
+-- Tabla: Direccion
+-- Depende de: Ciudad, TipoDireccion
+INSERT INTO
+    Direccion (
+        id_tipo_direccion,
+        id_ciudad,
+        calle,
+        numero_exterior,
+        numero_interior,
+        sector,
+        referencia,
+        codigo_postal,
+        es_principal,
+        estado
+    )
+VALUES
+    (
+        2,
+        1,
+        'Av. 27 de Febrero',
+        '145',
+        NULL,
+        'Piantini',
+        'Frente al centro comercial',
+        '10127',
+        1,
+        'Activo'
+    ),
+    (
+        5,
+        2,
+        'Calle del Sol',
+        '78',
+        NULL,
+        'Centro Histórico',
+        'Próximo al parque Duarte',
+        '51000',
+        1,
+        'Activo'
+    ),
+    (
+        4,
+        1,
+        'Av. Independencia',
+        '230',
+        'A',
+        'Gazcue',
+        'Zona de carga trasera',
+        '10205',
+        1,
+        'Activo'
+    ),
+    (
+        5,
+        3,
+        'Av. Libertad',
+        '56',
+        NULL,
+        'Centro',
+        'Junto a la plaza principal',
+        '22000',
+        1,
+        'Activo'
+    ),
+    (
+        4,
+        1,
+        'Autopista Las Américas',
+        '1200',
+        NULL,
+        'Los Mameyes',
+        'Dentro de la zona industrial',
+        '11605',
+        1,
+        'Activo'
+    ),
+    (
+        8,
+        1,
+        'Av. George Washington',
+        '500',
+        'Salón 3',
+        'Malecón',
+        'Centro de convenciones',
+        '10103',
+        0,
+        'Activo'
+    ),
+    (
+        2,
+        4,
+        'Calle Duarte',
+        '90',
+        NULL,
+        'Centro',
+        'Esquina Sánchez',
+        '21000',
+        1,
+        'Activo'
+    ),
+    (
+        5,
+        5,
+        'Av. Manolo Tavárez Justo',
+        '44',
+        NULL,
+        'Centro',
+        'Al lado de la terminal',
+        '57000',
+        1,
+        'Activo'
+    ),
+    (
+        3,
+        6,
+        'Fifth Avenue',
+        '350',
+        '12B',
+        'Manhattan',
+        'Oficina internacional',
+        '10001',
+        1,
+        'Activo'
+    ),
+    (
+        3,
+        7,
+        'Carrera 7',
+        '72-41',
+        'Piso 8',
+        'Chapinero',
+        'Edificio empresarial',
+        '110221',
+        1,
+        'Activo'
+    );
+
+-- Tabla: Persona_Tiene_Telefono
+-- Depende de: Persona, Telefono
+INSERT INTO
+    Persona_Tiene_Telefono (id_persona, id_telefono)
+VALUES
+    (1, 1),
+(2, 2),
+(3, 3),
+(4, 4),
+(5, 5),
+(6, 6),
+(7, 7),
+(8, 8),
+(9, 9),
+(10, 10);
+
+-- Tabla: CosteoInventario
+-- Depende de: Producto, Usuario
+INSERT INTO
+    CosteoInventario (
+        id_producto,
+        id_usuario,
+        costo_anterior,
+        costo_nuevo,
+        tipo_costeo,
+        observacion
+    )
+VALUES
+    (
+        1,
+        1,
+        1050,
+        1100,
+        'Promedio ponderado',
+        'Actualización por nueva recepción'
+    ),
+    (
+        2,
+        2,
+        850,
+        900,
+        'Promedio ponderado',
+        'Variación de costo internacional'
+    ),
+    (
+        3,
+        3,
+        825,
+        875,
+        'Última compra',
+        'Costo de la orden más reciente'
+    ),
+    (
+        4,
+        4,
+        600,
+        625,
+        'Promedio ponderado',
+        'Ajuste por flete local'
+    ),
+    (5, 5, 650, 675, 'Estándar', 'Revisión trimestral'),
+    (
+        6,
+        1,
+        900,
+        950,
+        'Última compra',
+        'Nueva edición importada'
+    ),
+    (
+        7,
+        2,
+        760,
+        800,
+        'Promedio ponderado',
+        'Recepción parcial'
+    ),
+    (8, 3, 950, 1000, 'Estándar', 'Actualización anual'),
+    (
+        9,
+        4,
+        450,
+        500,
+        'Promedio ponderado',
+        'Ajuste de importación'
+    ),
+    (
+        10,
+        5,
+        925,
+        975,
+        'Última compra',
+        'Nueva factura de proveedor'
+    );
+
+-- Tabla: OperacionIdempotenteInventario
+-- Depende de: Usuario
+INSERT INTO
+    OperacionIdempotenteInventario (
+        clave_idempotencia,
+        tipo_operacion,
+        documento_tipo,
+        documento_id,
+        id_usuario,
+        estado,
+        respuesta
+    )
+VALUES
+    (
+        'IDEMP-001',
+        'movimiento_entrada',
+        'OrdenCompra',
+        1,
+        1,
+        'procesada',
+        N'{"ok":true,"movimiento":1}'
+    ),
+    (
+        'IDEMP-002',
+        'movimiento_entrada',
+        'OrdenCompra',
+        2,
+        2,
+        'procesada',
+        N'{"ok":true,"movimiento":2}'
+    ),
+    (
+        'IDEMP-003',
+        'descarte',
+        'Descarte',
+        1,
+        3,
+        'procesada',
+        N'{"ok":true,"movimiento":3}'
+    ),
+    (
+        'IDEMP-004',
+        'ajuste',
+        'Ajuste',
+        2,
+        4,
+        'procesada',
+        N'{"ok":true,"movimiento":4}'
+    ),
+    (
+        'IDEMP-005',
+        'recepcion_transferencia',
+        'Transferencia',
+        2,
+        5,
+        'procesada',
+        N'{"ok":true,"movimiento":5}'
+    ),
+    (
+        'IDEMP-006',
+        'descarte',
+        'Descarte',
+        6,
+        6,
+        'procesada',
+        N'{"ok":true,"movimiento":6}'
+    ),
+    (
+        'IDEMP-007',
+        'recepcion_compra',
+        'OrdenCompra',
+        7,
+        7,
+        'procesada',
+        N'{"ok":true,"movimiento":7}'
+    ),
+    (
+        'IDEMP-008',
+        'importacion',
+        'Embarque',
+        3,
+        8,
+        'procesada',
+        N'{"ok":true,"movimiento":8}'
+    ),
+    (
+        'IDEMP-009',
+        'salida_venta',
+        'Venta',
+        1001,
+        9,
+        'procesada',
+        N'{"ok":true,"movimiento":9}'
+    ),
+    (
+        'IDEMP-010',
+        'ajuste',
+        'Conteo',
+        10,
+        10,
+        'procesada',
+        N'{"ok":true,"movimiento":10}'
+    );
+
+-- Tabla: DetalleFacturaInternacional
+-- Depende de: FacturaInternacional, Producto
+INSERT INTO
+    DetalleFacturaInternacional (
+        id_factura_int,
+        id_producto,
+        descripcion,
+        cantidad,
+        precio_unitario,
+        subtotal,
+        cantidad_recibida,
+        observacion
+    )
+VALUES
+    (
+        1,
+        1,
+        'Los pilares de la tierra',
+        30,
+        18.50,
+        555,
+        30,
+        'Completo'
+    ),
+    (2, 2, 'Sapiens', 25, 15, 375, 25, 'Completo'),
+    (
+        3,
+        3,
+        'El código Da Vinci',
+        40,
+        14.75,
+        590,
+        0,
+        'En aduana'
+    ),
+    (
+        4,
+        4,
+        'Orgullo y prejuicio',
+        50,
+        10.50,
+        525,
+        0,
+        'En tránsito'
+    ),
+    (5, 5, '1984', 45, 11.20, 504, 0, 'En tránsito'),
+    (6, 6, 'El Hobbit', 35, 16, 560, 35, 'Completo'),
+    (
+        7,
+        7,
+        'El psicoanalista',
+        20,
+        13.50,
+        270,
+        20,
+        'Completo'
+    ),
+    (8, 8, 'Hábitos atómicos', 40, 17, 680, 0, 'En aduana'),
+    (9, 9, 'El Principito', 60, 8.50, 510, 0, 'En tránsito'),
+    (10, 10, 'Inferno', 30, 16.50, 495, 0, 'En tránsito');
+
+-- ===========================================================
+-- NIVEL 3: TABLAS CUYOS PADRES YA FUERON INSERTADOS
+-- ===========================================================
+-- Tabla: Persona_Tiene_Direccion
+-- Depende de: Direccion, Persona
+INSERT INTO
+    Persona_Tiene_Direccion (id_persona, id_direccion)
+VALUES
+    (1, 1),
+(2, 2),
+(3, 3),
+(4, 4),
+(5, 5),
+(6, 6),
+(7, 7),
+(8, 8),
+(9, 9),
+(10, 10);
+
+-- Tabla: Sucursal
+-- Depende de: Direccion
+INSERT INTO
+    Sucursal (
+        id_direccion,
+        nombre,
+        codigo_sucursal,
+        telefono,
+        correo,
+        responsable,
+        es_principal,
+        estado
+    )
+VALUES
+    (
+        1,
+        'Sede Principal Santo Domingo',
+        'SUC-001',
+        '809-555-1001',
+        'principal@libreria.test',
+        'Carlos Méndez',
+        1,
+        'Activo'
+    ),
+    (
+        2,
+        'Sucursal Santiago Centro',
+        'SUC-002',
+        '809-555-1002',
+        'santiago@libreria.test',
+        'Ana Reyes',
+        0,
+        'Activo'
+    ),
+    (
+        4,
+        'Sucursal La Romana',
+        'SUC-003',
+        '809-555-1003',
+        'laromana@libreria.test',
+        'María González',
+        0,
+        'Activo'
+    ),
+    (
+        7,
+        'Sucursal San Pedro',
+        'SUC-004',
+        '809-555-1004',
+        'sanpedro@libreria.test',
+        'Elena Santos',
+        0,
+        'Activo'
+    ),
+    (
+        8,
+        'Sucursal Puerto Plata',
+        'SUC-005',
+        '809-555-1005',
+        'puertoplata@libreria.test',
+        'Roberto Castillo',
+        0,
+        'Activo'
+    ),
+    (
+        3,
+        'Centro de Descarte',
+        'SUC-006',
+        '809-555-1006',
+        'descarte@libreria.test',
+        'Luis Fernández',
+        0,
+        'Activo'
+    ),
+    (
+        5,
+        'Centro Logístico Este',
+        'SUC-007',
+        '809-555-1007',
+        'logisticaeste@libreria.test',
+        'Roberto Castillo',
+        0,
+        'Activo'
+    ),
+    (
+        6,
+        'Centro de Eventos',
+        'SUC-008',
+        '809-555-1008',
+        'eventos@libreria.test',
+        'Elena Santos',
+        0,
+        'Activo'
+    ),
+    (
+        9,
+        'Oficina Internacional Nueva York',
+        'SUC-009',
+        '212-555-1009',
+        'newyork@libreria.test',
+        'International Manager',
+        0,
+        'Activo'
+    ),
+    (
+        10,
+        'Oficina Regional Bogotá',
+        'SUC-010',
+        '571-555-1010',
+        'bogota@libreria.test',
+        'Regional Manager',
+        0,
+        'Activo'
+    );
+
+-- ===========================================================
+-- NIVEL 4: TABLAS CUYOS PADRES YA FUERON INSERTADOS
+-- ===========================================================
+-- Tabla: Almacen
+-- Depende de: Sucursal
+INSERT INTO
+    Almacen (
+        id_sucursal,
+        nombre,
+        codigo_almacen,
+        direccion,
+        ciudad,
+        responsable,
+        telefono,
+        tipo_almacen,
+        bloqueado,
+        estado
+    )
+VALUES
+    (
+        1,
+        'Almacén Central',
+        'ALM-001',
+        'Av. 27 de Febrero #145',
+        'Santo Domingo',
+        'Carlos Méndez',
+        '809-555-2001',
+        'Principal',
+        0,
+        'Activo'
+    ),
+    (
+        2,
+        'Almacén Santiago',
+        'ALM-002',
+        'Calle del Sol #78',
+        'Santiago',
+        'Ana Reyes',
+        '809-555-2002',
+        'Sucursal',
+        0,
+        'Activo'
+    ),
+    (
+        6,
+        'Bodega de Descarte',
+        'ALM-003',
+        'Av. Independencia #230',
+        'Santo Domingo',
+        'Luis Fernández',
+        '809-555-2003',
+        'Descarte',
+        0,
+        'Activo'
+    ),
+    (
+        3,
+        'Almacén La Romana',
+        'ALM-004',
+        'Av. Libertad #56',
+        'La Romana',
+        'María González',
+        '809-555-2004',
+        'Sucursal',
+        0,
+        'Activo'
+    ),
+    (
+        7,
+        'Almacén Zona Franca',
+        'ALM-005',
+        'Autopista Las Américas #1200',
+        'Santo Domingo',
+        'Roberto Castillo',
+        '809-555-2005',
+        'Importación',
+        0,
+        'Activo'
+    ),
+    (
+        4,
+        'Almacén San Pedro',
+        'ALM-006',
+        'Calle Duarte #90',
+        'San Pedro',
+        'Elena Santos',
+        '809-555-2006',
+        'Sucursal',
+        0,
+        'Activo'
+    ),
+    (
+        5,
+        'Almacén Puerto Plata',
+        'ALM-007',
+        'Av. Manolo Tavárez #44',
+        'Puerto Plata',
+        'Roberto Castillo',
+        '809-555-2007',
+        'Sucursal',
+        0,
+        'Activo'
+    ),
+    (
+        8,
+        'Almacén de Eventos',
+        'ALM-008',
+        'Av. George Washington #500',
+        'Santo Domingo',
+        'Elena Santos',
+        '809-555-2008',
+        'Eventos',
+        0,
+        'Activo'
+    ),
+    (
+        9,
+        'Almacén Nueva York',
+        'ALM-009',
+        'Fifth Avenue #350',
+        'Nueva York',
+        'International Manager',
+        '212-555-2009',
+        'Internacional',
+        0,
+        'Activo'
+    ),
+    (
+        10,
+        'Almacén Bogotá',
+        'ALM-010',
+        'Carrera 7 #72-41',
+        'Bogotá',
+        'Regional Manager',
+        '571-555-2010',
+        'Internacional',
+        0,
+        'Activo'
+    );
+
+-- Tabla: Evento
+-- Depende de: Direccion, Sucursal
+INSERT INTO
+    Evento (
+        nombre,
+        descripcion,
+        id_sucursal,
+        id_direccion,
+        fecha_inicio,
+        fecha_fin,
+        capacidad_esperada,
+        presupuesto,
+        costo_real,
+        tipo_evento,
+        estado,
+        observacion
+    )
+VALUES
+    (
+        'Feria Nacional del Libro',
+        'Exposición y venta de libros',
+        1,
+        6,
+        '2026-07-01 09:00',
+        '2026-07-05 20:00',
+        1000,
+        500000,
+        420000,
+        'Feria del libro',
+        'Finalizado',
+        'Evento principal'
+    ),
+    (
+        'Presentación de novela histórica',
+        'Presentación y firma',
+        2,
+        2,
+        '2026-07-10 18:00',
+        '2026-07-10 21:00',
+        150,
+        80000,
+        65000,
+        'Presentación',
+        'Finalizado',
+        'Buena asistencia'
+    ),
+    (
+        'Taller de escritura creativa',
+        'Taller para nuevos autores',
+        1,
+        1,
+        '2026-07-15 09:00',
+        '2026-07-15 16:00',
+        50,
+        60000,
+        45000,
+        'Taller',
+        'Finalizado',
+        'Cupos completos'
+    ),
+    (
+        'Firma de autores',
+        'Encuentro con autores locales',
+        3,
+        4,
+        '2026-08-02 15:00',
+        '2026-08-02 19:00',
+        200,
+        100000,
+        0,
+        'Firma',
+        'Planificado',
+        'Pendiente'
+    ),
+    (
+        'Club de lectura juvenil',
+        'Actividad mensual',
+        4,
+        7,
+        '2026-08-08 10:00',
+        '2026-08-08 13:00',
+        40,
+        25000,
+        0,
+        'Club de lectura',
+        'Planificado',
+        'Juvenil'
+    ),
+    (
+        'Conferencia de literatura',
+        'Conferencia académica',
+        1,
+        6,
+        '2026-08-12 08:00',
+        '2026-08-12 17:00',
+        300,
+        180000,
+        0,
+        'Conferencia',
+        'Planificado',
+        'Invitados internacionales'
+    ),
+    (
+        'Feria escolar',
+        'Venta y actividades escolares',
+        5,
+        8,
+        '2026-08-20 09:00',
+        '2026-08-22 18:00',
+        500,
+        250000,
+        0,
+        'Feria',
+        'Planificado',
+        'Temporada escolar'
+    ),
+    (
+        'Taller infantil',
+        'Lectura y manualidades',
+        2,
+        2,
+        '2026-08-25 10:00',
+        '2026-08-25 13:00',
+        60,
+        45000,
+        0,
+        'Taller',
+        'Planificado',
+        'Público infantil'
+    ),
+    (
+        'Lanzamiento editorial',
+        'Nuevo catálogo anual',
+        1,
+        1,
+        '2026-09-01 18:00',
+        '2026-09-01 21:00',
+        180,
+        120000,
+        0,
+        'Lanzamiento',
+        'Planificado',
+        'Prensa invitada'
+    ),
+    (
+        'Encuentro de lectores',
+        'Actividad comunitaria',
+        3,
+        4,
+        '2026-09-10 16:00',
+        '2026-09-10 20:00',
+        120,
+        70000,
+        0,
+        'Encuentro',
+        'Planificado',
+        'Entrada gratuita'
+    );
+
+-- ===========================================================
+-- NIVEL 5: TABLAS CUYOS PADRES YA FUERON INSERTADOS
+-- ===========================================================
+-- Tabla: Inventario
+-- Depende de: Almacen, Producto
+INSERT INTO
+    Inventario (
+        id_producto,
+        id_almacen,
+        stock_actual,
+        stock_minimo,
+        stock_maximo,
+        ubicacion,
+        version
+    )
+VALUES
+    (1, 1, 20, 5, 50, 'A-01-01', 1),
+    (2, 1, 15, 5, 40, 'A-01-02', 1),
+    (3, 1, 18, 5, 40, 'A-01-03', 1),
+    (4, 2, 12, 5, 30, 'B-01-01', 1),
+    (5, 2, 15, 5, 35, 'B-01-02', 1),
+    (6, 3, 4, 0, 20, 'D-01-01', 1),
+    (7, 4, 25, 5, 60, 'C-01-01', 1),
+    (8, 5, 20, 5, 50, 'I-01-01', 1),
+    (9, 6, 35, 10, 80, 'S-01-01', 1),
+    (10, 7, 10, 3, 25, 'P-01-01', 1);
+
+-- Tabla: TransferenciaInventario
+-- Depende de: Almacen, Usuario
+INSERT INTO
+    TransferenciaInventario (
+        codigo,
+        id_almacen_origen,
+        id_almacen_destino,
+        id_solicitante,
+        estado,
+        observacion,
+        fecha_solicitud,
+        fecha_despacho,
+        fecha_finalizacion
+    )
+VALUES
+    (
+        'TI-001',
+        1,
+        2,
+        1,
+        'finalizada',
+        'Reposición Santiago',
+        '2026-01-05',
+        '2026-01-06',
+        '2026-01-07'
+    ),
+    (
+        'TI-002',
+        1,
+        4,
+        2,
+        'finalizada',
+        'Reposición La Romana',
+        '2026-01-10',
+        '2026-01-11',
+        '2026-01-12'
+    ),
+    (
+        'TI-003',
+        1,
+        6,
+        3,
+        'en_transito',
+        'Reposición San Pedro',
+        '2026-01-15',
+        '2026-01-16',
+        NULL
+    ),
+    (
+        'TI-004',
+        5,
+        1,
+        4,
+        'finalizada',
+        'Ingreso desde zona franca',
+        '2026-01-20',
+        '2026-01-21',
+        '2026-01-22'
+    ),
+    (
+        'TI-005',
+        2,
+        3,
+        5,
+        'finalizada',
+        'Producto dañado',
+        '2026-02-01',
+        '2026-02-02',
+        '2026-02-03'
+    ),
+    (
+        'TI-006',
+        1,
+        7,
+        6,
+        'solicitada',
+        'Reposición Puerto Plata',
+        '2026-02-05',
+        NULL,
+        NULL
+    ),
+    (
+        'TI-007',
+        1,
+        8,
+        7,
+        'finalizada',
+        'Material para evento',
+        '2026-02-10',
+        '2026-02-11',
+        '2026-02-11'
+    ),
+    (
+        'TI-008',
+        9,
+        1,
+        8,
+        'en_transito',
+        'Importación desde Nueva York',
+        '2026-02-15',
+        '2026-02-16',
+        NULL
+    ),
+    (
+        'TI-009',
+        10,
+        1,
+        9,
+        'en_transito',
+        'Importación desde Bogotá',
+        '2026-02-20',
+        '2026-02-21',
+        NULL
+    ),
+    (
+        'TI-010',
+        4,
+        1,
+        10,
+        'borrador',
+        'Devolución de excedentes',
+        '2026-02-25',
+        NULL,
+        NULL
+    );
+
+-- Tabla: ConteoInventario
+-- Depende de: Almacen, Sucursal, Usuario
+INSERT INTO
+    ConteoInventario (
+        codigo,
+        nombre,
+        id_sucursal,
+        id_almacen,
+        tipo_conteo,
+        alcance_tipo,
+        alcance_valor,
+        fecha_programada,
+        hora_programada,
+        id_responsable,
+        responsable_nombre,
+        observaciones,
+        bloquear_almacen_al_abrir,
+        permitir_reconteo,
+        diferencia_minima_reconteo,
+        estado,
+        fase,
+        bloqueo_activo
+    )
+VALUES
+    (
+        'CON-001',
+        'Conteo general central',
+        1,
+        1,
+        'general',
+        'almacen',
+        'Todos',
+        '2026-03-01',
+        '08:00',
+        1,
+        'Carlos Méndez',
+        'Conteo mensual',
+        1,
+        1,
+        1,
+        'cerrado',
+        'Cerrar',
+        0
+    ),
+    (
+        'CON-002',
+        'Conteo Santiago',
+        2,
+        2,
+        'ciclico',
+        'categoria',
+        'Novela',
+        '2026-03-02',
+        '09:00',
+        2,
+        'Ana Reyes',
+        'Conteo por categoría',
+        0,
+        1,
+        2,
+        'abierto',
+        'Contar',
+        1
+    ),
+    (
+        'CON-003',
+        'Conteo descarte',
+        6,
+        3,
+        'general',
+        'almacen',
+        'Todos',
+        '2026-03-03',
+        '10:00',
+        3,
+        'Luis Fernández',
+        'Validación de descarte',
+        1,
+        1,
+        1,
+        'abierto',
+        'Recontar',
+        1
+    ),
+    (
+        'CON-004',
+        'Conteo La Romana',
+        3,
+        4,
+        'ciclico',
+        'producto',
+        'LIB004',
+        '2026-03-04',
+        '08:30',
+        4,
+        'María González',
+        'Conteo selectivo',
+        0,
+        1,
+        1,
+        'programado',
+        'Crear',
+        0
+    ),
+    (
+        'CON-005',
+        'Conteo zona franca',
+        7,
+        5,
+        'general',
+        'almacen',
+        'Todos',
+        '2026-03-05',
+        '07:30',
+        5,
+        'Roberto Castillo',
+        'Antes de recepción',
+        1,
+        1,
+        3,
+        'programado',
+        'Crear',
+        0
+    ),
+    (
+        'CON-006',
+        'Conteo San Pedro',
+        4,
+        6,
+        'ciclico',
+        'categoria',
+        'Infantil',
+        '2026-03-06',
+        '09:30',
+        6,
+        'Elena Santos',
+        'Conteo cíclico',
+        0,
+        1,
+        1,
+        'programado',
+        'Crear',
+        0
+    ),
+    (
+        'CON-007',
+        'Conteo Puerto Plata',
+        5,
+        7,
+        'general',
+        'almacen',
+        'Todos',
+        '2026-03-07',
+        '08:00',
+        7,
+        'Auditor 1',
+        'Auditoría trimestral',
+        1,
+        1,
+        1,
+        'borrador',
+        'Crear',
+        0
+    ),
+    (
+        'CON-008',
+        'Conteo eventos',
+        8,
+        8,
+        'ciclico',
+        'producto',
+        'LIB007',
+        '2026-03-08',
+        '11:00',
+        8,
+        'Cajero 1',
+        'Control previo a evento',
+        0,
+        0,
+        1,
+        'borrador',
+        'Crear',
+        0
+    ),
+    (
+        'CON-009',
+        'Conteo Nueva York',
+        9,
+        9,
+        'general',
+        'almacen',
+        'Todos',
+        '2026-03-09',
+        '08:00',
+        9,
+        'Logística 1',
+        'Conteo remoto',
+        1,
+        1,
+        2,
+        'programado',
+        'Crear',
+        0
+    ),
+    (
+        'CON-010',
+        'Conteo Bogotá',
+        10,
+        10,
+        'general',
+        'almacen',
+        'Todos',
+        '2026-03-10',
+        '08:00',
+        10,
+        'Consulta 1',
+        'Conteo regional',
+        1,
+        1,
+        2,
+        'programado',
+        'Crear',
+        0
+    );
+
+-- Tabla: AjusteInventario
+-- Depende de: Almacen, Usuario
+INSERT INTO
+    AjusteInventario (
+        codigo,
+        id_almacen,
+        tipo_ajuste,
+        estado,
+        id_solicitante,
+        id_aprobador,
+        observacion,
+        documento_origen_tipo,
+        documento_origen_id,
+        fecha_solicitud,
+        fecha_aprobacion,
+        fecha_aplicacion
+    )
+VALUES
+    (
+        'AJ-001',
+        1,
+        'disminucion',
+        'aplicado',
+        1,
+        3,
+        'Faltante conteo central',
+        'Conteo',
+        1,
+        '2026-03-01',
+        '2026-03-01',
+        '2026-03-01'
+    ),
+    (
+        'AJ-002',
+        4,
+        'aumento',
+        'aprobado',
+        4,
+        3,
+        'Sobrante en La Romana',
+        'Conteo',
+        4,
+        '2026-03-04',
+        '2026-03-04',
+        NULL
+    ),
+    (
+        'AJ-003',
+        5,
+        'disminucion',
+        'solicitado',
+        5,
+        NULL,
+        'Faltante zona franca',
+        'Conteo',
+        5,
+        '2026-03-05',
+        NULL,
+        NULL
+    ),
+    (
+        'AJ-004',
+        7,
+        'disminucion',
+        'aplicado',
+        7,
+        1,
+        'Faltante auditoría',
+        'Conteo',
+        7,
+        '2026-03-07',
+        '2026-03-07',
+        '2026-03-07'
+    ),
+    (
+        'AJ-005',
+        9,
+        'disminucion',
+        'solicitado',
+        9,
+        NULL,
+        'Faltante Nueva York',
+        'Conteo',
+        9,
+        '2026-03-09',
+        NULL,
+        NULL
+    ),
+    (
+        'AJ-006',
+        10,
+        'aumento',
+        'solicitado',
+        10,
+        NULL,
+        'Sobrante Bogotá',
+        'Conteo',
+        10,
+        '2026-03-10',
+        NULL,
+        NULL
+    ),
+    (
+        'AJ-007',
+        2,
+        'aumento',
+        'aplicado',
+        2,
+        1,
+        'Devolución de cliente',
+        'Devolucion',
+        101,
+        '2026-03-11',
+        '2026-03-11',
+        '2026-03-11'
+    ),
+    (
+        'AJ-008',
+        3,
+        'disminucion',
+        'aplicado',
+        3,
+        1,
+        'Deterioro en bodega',
+        'Descarte',
+        1,
+        '2026-03-12',
+        '2026-03-12',
+        '2026-03-12'
+    ),
+    (
+        'AJ-009',
+        6,
+        'aumento',
+        'aprobado',
+        6,
+        3,
+        'Recepción no registrada',
+        'Recepcion',
+        5,
+        '2026-03-13',
+        '2026-03-13',
+        NULL
+    ),
+    (
+        'AJ-010',
+        8,
+        'disminucion',
+        'borrador',
+        6,
+        NULL,
+        'Material utilizado en evento',
+        'Evento',
+        1,
+        NULL,
+        NULL,
+        NULL
+    );
+
+-- Tabla: DescarteInventario
+-- Depende de: Almacen, Sucursal, Usuario
+INSERT INTO
+    DescarteInventario (
+        codigo,
+        fecha,
+        id_sucursal,
+        id_almacen,
+        id_responsable,
+        responsable_nombre,
+        motivo_codigo,
+        motivo_descripcion,
+        observaciones,
+        requiere_aprobacion,
+        id_supervisor,
+        supervisor_nombre,
+        id_solicitante,
+        id_aprobador,
+        estado,
+        documento_origen_tipo,
+        documento_origen_id,
+        fecha_solicitud,
+        fecha_aprobacion,
+        fecha_aplicacion
+    )
+VALUES
+    (
+        'DES-001',
+        '2026-03-12',
+        6,
+        3,
+        3,
+        'Luis Fernández',
+        'HUMEDAD',
+        'Daño por humedad',
+        'Dos libros afectados',
+        1,
+        1,
+        'Carlos Méndez',
+        3,
+        1,
+        'aplicado',
+        'Ajuste',
+        8,
+        '2026-03-12',
+        '2026-03-12',
+        '2026-03-12'
+    ),
+    (
+        'DES-002',
+        '2026-03-13',
+        1,
+        1,
+        1,
+        'Carlos Méndez',
+        'ROTURA',
+        'Cubierta rota',
+        'Una unidad',
+        1,
+        3,
+        'Luis Fernández',
+        1,
+        3,
+        'aprobado',
+        'Conteo',
+        1,
+        '2026-03-13',
+        '2026-03-13',
+        NULL
+    ),
+    (
+        'DES-003',
+        '2026-03-14',
+        2,
+        2,
+        2,
+        'Ana Reyes',
+        'MOJADO',
+        'Daño por agua',
+        'Tres unidades',
+        1,
+        3,
+        'Luis Fernández',
+        2,
+        NULL,
+        'solicitado',
+        NULL,
+        NULL,
+        '2026-03-14',
+        NULL,
+        NULL
+    ),
+    (
+        'DES-004',
+        '2026-03-15',
+        3,
+        4,
+        4,
+        'María González',
+        'OBSOLETO',
+        'Edición obsoleta',
+        'Material promocional',
+        0,
+        NULL,
+        NULL,
+        4,
+        4,
+        'aplicado',
+        NULL,
+        NULL,
+        '2026-03-15',
+        '2026-03-15',
+        '2026-03-15'
+    ),
+    (
+        'DES-005',
+        '2026-03-16',
+        7,
+        5,
+        5,
+        'Roberto Castillo',
+        'ADUANA',
+        'Daño en inspección',
+        'Caja golpeada',
+        1,
+        1,
+        'Carlos Méndez',
+        5,
+        NULL,
+        'borrador',
+        'Embarque',
+        3,
+        NULL,
+        NULL,
+        NULL
+    ),
+    (
+        'DES-006',
+        '2026-03-17',
+        4,
+        6,
+        6,
+        'Elena Santos',
+        'MANCHA',
+        'Manchas de tinta',
+        'Una unidad',
+        1,
+        3,
+        'Luis Fernández',
+        6,
+        3,
+        'aplicado',
+        NULL,
+        NULL,
+        '2026-03-17',
+        '2026-03-17',
+        '2026-03-17'
+    ),
+    (
+        'DES-007',
+        '2026-03-18',
+        5,
+        7,
+        7,
+        'Auditor 1',
+        'PLAGA',
+        'Daño por plaga',
+        'Dos unidades',
+        1,
+        1,
+        'Carlos Méndez',
+        7,
+        1,
+        'aprobado',
+        NULL,
+        NULL,
+        '2026-03-18',
+        '2026-03-18',
+        NULL
+    ),
+    (
+        'DES-008',
+        '2026-03-19',
+        8,
+        8,
+        6,
+        'Elena Santos',
+        'EVENTO',
+        'Daño durante evento',
+        'Una unidad',
+        0,
+        NULL,
+        NULL,
+        6,
+        6,
+        'aplicado',
+        'Evento',
+        2,
+        '2026-03-19',
+        '2026-03-19',
+        '2026-03-19'
+    ),
+    (
+        'DES-009',
+        '2026-03-20',
+        9,
+        9,
+        9,
+        'Logística 1',
+        'TRANSPORTE',
+        'Daño de transporte',
+        'Tres unidades',
+        1,
+        1,
+        'Carlos Méndez',
+        9,
+        NULL,
+        'solicitado',
+        'Transferencia',
+        8,
+        '2026-03-20',
+        NULL,
+        NULL
+    ),
+    (
+        'DES-010',
+        '2026-03-21',
+        10,
+        10,
+        10,
+        'Consulta 1',
+        'OTRO',
+        'Daño no clasificado',
+        'Pendiente evaluación',
+        1,
+        3,
+        'Luis Fernández',
+        10,
+        NULL,
+        'borrador',
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL
+    );
+
+-- Tabla: Consolidacion
+-- Depende de: Almacen, Embarque
+INSERT INTO
+    Consolidacion (
+        codigo_consolidacion,
+        id_embarque,
+        id_almacen_destino,
+        fecha_consolidacion,
+        total_bultos,
+        peso_total_kg,
+        volumen_total_m3,
+        estado,
+        observacion
+    )
+VALUES
+    (
+        'CONS-001',
+        1,
+        1,
+        '2026-01-13',
+        15,
+        320.5,
+        2.8,
+        'Procesado',
+        'Distribuido'
+    ),
+    (
+        'CONS-002',
+        2,
+        1,
+        '2026-01-20',
+        8,
+        180,
+        1.5,
+        'Procesado',
+        'Distribución urgente'
+    ),
+    (
+        'CONS-003',
+        3,
+        5,
+        '2026-02-06',
+        22,
+        510,
+        4.2,
+        'Pendiente',
+        'En aduana'
+    ),
+    (
+        'CONS-004',
+        4,
+        5,
+        '2026-01-31',
+        12,
+        260,
+        2.1,
+        'Pendiente',
+        'En tránsito'
+    ),
+    (
+        'CONS-005',
+        5,
+        5,
+        '2026-02-21',
+        18,
+        430,
+        3.6,
+        'Pendiente',
+        'Marítimo'
+    ),
+    (
+        'CONS-006',
+        6,
+        1,
+        '2026-02-19',
+        10,
+        220,
+        1.8,
+        'Cerrado',
+        'Completado'
+    ),
+    (
+        'CONS-007',
+        7,
+        1,
+        '2026-02-16',
+        6,
+        120,
+        0.9,
+        'Cerrado',
+        'Courier recibido'
+    ),
+    (
+        'CONS-008',
+        8,
+        5,
+        '2026-03-06',
+        20,
+        480,
+        4.0,
+        'Pendiente',
+        'Documentación'
+    ),
+    (
+        'CONS-009',
+        9,
+        5,
+        '2026-02-26',
+        9,
+        210,
+        1.7,
+        'Pendiente',
+        'En tránsito'
+    ),
+    (
+        'CONS-010',
+        10,
+        5,
+        '2026-03-03',
+        11,
+        240,
+        2.0,
+        'Pendiente',
+        'Consolidado'
+    );
+
+-- Tabla: Transferencia
+-- Depende de: Almacen, TipoTransferencia, Usuario
+INSERT INTO
+    Transferencia (
+        codigo_transferencia,
+        id_tipo_transferencia,
+        id_almacen_origen,
+        id_almacen_destino,
+        id_usuario_solicita,
+        motivo,
+        estado,
+        fecha_solicitud,
+        fecha_despacho,
+        observacion
+    )
+VALUES
+    (
+        'TRF-001',
+        1,
+        1,
+        2,
+        1,
+        'Reposición Santiago',
+        'Recibido',
+        '2026-04-01',
+        '2026-04-02',
+        'Completa'
+    ),
+    (
+        'TRF-002',
+        1,
+        1,
+        4,
+        2,
+        'Reposición La Romana',
+        'Recibido',
+        '2026-04-03',
+        '2026-04-04',
+        'Completa'
+    ),
+    (
+        'TRF-003',
+        2,
+        1,
+        3,
+        3,
+        'Productos dañados',
+        'Recibido',
+        '2026-04-05',
+        '2026-04-06',
+        'Descarte'
+    ),
+    (
+        'TRF-004',
+        3,
+        1,
+        2,
+        4,
+        'Campaña de descuentos',
+        'En Tránsito',
+        '2026-04-07',
+        '2026-04-08',
+        'Oferta'
+    ),
+    (
+        'TRF-005',
+        4,
+        1,
+        7,
+        5,
+        'Pedido mayorista',
+        'Pendiente',
+        '2026-04-09',
+        NULL,
+        'Pendiente'
+    ),
+    (
+        'TRF-006',
+        5,
+        4,
+        1,
+        6,
+        'Devolución de excedentes',
+        'Recibido',
+        '2026-04-10',
+        '2026-04-11',
+        'Completa'
+    ),
+    (
+        'TRF-007',
+        6,
+        5,
+        1,
+        7,
+        'Ingreso importación',
+        'Recibido',
+        '2026-04-12',
+        '2026-04-13',
+        'Completa'
+    ),
+    (
+        'TRF-008',
+        7,
+        1,
+        8,
+        8,
+        'Material de evento',
+        'En Tránsito',
+        '2026-04-14',
+        '2026-04-15',
+        'Evento'
+    ),
+    (
+        'TRF-009',
+        9,
+        2,
+        4,
+        9,
+        'Préstamo temporal',
+        'Pendiente',
+        '2026-04-16',
+        NULL,
+        'Pendiente'
+    ),
+    (
+        'TRF-010',
+        10,
+        1,
+        6,
+        10,
+        'Consignación regional',
+        'Pendiente',
+        '2026-04-18',
+        NULL,
+        'Pendiente'
+    );
+
+-- Tabla: OrdenCompra
+-- Depende de: Almacen, Usuario
+INSERT INTO
+    OrdenCompra (
+        codigo_orden,
+        id_almacen,
+        proveedor,
+        contacto_proveedor,
+        fecha_emision,
+        fecha_entrega_est,
+        subtotal,
+        impuestos,
+        total,
+        estado,
+        observacion,
+        id_usuario
+    )
+VALUES
+    (
+        'OC-001',
+        1,
+        'Distribuidora Nacional del Libro',
+        'ventas@dnl.test',
+        '2026-05-01',
+        '2026-05-05',
+        50000,
+        9000,
+        59000,
+        'Recibida',
+        'Compra local',
+        1
+    ),
+    (
+        'OC-002',
+        1,
+        'Editorial Planeta DR',
+        'ventas@planeta.test',
+        '2026-05-02',
+        '2026-05-07',
+        42000,
+        7560,
+        49560,
+        'Recibida',
+        'Reposición',
+        2
+    ),
+    (
+        'OC-003',
+        5,
+        'Penguin Random House Latinoamérica',
+        'ventas@penguin.test',
+        '2026-05-03',
+        '2026-05-15',
+        85000,
+        15300,
+        100300,
+        'Aprobada',
+        'Importación',
+        3
+    ),
+    (
+        'OC-004',
+        5,
+        'Grupo Santillana Colombia',
+        'ventas@santillana.test',
+        '2026-05-04',
+        '2026-05-16',
+        60000,
+        10800,
+        70800,
+        'Aprobada',
+        'Importación',
+        4
+    ),
+    (
+        'OC-005',
+        1,
+        'Alfaguara España',
+        'ventas@alfaguara.test',
+        '2026-05-05',
+        '2026-05-20',
+        72000,
+        12960,
+        84960,
+        'Pendiente',
+        'Nueva edición',
+        5
+    ),
+    (
+        'OC-006',
+        1,
+        'Bloomsbury Publishing UK',
+        'sales@bloomsbury.test',
+        '2026-05-06',
+        '2026-05-25',
+        90000,
+        16200,
+        106200,
+        'Pendiente',
+        'Fantasía',
+        6
+    ),
+    (
+        'OC-007',
+        2,
+        'Librería El Saber',
+        'ventas@elsaber.test',
+        '2026-05-07',
+        '2026-05-10',
+        28000,
+        5040,
+        33040,
+        'Recibida',
+        'Sucursal',
+        7
+    ),
+    (
+        'OC-008',
+        4,
+        'Editorial Planeta DR',
+        'ventas@planeta.test',
+        '2026-05-08',
+        '2026-05-13',
+        35000,
+        6300,
+        41300,
+        'Aprobada',
+        'La Romana',
+        8
+    ),
+    (
+        'OC-009',
+        6,
+        'Distribuidora Nacional del Libro',
+        'ventas@dnl.test',
+        '2026-05-09',
+        '2026-05-14',
+        24000,
+        4320,
+        28320,
+        'Pendiente',
+        'San Pedro',
+        9
+    ),
+    (
+        'OC-010',
+        7,
+        'Fondo de Cultura Económica México',
+        'ventas@fce.test',
+        '2026-05-10',
+        '2026-05-25',
+        55000,
+        9900,
+        64900,
+        'Cancelada',
+        'Cancelada por demora',
+        10
+    );
+
+-- Tabla: PersonalEvento
+-- Depende de: Evento, Persona
+INSERT INTO
+    PersonalEvento (
+        id_evento,
+        id_persona,
+        rol,
+        hora_entrada,
+        hora_salida,
+        costo,
+        observacion,
+        estado
+    )
+VALUES
+    (
+        1,
+        1,
+        'Coordinador',
+        '2026-07-01 08:00',
+        '2026-07-01 21:00',
+        15000,
+        'Coordinación general',
+        'Asistió'
+    ),
+    (
+        2,
+        2,
+        'Recepción',
+        '2026-07-10 17:00',
+        '2026-07-10 21:30',
+        3500,
+        'Registro de invitados',
+        'Asistió'
+    ),
+    (
+        3,
+        3,
+        'Logística',
+        '2026-07-15 08:00',
+        '2026-07-15 17:00',
+        5000,
+        'Montaje',
+        'Asistió'
+    ),
+    (
+        4,
+        4,
+        'Coordinador',
+        '2026-08-02 14:00',
+        '2026-08-02 20:00',
+        6000,
+        'Planificado',
+        'Confirmado'
+    ),
+    (
+        5,
+        5,
+        'Moderador',
+        '2026-08-08 09:30',
+        '2026-08-08 13:30',
+        3000,
+        'Planificado',
+        'Confirmado'
+    ),
+    (
+        6,
+        6,
+        'Recepción',
+        '2026-08-12 07:00',
+        '2026-08-12 18:00',
+        6500,
+        'Planificado',
+        'Confirmado'
+    ),
+    (
+        7,
+        1,
+        'Seguridad',
+        '2026-08-20 08:00',
+        '2026-08-20 19:00',
+        5500,
+        'Planificado',
+        'Confirmado'
+    ),
+    (
+        8,
+        2,
+        'Facilitador',
+        '2026-08-25 09:00',
+        '2026-08-25 14:00',
+        4500,
+        'Planificado',
+        'Confirmado'
+    ),
+    (
+        9,
+        3,
+        'Logística',
+        '2026-09-01 16:00',
+        '2026-09-01 22:00',
+        5000,
+        'Planificado',
+        'Confirmado'
+    ),
+    (
+        10,
+        4,
+        'Recepción',
+        '2026-09-10 15:00',
+        '2026-09-10 21:00',
+        4000,
+        'Planificado',
+        'Confirmado'
+    );
+
+-- Tabla: EventoTieneEditorialEvento
+-- Depende de: EditorialEvento, Evento
+INSERT INTO
+    EventoTieneEditorialEvento (
+        id_evento,
+        id_editorial_evento,
+        rol_en_evento,
+        stand,
+        confirmado,
+        observacion
+    )
+VALUES
+    (1, 1, 'Patrocinador', 'A-01', 1, 'Confirmado'),
+    (2, 2, 'Expositor', 'A-02', 1, 'Confirmado'),
+    (3, 3, 'Invitado', 'A-03', 1, 'Confirmado'),
+    (4, 4, 'Expositor', 'B-01', 1, 'Confirmado'),
+    (5, 5, 'Invitado', 'B-02', 0, 'Pendiente'),
+    (6, 6, 'Patrocinador', 'B-03', 1, 'Confirmado'),
+    (7, 7, 'Expositor', 'C-01', 1, 'Confirmado'),
+    (8, 8, 'Invitado', 'C-02', 1, 'Confirmado'),
+    (9, 9, 'Patrocinador', 'C-03', 0, 'Pendiente'),
+    (10, 10, 'Expositor', 'D-01', 1, 'Confirmado');
+
+-- Tabla: EventoTieneProveedorEvento
+-- Depende de: Evento, Proveedor
+INSERT INTO
+    EventoTieneProveedorEvento (
+        id_evento,
+        id_proveedor,
+        servicio_ofrecido,
+        presupuesto_asignado,
+        estado,
+        observacion
+    )
+VALUES
+    (
+        1,
+        7,
+        'Catering y sonido',
+        120000,
+        'Finalizado',
+        'Servicio completado'
+    ),
+    (
+        2,
+        8,
+        'Mobiliario',
+        25000,
+        'Finalizado',
+        'Servicio completado'
+    ),
+    (
+        3,
+        7,
+        'Refrigerios',
+        18000,
+        'Finalizado',
+        'Servicio completado'
+    ),
+    (
+        4,
+        8,
+        'Sillas y mesas',
+        35000,
+        'Confirmado',
+        'Programado'
+    ),
+    (
+        5,
+        7,
+        'Refrigerios',
+        12000,
+        'Confirmado',
+        'Programado'
+    ),
+    (
+        6,
+        8,
+        'Montaje audiovisual',
+        60000,
+        'Confirmado',
+        'Programado'
+    ),
+    (7, 7, 'Catering', 70000, 'Pendiente', 'Cotización'),
+    (
+        8,
+        8,
+        'Mobiliario infantil',
+        20000,
+        'Confirmado',
+        'Programado'
+    ),
+    (
+        9,
+        7,
+        'Sonido y catering',
+        50000,
+        'Pendiente',
+        'Cotización'
+    ),
+    (
+        10,
+        8,
+        'Mobiliario',
+        30000,
+        'Confirmado',
+        'Programado'
+    );
+
+-- ===========================================================
+-- NIVEL 6: TABLAS CUYOS PADRES YA FUERON INSERTADOS
+-- ===========================================================
+-- Tabla: DetalleTransferenciaInventario
+-- Depende de: Producto, TransferenciaInventario
+INSERT INTO
+    DetalleTransferenciaInventario (
+        id_transferencia,
+        id_producto,
+        cantidad_solicitada,
+        cantidad_despachada,
+        cantidad_recibida,
+        cantidad_faltante,
+        cantidad_danada,
+        observacion
+    )
+VALUES
+    (1, 1, 5, 5, 5, 0, 0, 'Recibido completo'),
+    (2, 2, 4, 4, 4, 0, 0, 'Recibido completo'),
+    (3, 3, 6, 6, 0, 6, 0, 'En tránsito'),
+    (4, 4, 10, 10, 10, 0, 0, 'Ingreso completado'),
+    (5, 5, 2, 2, 2, 0, 2, 'Daño confirmado'),
+    (6, 6, 8, 0, 0, 8, 0, 'Pendiente despacho'),
+    (7, 7, 5, 5, 5, 0, 0, 'Entregado al almacén de eventos'),
+    (8, 8, 12, 12, 0, 12, 0, 'En tránsito internacional'),
+    (9, 9, 15, 15, 0, 15, 0, 'En tránsito internacional'),
+    (10, 10, 3, 0, 0, 3, 0, 'Borrador');
+
+-- Tabla: RecepcionTransferencia
+-- Depende de: TransferenciaInventario, Usuario
+INSERT INTO
+    RecepcionTransferencia (
+        id_transferencia,
+        id_usuario,
+        clave_idempotencia,
+        observacion
+    )
+VALUES
+    (1, 2, 'REC-TI-001', 'Recepción completa'),
+    (2, 4, 'REC-TI-002', 'Recepción completa'),
+    (
+        3,
+        6,
+        'REC-TI-003',
+        'Recepción pendiente registrada'
+    ),
+    (4, 1, 'REC-TI-004', 'Ingreso de importación'),
+    (5, 3, 'REC-TI-005', 'Recepción en descarte'),
+    (6, 7, 'REC-TI-006', 'Documento preliminar'),
+    (7, 6, 'REC-TI-007', 'Material recibido'),
+    (8, 8, 'REC-TI-008', 'Registro de tránsito'),
+    (9, 9, 'REC-TI-009', 'Registro de tránsito'),
+    (10, 10, 'REC-TI-010', 'Documento borrador');
+
+-- Tabla: SnapshotConteoInventario
+-- Depende de: ConteoInventario, Producto
+INSERT INTO
+    SnapshotConteoInventario (
+        id_conteo,
+        id_producto,
+        cantidad_teorica,
+        costo_referencia
+    )
+VALUES
+    (1, 1, 20, 1100),
+(2, 2, 15, 900),
+(3, 3, 18, 875),
+(4, 4, 12, 625),
+(5, 5, 15, 675),
+    (6, 6, 4, 950),
+(7, 7, 25, 800),
+(8, 8, 20, 1000),
+(9, 9, 35, 500),
+(10, 10, 10, 975);
+
+-- Tabla: EvidenciaDescarteInventario
+-- Depende de: DescarteInventario, Usuario
+INSERT INTO
+    EvidenciaDescarteInventario (
+        id_descarte,
+        tipo,
+        nombre_archivo,
+        url_referencia,
+        comentario,
+        id_usuario
+    )
+VALUES
+    (
+        1,
+        'foto',
+        'des001_1.jpg',
+        '/evidencias/des001_1.jpg',
+        'Daño por humedad',
+        3
+    ),
+    (
+        2,
+        'foto',
+        'des002_1.jpg',
+        '/evidencias/des002_1.jpg',
+        'Cubierta rota',
+        1
+    ),
+    (
+        3,
+        'video',
+        'des003.mp4',
+        '/evidencias/des003.mp4',
+        'Daño por agua',
+        2
+    ),
+    (
+        4,
+        'documento',
+        'des004.pdf',
+        '/evidencias/des004.pdf',
+        'Acta de obsolescencia',
+        4
+    ),
+    (
+        5,
+        'foto',
+        'des005_1.jpg',
+        '/evidencias/des005_1.jpg',
+        'Caja golpeada',
+        5
+    ),
+    (
+        6,
+        'foto',
+        'des006_1.jpg',
+        '/evidencias/des006_1.jpg',
+        'Manchas de tinta',
+        6
+    ),
+    (
+        7,
+        'informe',
+        'des007.pdf',
+        '/evidencias/des007.pdf',
+        'Informe de plaga',
+        7
+    ),
+    (
+        8,
+        'foto',
+        'des008_1.jpg',
+        '/evidencias/des008_1.jpg',
+        'Daño durante evento',
+        6
+    ),
+    (
+        9,
+        'video',
+        'des009.mp4',
+        '/evidencias/des009.mp4',
+        'Daño de transporte',
+        9
+    ),
+    (
+        10,
+        'foto',
+        'des010_1.jpg',
+        '/evidencias/des010_1.jpg',
+        'Pendiente evaluación',
+        10
+    );
+
+-- Tabla: MovimientoInventario
+-- Depende de: Almacen, Inventario, Producto, Usuario
+INSERT INTO
+    MovimientoInventario (
+        id_inventario,
+        id_producto,
+        id_almacen,
+        id_usuario,
+        tipo_movimiento,
+        cantidad,
+        saldo_anterior,
+        saldo_posterior,
+        documento_tipo,
+        documento_id,
+        motivo_codigo,
+        observacion
+    )
+VALUES
+    (
+        1,
+        1,
+        1,
+        1,
+        'entrada',
+        10,
+        10,
+        20,
+        'OrdenCompra',
+        1,
+        'RECEPCION',
+        'Recepción inicial'
+    ),
+    (
+        2,
+        2,
+        1,
+        2,
+        'entrada',
+        15,
+        0,
+        15,
+        'OrdenCompra',
+        2,
+        'RECEPCION',
+        'Ingreso producto'
+    ),
+    (
+        3,
+        3,
+        1,
+        3,
+        'salida',
+        2,
+        20,
+        18,
+        'Descarte',
+        1,
+        'HUMEDAD',
+        'Baja por daño'
+    ),
+    (
+        4,
+        4,
+        2,
+        4,
+        'ajuste',
+        1,
+        11,
+        12,
+        'Ajuste',
+        2,
+        'SOBRANTE_CONTEO',
+        'Ajuste positivo'
+    ),
+    (
+        5,
+        5,
+        2,
+        5,
+        'entrada',
+        5,
+        10,
+        15,
+        'Transferencia',
+        2,
+        'TRANSFERENCIA',
+        'Recepción sucursal'
+    ),
+    (
+        6,
+        6,
+        3,
+        3,
+        'salida',
+        1,
+        5,
+        4,
+        'Descarte',
+        6,
+        'MANCHA',
+        'Baja por daño'
+    ),
+    (
+        7,
+        7,
+        4,
+        4,
+        'entrada',
+        8,
+        17,
+        25,
+        'OrdenCompra',
+        7,
+        'RECEPCION',
+        'Reposición'
+    ),
+    (
+        8,
+        8,
+        5,
+        5,
+        'entrada',
+        20,
+        0,
+        20,
+        'Embarque',
+        3,
+        'IMPORTACION',
+        'Ingreso zona franca'
+    ),
+    (
+        9,
+        9,
+        6,
+        6,
+        'salida',
+        5,
+        40,
+        35,
+        'Venta',
+        1001,
+        'VENTA',
+        'Venta sucursal'
+    ),
+    (
+        10,
+        10,
+        7,
+        7,
+        'ajuste',
+        1,
+        9,
+        10,
+        'Conteo',
+        10,
+        'SOBRANTE_CONTEO',
+        'Ajuste positivo'
+    );
+
+-- Tabla: DetalleTransferencia
+-- Depende de: Producto, Transferencia
+INSERT INTO
+    DetalleTransferencia (
+        id_transferencia,
+        id_producto,
+        cantidad_solicitada,
+        cantidad_despachada,
+        observacion
+    )
+VALUES
+    (1, 1, 5, 5, 'Completo'),
+(2, 2, 4, 4, 'Completo'),
+(3, 3, 2, 2, 'Dañados'),
+    (4, 4, 8, 8, 'En tránsito'),
+(5, 5, 10, 0, 'Pendiente'),
+(6, 6, 3, 3, 'Devuelto'),
+    (7, 7, 12, 12, 'Importación'),
+(8, 8, 6, 6, 'Evento'),
+(9, 9, 5, 0, 'Pendiente'),
+(10, 10, 7, 0, 'Pendiente');
+
+-- Tabla: RecibimientoTransferencias
+-- Depende de: Almacen, Transferencia, Usuario
+INSERT INTO
+    RecibimientoTransferencias (
+        id_transferencia,
+        id_almacen_receptor,
+        id_usuario_recibe,
+        estado,
+        observacion
+    )
+VALUES
+    (1, 2, 2, 'Recibido', 'Completo'),
+    (2, 4, 4, 'Recibido', 'Completo'),
+    (3, 3, 3, 'Recibido', 'Registrado'),
+    (4, 2, 2, 'Recibido Parcial', 'En proceso'),
+    (5, 7, 7, 'Rechazado', 'Aún no despachado'),
+    (6, 1, 1, 'Recibido', 'Devolución'),
+    (7, 1, 1, 'Recibido', 'Importación'),
+    (8, 8, 6, 'Recibido Parcial', 'Evento'),
+    (9, 4, 4, 'Rechazado', 'Pendiente'),
+    (10, 6, 6, 'Rechazado', 'Pendiente');
+
+-- Tabla: DetalleOrdenCompra
+-- Depende de: OrdenCompra, Producto
+INSERT INTO
+    DetalleOrdenCompra (
+        id_orden_compra,
+        id_producto,
+        cantidad,
+        precio_unitario,
+        subtotal,
+        observacion
+    )
+VALUES
+    (1, 1, 20, 1100, 22000, 'Lote 1'),
+(2, 2, 20, 900, 18000, 'Lote 2'),
+(3, 3, 30, 875, 26250, 'Importación'),
+    (4, 4, 25, 625, 15625, 'Importación'),
+(5, 5, 20, 675, 13500, 'Pendiente'),
+(6, 6, 25, 950, 23750, 'Pendiente'),
+    (7, 7, 15, 800, 12000, 'Recibida'),
+(8, 8, 15, 1000, 15000, 'Aprobada'),
+(9, 9, 20, 500, 10000, 'Pendiente'),
+(10, 10, 15, 975, 14625, 'Cancelada');
+
+-- Tabla: RecepcionOrdenCompra
+-- Depende de: Almacen, OrdenCompra, Usuario
+INSERT INTO
+    RecepcionOrdenCompra (
+        id_orden_compra,
+        id_almacen,
+        id_usuario_recibe,
+        estado,
+        observacion
+    )
+VALUES
+    (1, 1, 1, 'Recibido', 'Completo'),
+(2, 1, 2, 'Recibido', 'Completo'),
+(3, 5, 3, 'Recibido Parcial', 'Parcial'),
+    (4, 5, 4, 'Recibido Parcial', 'Parcial'),
+(5, 1, 5, 'Rechazado', 'Pendiente'),
+(6, 1, 6, 'Rechazado', 'Pendiente'),
+    (7, 2, 7, 'Recibido', 'Completo'),
+(8, 4, 8, 'Recibido Parcial', 'Parcial'),
+(9, 6, 9, 'Rechazado', 'Pendiente'),
+(10, 7, 10, 'Rechazado', 'Cancelada');
+
+-- Tabla: FacturaProveedores
+-- Depende de: OrdenCompra
+INSERT INTO
+    FacturaProveedores (
+        id_orden_compra,
+        numero_factura,
+        proveedor,
+        fecha_emision,
+        fecha_vencimiento,
+        subtotal,
+        impuestos,
+        total,
+        estado,
+        observacion
+    )
+VALUES
+    (
+        1,
+        'FP-001',
+        'Distribuidora Nacional del Libro',
+        '2026-05-01',
+        '2026-05-31',
+        50000,
+        9000,
+        59000,
+        'Pagada',
+        'Pagada'
+    ),
+    (
+        2,
+        'FP-002',
+        'Editorial Planeta DR',
+        '2026-05-02',
+        '2026-06-01',
+        42000,
+        7560,
+        49560,
+        'Pagada',
+        'Pagada'
+    ),
+    (
+        3,
+        'FP-003',
+        'Penguin Random House Latinoamérica',
+        '2026-05-03',
+        '2026-07-02',
+        85000,
+        15300,
+        100300,
+        'Pendiente',
+        'Importación'
+    ),
+    (
+        4,
+        'FP-004',
+        'Grupo Santillana Colombia',
+        '2026-05-04',
+        '2026-06-03',
+        60000,
+        10800,
+        70800,
+        'Pendiente',
+        'Importación'
+    ),
+    (
+        5,
+        'FP-005',
+        'Alfaguara España',
+        '2026-05-05',
+        '2026-06-19',
+        72000,
+        12960,
+        84960,
+        'Pendiente',
+        'Pendiente'
+    ),
+    (
+        6,
+        'FP-006',
+        'Bloomsbury Publishing UK',
+        '2026-05-06',
+        '2026-07-05',
+        90000,
+        16200,
+        106200,
+        'Pendiente',
+        'Pendiente'
+    ),
+    (
+        7,
+        'FP-007',
+        'Librería El Saber',
+        '2026-05-07',
+        '2026-05-07',
+        28000,
+        5040,
+        33040,
+        'Pagada',
+        'Contado'
+    ),
+    (
+        8,
+        'FP-008',
+        'Editorial Planeta DR',
+        '2026-05-08',
+        '2026-06-07',
+        35000,
+        6300,
+        41300,
+        'Pendiente',
+        'Crédito'
+    ),
+    (
+        9,
+        'FP-009',
+        'Distribuidora Nacional del Libro',
+        '2026-05-09',
+        '2026-06-08',
+        24000,
+        4320,
+        28320,
+        'Pendiente',
+        'Crédito'
+    ),
+    (
+        10,
+        'FP-010',
+        'Fondo de Cultura Económica México',
+        '2026-05-10',
+        '2026-06-09',
+        55000,
+        9900,
+        64900,
+        'Anulada',
+        'Orden cancelada'
+    );
+
+-- Tabla: DetalleProveedorEvento
+-- Depende de: EventoTieneProveedorEvento, Material
+INSERT INTO
+    DetalleProveedorEvento (
+        id_evento_proveedor,
+        id_material,
+        cantidad,
+        unidad_medida,
+        costo_unitario,
+        fecha_entrega,
+        estado_entrega,
+        observacion
+    )
+VALUES
+    (
+        1,
+        1,
+        20,
+        'Caja',
+        850,
+        '2026-07-01 08:00',
+        'Entregado',
+        'Completo'
+    ),
+    (
+        2,
+        2,
+        100,
+        'Unidad',
+        450,
+        '2026-07-10 15:00',
+        'Entregado',
+        'Completo'
+    ),
+    (
+        3,
+        8,
+        50,
+        'Persona',
+        300,
+        '2026-07-15 10:00',
+        'Entregado',
+        'Completo'
+    ),
+    (
+        4,
+        3,
+        15,
+        'Unidad',
+        2500,
+        '2026-08-02 12:00',
+        'Pendiente',
+        'Programado'
+    ),
+    (
+        5,
+        1,
+        5,
+        'Caja',
+        850,
+        '2026-08-08 09:00',
+        'Pendiente',
+        'Programado'
+    ),
+    (
+        6,
+        5,
+        2,
+        'Unidad',
+        45000,
+        '2026-08-12 07:00',
+        'Pendiente',
+        'Programado'
+    ),
+    (
+        7,
+        8,
+        300,
+        'Persona',
+        300,
+        '2026-08-20 08:00',
+        'Pendiente',
+        'Cotización'
+    ),
+    (
+        8,
+        2,
+        60,
+        'Unidad',
+        450,
+        '2026-08-25 08:00',
+        'Pendiente',
+        'Programado'
+    ),
+    (
+        9,
+        6,
+        4,
+        'Unidad',
+        8500,
+        '2026-09-01 15:00',
+        'Pendiente',
+        'Cotización'
+    ),
+    (
+        10,
+        10,
+        3,
+        'Juego',
+        12000,
+        '2026-09-10 14:00',
+        'Pendiente',
+        'Programado'
+    );
+
+-- ===========================================================
+-- NIVEL 7: TABLAS CUYOS PADRES YA FUERON INSERTADOS
+-- ===========================================================
+-- Tabla: DetalleRecepcionTransferencia
+-- Depende de: DetalleTransferenciaInventario, RecepcionTransferencia
+INSERT INTO
+    DetalleRecepcionTransferencia (
+        id_recepcion,
+        id_detalle_transferencia,
+        cantidad_recibida,
+        cantidad_faltante,
+        cantidad_danada,
+        observacion
+    )
+VALUES
+    (1, 1, 5, 0, 0, 'Sin novedad'),
+    (2, 2, 4, 0, 0, 'Sin novedad'),
+    (3, 3, 0, 6, 0, 'Aún no recibido'),
+    (4, 4, 10, 0, 0, 'Completo'),
+    (5, 5, 2, 0, 2, 'Productos dañados'),
+    (6, 6, 0, 8, 0, 'Pendiente'),
+    (7, 7, 5, 0, 0, 'Completo'),
+    (8, 8, 0, 12, 0, 'En tránsito'),
+    (9, 9, 0, 15, 0, 'En tránsito'),
+    (10, 10, 0, 3, 0, 'Borrador');
+
+-- Tabla: DetalleConteoInventario
+-- Depende de: ConteoInventario, Producto, SnapshotConteoInventario
+INSERT INTO
+    DetalleConteoInventario (
+        id_conteo,
+        id_snapshot,
+        id_producto,
+        cantidad_contada,
+        cantidad_reconteo,
+        cantidad_aceptada,
+        diferencia,
+        clasificacion,
+        estado_linea,
+        regularizacion_tipo,
+        regularizacion_id,
+        observacion
+    )
+VALUES
+    (
+        1,
+        1,
+        1,
+        19,
+        19,
+        19,
+        -1,
+        'faltante',
+        'cerrada',
+        'ajuste',
+        1,
+        'Una unidad faltante'
+    ),
+    (
+        2,
+        2,
+        2,
+        15,
+        NULL,
+        15,
+        0,
+        'sin_diferencia',
+        'aceptada',
+        NULL,
+        NULL,
+        'Correcto'
+    ),
+    (
+        3,
+        3,
+        3,
+        17,
+        18,
+        18,
+        0,
+        'reconteo',
+        'aceptada',
+        NULL,
+        NULL,
+        'Corregido en reconteo'
+    ),
+    (
+        4,
+        4,
+        4,
+        13,
+        NULL,
+        13,
+        1,
+        'sobrante',
+        'contada',
+        'ajuste',
+        2,
+        'Una unidad sobrante'
+    ),
+    (
+        5,
+        5,
+        5,
+        14,
+        NULL,
+        14,
+        -1,
+        'faltante',
+        'contada',
+        'ajuste',
+        3,
+        'Pendiente aprobación'
+    ),
+    (
+        6,
+        6,
+        6,
+        4,
+        NULL,
+        4,
+        0,
+        'sin_diferencia',
+        'aceptada',
+        NULL,
+        NULL,
+        'Correcto'
+    ),
+    (
+        7,
+        7,
+        7,
+        24,
+        24,
+        24,
+        -1,
+        'faltante',
+        'reconteo',
+        'ajuste',
+        4,
+        'Faltante confirmado'
+    ),
+    (
+        8,
+        8,
+        8,
+        20,
+        NULL,
+        20,
+        0,
+        'sin_diferencia',
+        'aceptada',
+        NULL,
+        NULL,
+        'Correcto'
+    ),
+    (
+        9,
+        9,
+        9,
+        34,
+        NULL,
+        34,
+        -1,
+        'faltante',
+        'contada',
+        'ajuste',
+        5,
+        'Pendiente'
+    ),
+    (
+        10,
+        10,
+        10,
+        11,
+        NULL,
+        11,
+        1,
+        'sobrante',
+        'contada',
+        'ajuste',
+        6,
+        'Pendiente'
+    );
+
+-- Tabla: AuditoriaInventario
+-- Depende de: Almacen, MovimientoInventario, Producto, Usuario
+INSERT INTO
+    AuditoriaInventario (
+        id_usuario,
+        tipo_accion,
+        id_movimiento,
+        documento_tipo,
+        documento_id,
+        id_producto,
+        id_almacen,
+        direccion_ip,
+        resultado,
+        detalle
+    )
+VALUES
+    (
+        1,
+        'CREAR_MOVIMIENTO',
+        1,
+        'OrdenCompra',
+        1,
+        1,
+        1,
+        '192.168.1.10',
+        'OK',
+        'Movimiento registrado'
+    ),
+    (
+        2,
+        'CREAR_MOVIMIENTO',
+        2,
+        'OrdenCompra',
+        2,
+        2,
+        1,
+        '192.168.1.11',
+        'OK',
+        'Movimiento registrado'
+    ),
+    (
+        3,
+        'APROBAR_DESCARTE',
+        3,
+        'Descarte',
+        1,
+        3,
+        1,
+        '192.168.1.12',
+        'OK',
+        'Descarte aprobado'
+    ),
+    (
+        4,
+        'APROBAR_AJUSTE',
+        4,
+        'Ajuste',
+        2,
+        4,
+        2,
+        '192.168.1.13',
+        'OK',
+        'Ajuste aprobado'
+    ),
+    (
+        5,
+        'RECIBIR_TRANSFERENCIA',
+        5,
+        'Transferencia',
+        2,
+        5,
+        2,
+        '192.168.1.14',
+        'OK',
+        'Transferencia recibida'
+    ),
+    (
+        6,
+        'APLICAR_DESCARTE',
+        6,
+        'Descarte',
+        6,
+        6,
+        3,
+        '192.168.1.15',
+        'OK',
+        'Descarte aplicado'
+    ),
+    (
+        7,
+        'CONSULTAR_KARDEX',
+        7,
+        'OrdenCompra',
+        7,
+        7,
+        4,
+        '192.168.1.16',
+        'OK',
+        'Consulta completada'
+    ),
+    (
+        8,
+        'REGISTRAR_IMPORTACION',
+        8,
+        'Embarque',
+        3,
+        8,
+        5,
+        '192.168.1.17',
+        'OK',
+        'Importación registrada'
+    ),
+    (
+        9,
+        'REGISTRAR_SALIDA',
+        9,
+        'Venta',
+        1001,
+        9,
+        6,
+        '192.168.1.18',
+        'OK',
+        'Salida registrada'
+    ),
+    (
+        10,
+        'APROBAR_CONTEO',
+        10,
+        'Conteo',
+        10,
+        10,
+        7,
+        '192.168.1.19',
+        'OK',
+        'Conteo aprobado'
+    );
+
+-- Tabla: DetalleRecibimientoMercancia
+-- Depende de: Producto, RecibimientoTransferencias
+INSERT INTO
+    DetalleRecibimientoMercancia (
+        id_recibimiento,
+        id_producto,
+        cantidad_esperada,
+        cantidad_recibida,
+        cantidad_con_dano,
+        observacion
+    )
+VALUES
+    (1, 1, 5, 5, 0, 'Completo'),
+(2, 2, 4, 4, 0, 'Completo'),
+(3, 3, 2, 2, 2, 'Dañados'),
+    (4, 4, 8, 6, 0, 'Parcial'),
+(5, 5, 10, 0, 0, 'No recibido'),
+(6, 6, 3, 3, 0, 'Completo'),
+    (7, 7, 12, 12, 0, 'Completo'),
+(8, 8, 6, 4, 1, 'Parcial'),
+(9, 9, 5, 0, 0, 'Pendiente'),
+(10, 10, 7, 0, 0, 'Pendiente');
+
+-- Tabla: DetalleRecepcionOrdenCompra
+-- Depende de: Producto, RecepcionOrdenCompra
+INSERT INTO
+    DetalleRecepcionOrdenCompra (
+        id_recepcion,
+        id_producto,
+        cantidad_esperada,
+        cantidad_recibida,
+        cantidad_con_dano,
+        precio_unitario,
+        observacion
+    )
+VALUES
+    (1, 1, 20, 20, 0, 1100, 'Completo'),
+(2, 2, 20, 20, 0, 900, 'Completo'),
+(3, 3, 30, 20, 1, 875, 'Parcial'),
+    (4, 4, 25, 15, 0, 625, 'Parcial'),
+(5, 5, 20, 0, 0, 675, 'No recibido'),
+(6, 6, 25, 0, 0, 950, 'No recibido'),
+    (7, 7, 15, 15, 0, 800, 'Completo'),
+(8, 8, 15, 10, 0, 1000, 'Parcial'),
+(9, 9, 20, 0, 0, 500, 'No recibido'),
+(10, 10, 15, 0, 0, 975, 'Cancelada');
+
+-- Tabla: CuentasPorPagar
+-- Depende de: FacturaProveedores
+INSERT INTO
+    CuentasPorPagar (
+        id_factura_prov,
+        monto_total,
+        monto_pagado,
+        fecha_vencimiento,
+        estado,
+        fecha_ultimo_pago,
+        observacion
+    )
+VALUES
+    (
+        1,
+        59000,
+        59000,
+        '2026-05-31',
+        'Pagado',
+        '2026-05-20',
+        'Completo'
+    ),
+    (
+        2,
+        49560,
+        49560,
+        '2026-06-01',
+        'Pagado',
+        '2026-05-22',
+        'Completo'
+    ),
+    (
+        3,
+        100300,
+        30000,
+        '2026-07-02',
+        'Pagado Parcial',
+        '2026-06-01',
+        'Abono'
+    ),
+    (
+        4,
+        70800,
+        0,
+        '2026-06-03',
+        'Pendiente',
+        NULL,
+        'Pendiente'
+    ),
+    (
+        5,
+        84960,
+        0,
+        '2026-06-19',
+        'Pendiente',
+        NULL,
+        'Pendiente'
+    ),
+    (
+        6,
+        106200,
+        0,
+        '2026-07-05',
+        'Pendiente',
+        NULL,
+        'Pendiente'
+    ),
+    (
+        7,
+        33040,
+        33040,
+        '2026-05-07',
+        'Pagado',
+        '2026-05-07',
+        'Contado'
+    ),
+    (
+        8,
+        41300,
+        10000,
+        '2026-06-07',
+        'Pagado Parcial',
+        '2026-05-25',
+        'Abono'
+    ),
+    (
+        9,
+        28320,
+        0,
+        '2026-06-08',
+        'Pendiente',
+        NULL,
+        'Pendiente'
+    ),
+    (
+        10,
+        64900,
+        0,
+        '2026-06-09',
+        'Pendiente',
+        NULL,
+        'Factura anulada'
+    );
+
+-- ===========================================================
+-- NIVEL 8: TABLAS CUYOS PADRES YA FUERON INSERTADOS
+-- ===========================================================
+-- Tabla: DetalleAjusteInventario
+-- Depende de: AjusteInventario, DetalleConteoInventario, Producto
+INSERT INTO
+    DetalleAjusteInventario (
+        id_ajuste,
+        id_producto,
+        cantidad_objetivo,
+        diferencia,
+        existencia_anterior,
+        motivo_codigo,
+        id_detalle_conteo,
+        observacion
+    )
+VALUES
+    (
+        1,
+        1,
+        19,
+        -1,
+        20,
+        'FALTANTE_CONTEO',
+        1,
+        'Ajuste por conteo'
+    ),
+    (
+        2,
+        4,
+        13,
+        1,
+        12,
+        'SOBRANTE_CONTEO',
+        4,
+        'Ajuste por conteo'
+    ),
+    (3, 5, 14, -1, 15, 'FALTANTE_CONTEO', 5, 'Pendiente'),
+    (4, 7, 24, -1, 25, 'FALTANTE_CONTEO', 7, 'Aplicado'),
+    (5, 9, 34, -1, 35, 'FALTANTE_CONTEO', 9, 'Pendiente'),
+    (6, 10, 11, 1, 10, 'SOBRANTE_CONTEO', 10, 'Pendiente'),
+    (
+        7,
+        2,
+        16,
+        1,
+        15,
+        'DEVOLUCION',
+        NULL,
+        'Devolución en buen estado'
+    ),
+    (8, 3, 16, -2, 18, 'DETERIORO', NULL, 'Daño por humedad'),
+    (
+        9,
+        6,
+        5,
+        1,
+        4,
+        'RECEPCION_OMITIDA',
+        NULL,
+        'Unidad recibida'
+    ),
+    (
+        10,
+        8,
+        18,
+        -2,
+        20,
+        'CONSUMO_EVENTO',
+        NULL,
+        'Uso en evento'
+    );
+
+-- Tabla: DetalleDescarteInventario
+-- Depende de: DescarteInventario, DetalleConteoInventario, Producto
+INSERT INTO
+    DetalleDescarteInventario (
+        id_descarte,
+        id_producto,
+        existencia_actual,
+        cantidad,
+        costo_unitario,
+        motivo_especifico,
+        id_detalle_conteo,
+        observacion
+    )
+VALUES
+    (
+        1,
+        3,
+        18,
+        2,
+        875,
+        'Humedad',
+        NULL,
+        'Retirar de inventario'
+    ),
+    (
+        2,
+        1,
+        20,
+        1,
+        1100,
+        'Cubierta rota',
+        1,
+        'Pendiente aplicación'
+    ),
+    (3, 2, 15, 3, 900, 'Agua', NULL, 'Aislar unidades'),
+    (4, 4, 12, 2, 625, 'Edición obsoleta', 4, 'Aplicado'),
+    (5, 5, 15, 1, 675, 'Golpe de caja', 5, 'Evaluación'),
+    (6, 6, 4, 1, 950, 'Manchas', NULL, 'Aplicado'),
+    (7, 7, 25, 2, 800, 'Plaga', 7, 'Pendiente'),
+    (8, 8, 20, 1, 1000, 'Daño de evento', 8, 'Aplicado'),
+    (9, 9, 35, 3, 500, 'Transporte', 9, 'Pendiente'),
+    (10, 10, 10, 1, 975, 'Otro', 10, 'Borrador');

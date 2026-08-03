@@ -28,60 +28,60 @@ export const eventPublishers = [
   { eventId: 'EV-03', eventName: 'Feria del Libro Guadalajara', publisher: 'Debate', stand: 'C-08', products: 30 },
 ]
 
-export const eventExtendedSeed: EventExtendedData[] = [
-  {
-    eventId: 'EV-01',
-    publishers: ['Planeta', 'Alfaguara', 'Penguin Random House'],
-    capacity: 5000,
-    notes: 'Stand principal en pabellón A. Coordinación con logística para montaje el 14 de junio.',
-    operationalCost: 15000,
-    inventory: [
-      { id: 'EI-1', product: 'Cien años de soledad', code: 'P-001', isbn: '978-0307474728', qty: 40, originBranch: 'Almacén Central' },
-      { id: 'EI-2', product: 'Harry Potter y la piedra filosofal', code: 'P-005', isbn: '978-8498384453', qty: 30, originBranch: 'Sucursal Centro' },
-    ],
-    utensils: [
-      { id: 'EU-1', supplier: 'Mobiliario RD', utensil: 'Mesas', qty: 6, unitCost: 2500, notes: 'Mesas plegables 180cm' },
-      { id: 'EU-2', supplier: 'Mobiliario RD', utensil: 'Sillas', qty: 24, unitCost: 150, notes: '' },
-      { id: 'EU-3', supplier: 'Publicidad Express', utensil: 'Roll Up', qty: 3, unitCost: 4500, notes: 'Diseño corporativo' },
-    ],
-  },
-  {
-    eventId: 'EV-02',
-    publishers: ['Salamandra'],
-    capacity: 120,
-    notes: 'Evento en curso. Solo ajustes de inventario adicional y utensilios permitidos.',
-    operationalCost: 3500,
-    inventory: [
-      { id: 'EI-3', product: 'El principito', code: 'P-002', isbn: '978-0156012195', qty: 25, originBranch: 'Sucursal Coyoacán' },
-      { id: 'EI-4', product: 'Harry Potter y la piedra filosofal', code: 'P-005', isbn: '978-8498384453', qty: 15, originBranch: 'Sucursal Coyoacán' },
-    ],
-    utensils: [
-      { id: 'EU-4', supplier: 'Audio Visual Pro', utensil: 'Banners', qty: 2, unitCost: 1000, notes: 'Material promocional infantil' },
-    ],
-  },
-  {
-    eventId: 'EV-03',
-    publishers: ['Debate', 'Planeta'],
-    capacity: 8000,
-    notes: 'Feria programada para noviembre. Presupuesto preliminar aprobado.',
-    operationalCost: 0,
-    inventory: [],
-    utensils: [],
-  },
-  {
-    eventId: 'EV-04',
-    publishers: ['Debolsillo'],
-    capacity: 40,
-    notes: 'Club mensual en sucursal Polanco.',
-    operationalCost: 2000,
-    inventory: [
-      { id: 'EI-5', product: 'La sombra del viento', code: 'P-007', isbn: '978-8497592432', qty: 10, originBranch: 'Sucursal Polanco' },
-    ],
-    utensils: [
-      { id: 'EU-5', supplier: 'Mobiliario RD', utensil: 'Mesas', qty: 2, unitCost: 600, notes: '' },
-    ],
-  },
-]
+// export const eventExtendedSeed: EventExtendedData[] = [
+//   {
+//     eventId: 'EV-01',
+//     publishers: ['Planeta', 'Alfaguara', 'Penguin Random House'],
+//     capacity: 5000,
+//     notes: 'Stand principal en pabellón A. Coordinación con logística para montaje el 14 de junio.',
+//     operationalCost: 15000,
+//     inventory: [
+//       { id: 'EI-1', product: 'Cien años de soledad', code: 'P-001', isbn: '978-0307474728', qty: 40, originBranch: 'Almacén Central' },
+//       { id: 'EI-2', product: 'Harry Potter y la piedra filosofal', code: 'P-005', isbn: '978-8498384453', qty: 30, originBranch: 'Sucursal Centro' },
+//     ],
+//     utensils: [
+//       { id: 'EU-1', supplier: 'Mobiliario RD', utensil: 'Mesas', qty: 6, unitCost: 2500, notes: 'Mesas plegables 180cm' },
+//       { id: 'EU-2', supplier: 'Mobiliario RD', utensil: 'Sillas', qty: 24, unitCost: 150, notes: '' },
+//       { id: 'EU-3', supplier: 'Publicidad Express', utensil: 'Roll Up', qty: 3, unitCost: 4500, notes: 'Diseño corporativo' },
+//     ],
+//   },
+//   {
+//     eventId: 'EV-02',
+//     publishers: ['Salamandra'],
+//     capacity: 120,
+//     notes: 'Evento en curso. Solo ajustes de inventario adicional y utensilios permitidos.',
+//     operationalCost: 3500,
+//     inventory: [
+//       { id: 'EI-3', product: 'El principito', code: 'P-002', isbn: '978-0156012195', qty: 25, originBranch: 'Sucursal Coyoacán' },
+//       { id: 'EI-4', product: 'Harry Potter y la piedra filosofal', code: 'P-005', isbn: '978-8498384453', qty: 15, originBranch: 'Sucursal Coyoacán' },
+//     ],
+//     utensils: [
+//       { id: 'EU-4', supplier: 'Audio Visual Pro', utensil: 'Banners', qty: 2, unitCost: 1000, notes: 'Material promocional infantil' },
+//     ],
+//   },
+//   {
+//     eventId: 'EV-03',
+//     publishers: ['Debate', 'Planeta'],
+//     capacity: 8000,
+//     notes: 'Feria programada para noviembre. Presupuesto preliminar aprobado.',
+//     operationalCost: 0,
+//     inventory: [],
+//     utensils: [],
+//   },
+//   {
+//     eventId: 'EV-04',
+//     publishers: ['Debolsillo'],
+//     capacity: 40,
+//     notes: 'Club mensual en sucursal Polanco.',
+//     operationalCost: 2000,
+//     inventory: [
+//       { id: 'EI-5', product: 'La sombra del viento', code: 'P-007', isbn: '978-8497592432', qty: 10, originBranch: 'Sucursal Polanco' },
+//     ],
+//     utensils: [
+//       { id: 'EU-5', supplier: 'Mobiliario RD', utensil: 'Mesas', qty: 2, unitCost: 600, notes: '' },
+//     ],
+//   },
+// ]
 
 /** Ventas vinculadas por atributo interno eventId (Evento Asociado) — preparado para integración con Ventas/MySQL */
 export const eventAssociatedSales: EventAssociatedSale[] = [

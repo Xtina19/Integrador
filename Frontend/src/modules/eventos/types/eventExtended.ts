@@ -16,16 +16,30 @@ export interface EventUtensil {
   qty: number
   unitCost: number
   notes: string
+  id_material?: number
+  id_proveedor?: number
+}
+
+export interface EventStaffMember {
+  id: string
+  id_persona: number
+  personaNombre: string
+  rol: string
+  horaEntrada: string
+  horaSalida: string
+  costo: string
+  observacion: string
 }
 
 export interface EventExtendedData {
   eventId: string
   publishers: string[]
   capacity: number
-  notes: string
-  operationalCost: number
   inventory: EventInventoryItem[]
   utensils: EventUtensil[]
+  staff: EventStaffMember[]
+  operationalCost: number
+  notes: string
 }
 
 /** Venta asociada a un evento (preparado para integración con módulo Ventas) */

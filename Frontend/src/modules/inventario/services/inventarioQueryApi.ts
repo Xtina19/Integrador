@@ -20,21 +20,47 @@ interface ProductoVistaBackendDto {
   costoReferencia: number
   activo: boolean
   existenciaTotal: number
-  existencias: { almacenId: string; almacenNombre: string; saldo: number }[]
+  stockMinimo: number
+
+  existencias: {
+    almacenId: string
+    almacenNombre: string
+    sucursalId?: string | null
+    sucursalNombre?: string
+    saldo: number
+    stockMinimo?: number
+    ubicacion?: string
+  }[]
+
+  transferenciasActivas: number
+  conteosAbiertos: number
+  ajustesPendientes: number
+  descartesRelacionados: number
+  ultimoMovimientoId: string | null
+  ultimoMovimientoFecha: string | null
+  ultimaAuditoriaFecha: string | null
 }
 
 /** Forma real devuelta por GET /api/inventario/dashboard (backend read-model). */
 interface DashboardKpisBackendDto {
   totalProductos: number
   totalExistencias: number
-  valorInventario: number
+  productosBajoStock: number
+  productosSinStock: number
+  valorInventario: number | null
   almacenesBloqueados: number
   transferenciasPendientes: number
   ajustesPendientes: number
   descartesPendientes: number
   conteosActivos: number
   movimientosUltimas24h: number
-  porAlmacen: { almacenId: string; almacenNombre: string; existencias: number; valor: number }[]
+
+  porAlmacen: {
+    almacenId: string
+    almacenNombre: string
+    existencias: number
+    valor: number | null
+  }[]
 }
 
 const AUTH_HEADERS = {
@@ -46,26 +72,43 @@ function withAuth() {
   return { headers: { ...apiConfig.headers, ...AUTH_HEADERS } }
 }
 
-function mapProducto(p: ProductoVistaBackendDto): ProductoInventarioVista {
+function mapProducto(
+  p: ProductoVistaBackendDto,
+): ProductoInventarioVista {
   return {
     id: p.productoId,
     isbn: p.isbn ?? '',
     titulo: p.titulo,
     autor: p.autor ?? '—',
     categoria: p.categoria ?? '—',
+    editorial: p.editorial ?? '—',
     stockConsolidado: p.existenciaTotal,
-    stockMinimo: 0,
+    stockMinimo: p.stockMinimo ?? 0,
+
     porAlmacen: p.existencias.map((e) => ({
       almacenId: e.almacenId,
       almacenNombre: e.almacenNombre,
-      sucursal: e.almacenNombre,
+      sucursalId: e.sucursalId ?? null,
+      sucursal:
+        e.sucursalNombre ??
+        e.almacenNombre,
       saldo: e.saldo,
+      stockMinimo: e.stockMinimo ?? 0,
+      ubicacion: e.ubicacion ?? '',
     })),
+
     transferenciasActivas: 0,
     conteosAbiertos: 0,
     ajustesPendientes: 0,
     descartesRelacionados: 0,
-    estado: p.existenciaTotal <= 0 ? 'agotado' : 'normal',
+
+    estado:
+      p.existenciaTotal <= 0
+        ? 'agotado'
+        : p.existenciaTotal <=
+            (p.stockMinimo ?? 0)
+          ? 'bajo'
+          : 'normal',
   }
 }
 
@@ -77,22 +120,45 @@ export const inventarioQueryApi = {
   },
 
   /** No hay endpoint GET /productos/:id — se filtra sobre el listado completo. */
-  async productoVistaById(id: string): Promise<ProductoInventarioVista | null> {
-    const productos = await inventarioQueryApi.productosVista()
-    return productos.find((p) => p.id === id) ?? null
+  async productoVistaById(
+    id: string,
+  ): Promise<ProductoInventarioVista | null> {
+    try {
+      const response = await httpGet<
+        ApiEnvelope<ProductoVistaBackendDto>
+      >(
+        `/api/inventario/productos/${id}`,
+        withAuth(),
+      )
+
+      return response.data
+        ? mapProducto(response.data)
+        : null
+    } catch {
+      return null
+    }
   },
 
   async dashboardKpis(): Promise<InventoryDashboardKpis> {
-    const res = await httpGet<ApiEnvelope<DashboardKpisBackendDto>>('/api/inventario/dashboard', withAuth())
-    const d = res.data
-    const ahora = new Date().toLocaleString('es-DO', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-    if (!d) {
+    const response = await httpGet<
+      ApiEnvelope<DashboardKpisBackendDto>
+    >(
+      '/api/inventario/dashboard',
+      withAuth(),
+    )
+
+    const ahora = new Date().toLocaleString(
+      'es-DO',
+      {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      },
+    )
+
+    if (!response.data) {
       return {
         stockTotal: 0,
         productosBajoStock: 0,
@@ -102,13 +168,20 @@ export const inventarioQueryApi = {
         ultimaActualizacion: ahora,
       }
     }
-    // Solo métricas globales: los pendientes de proceso viven en cada pestaña.
+
+    const data: DashboardKpisBackendDto =
+      response.data
+
     return {
-      stockTotal: d.totalExistencias,
-      productosBajoStock: 0,
-      productosSinStock: 0,
-      almacenesBloqueados: d.almacenesBloqueados,
-      valorInventario: d.valorInventario > 0 ? d.valorInventario : null,
+      stockTotal: data.totalExistencias,
+      productosBajoStock:
+        data.productosBajoStock,
+      productosSinStock:
+        data.productosSinStock,
+      almacenesBloqueados:
+        data.almacenesBloqueados,
+      valorInventario:
+        data.valorInventario,
       ultimaActualizacion: ahora,
     }
   },

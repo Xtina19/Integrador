@@ -13,11 +13,9 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Table } from '@/components/ui/Table'
 import { useEventExtended } from '@/context/EventExtendedContext'
-import { useStaffAssignment } from '@/context/StaffAssignmentContext'
 import { getEventHistory, getEventSales } from '@/mocks/mockEventos'
 import { eventStatusLabels } from '@/constants/stateMachines'
-import type { StaffAssignmentResult } from '@/types/staffAssignment'
-import { formatDop } from '@/lib/money'
+
 
 const DETAIL_TABS: { id: DetailEventTab; label: string }[] = [
   { id: 'resumen', label: 'Resumen' },
@@ -37,25 +35,14 @@ interface EventDetailDialogProps {
 
 export function EventDetailDialog({ event, open, onClose, onEdit }: EventDetailDialogProps) {
   const { getExtended } = useEventExtended()
-  const { history } = useStaffAssignment()
   const [activeTab, setActiveTab] = useState<DetailEventTab>('resumen')
 
   const extended = useMemo(() => (event ? getExtended(event.id) : null), [event, getExtended])
   const sales = useMemo(() => (event ? getEventSales(event.id) : []), [event])
   const eventHistory = useMemo(() => (event ? getEventHistory(event.id) : []), [event])
 
-  const staffAssignment = useMemo((): StaffAssignmentResult['assignments'] => {
-    const empty: StaffAssignmentResult['assignments'] = { ventas: [], inventario: [], logistica: [], caja: [] }
-    if (!event) return empty
-    const records = history.filter((r) => r.eventId === event.id && r.status === 'confirmed')
-    const result: StaffAssignmentResult['assignments'] = { ...empty }
-    for (const r of records) {
-      result[r.area].push({ employeeId: r.employeeId, employeeName: r.employeeName, area: r.area })
-    }
-    return result
-  }, [event, history])
 
-  const staffCount = history.filter((r) => event && r.eventId === event.id).length || event?.participants || 0
+const staffCount = extended?.staff?.length || event?.participants || 0
   const salesTotal = sales.reduce((s, sale) => s + (sale.status === 'paid' ? sale.total : 0), 0)
 
   if (!event || !extended) return null
@@ -122,18 +109,12 @@ export function EventDetailDialog({ event, open, onClose, onEdit }: EventDetailD
         )}
 
         {activeTab === 'personal' && (
-          <EventStaffTabContent
-            requirements={{ ventas: 0, inventario: 0, logistica: 0, caja: 0 }}
-            onRequirementChange={() => {}}
-            assignment={staffAssignment}
-            warnings={[]}
-            generated
-            confirmed
-            onGenerate={() => {}}
-            onConfirm={() => {}}
-            readOnly
-          />
-        )}
+  <EventStaffTabContent
+    items={extended.staff ?? []}
+    onChange={() => {}}
+    readOnly
+  />
+)}
 
         {activeTab === 'utensilios' && (
           <EventUtensilsTabContent items={extended.utensils} onChange={() => {}} readOnly />
@@ -151,7 +132,7 @@ export function EventDetailDialog({ event, open, onClose, onEdit }: EventDetailD
                 { key: 'id', header: 'Factura', render: (s) => <span className="font-mono text-xs">{s.id}</span> },
                 { key: 'date', header: 'Fecha' },
                 { key: 'customer', header: 'Cliente' },
-                { key: 'total', header: 'Total', render: (s) => <span className="font-semibold text-corporate tabular-nums">{formatDop(s.total)}</span> },
+                { key: 'total', header: 'Total', render: (s) => <span className="font-semibold text-corporate">RD${s.total.toLocaleString()}</span> },
                 {
                   key: 'status',
                   header: 'Estado',

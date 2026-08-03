@@ -6,7 +6,6 @@ import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Table } from '@/components/ui/Table'
 import { DetailRow } from '@/components/ui/FormDialog'
-import { branches } from '@/mocks/mockCore'
 import {
   transferenciasApi,
   type TransferenciaDetalleDto,
@@ -19,10 +18,6 @@ import { transferenciaBadge } from '../utils/statusBadges'
 import { DetailPageShell } from '@/compartido/Components/DetailPageShell'
 
 const PIPELINE = ['borrador', 'solicitada', 'en_transito', 'recibida_parcial', 'recibida'] as const
-
-function almacenNombre(id: string): string {
-  return branches.find((b) => b.id === id)?.name ?? id
-}
 
 export function DetalleTransferenciaPage() {
   const { id = '' } = useParams()
@@ -77,10 +72,10 @@ export function DetalleTransferenciaPage() {
     <DetailPageShell
       breadcrumbs={[
         { label: 'Inventario', to: '/inventario' },
-        { label: 'Transferencias', to: '/inventario?tab=movimientos&filtro=transferencias' },
+        { label: 'Transferencias', to: '/inventario?tab=transferencias' },
         { label: data?.codigo ?? id },
       ]}
-      backPath="/inventario?tab=movimientos&filtro=transferencias"
+      backPath="/inventario?tab=transferencias"
       title={data?.codigo ?? 'Transferencia'}
       badge={data && <Badge variant={transferenciaBadge(data.estado)}>{TRANSFERENCIA_ESTADO_LABEL[data.estado]}</Badge>}
       loading={loading}
@@ -133,10 +128,24 @@ export function DetalleTransferenciaPage() {
             <CardHeader title="Detalle general" />
             <CardBody>
               <div className="grid gap-3 sm:grid-cols-2">
-                <DetailRow label="Origen" value={almacenNombre(data.almacenOrigenId)} />
-                <DetailRow label="Destino" value={almacenNombre(data.almacenDestinoId)} />
+                <DetailRow
+                  label="Origen"
+                  value={
+                    data.almacenOrigenNombre
+                  }
+                />
+
+                <DetailRow
+                  label="Destino"
+                  value={
+                    data.almacenDestinoNombre
+                  }
+                />
                 <DetailRow label="Fecha" value={data.fecha} />
-                <DetailRow label="Solicitante" value={data.solicitanteId} />
+                <DetailRow
+                  label="Solicitante"
+                  value={data.solicitanteNombre}
+                />
                 <DetailRow label="Versión (concurrencia)" value={String(data.version)} />
                 <DetailRow label="Observación" value={data.observacion ?? '—'} />
               </div>
@@ -157,9 +166,8 @@ export function DetalleTransferenciaPage() {
                     return (
                       <span
                         key={estado}
-                        className={`rounded px-2 py-1 text-[11px] font-medium ${
-                          done ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-400'
-                        }`}
+                        className={`rounded px-2 py-1 text-[11px] font-medium ${done ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-400'
+                          }`}
                       >
                         {TRANSFERENCIA_ESTADO_LABEL[estado]}
                       </span>

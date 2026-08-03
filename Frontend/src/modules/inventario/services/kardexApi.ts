@@ -19,6 +19,8 @@ export interface KardexLineaDto {
 /** Forma real devuelta por GET /api/inventario/kardex (backend read-model). */
 interface KardexBackendDto {
   id: string
+  isbn?: string
+  sucursalNombre?: string
   movimientoId: string
   productoId: string
   productoTitulo?: string
@@ -54,19 +56,25 @@ function withAuth(params?: Record<string, string | undefined>) {
   }
 }
 
-function mapKardex(k: KardexBackendDto): KardexLineaDto {
+function mapKardex(
+  kardex: KardexBackendDto,
+): KardexLineaDto {
   return {
-    id: k.id,
-    fecha: k.fechaMovimiento,
-    productoId: k.productoId,
-    productoTitulo: k.productoTitulo,
-    tipo: k.tipoMovimiento,
-    cantidad: k.cantidad,
-    saldo: k.saldoPosterior,
-    documentoTipo: k.documentoTipo,
-    documentoId: k.documentoId,
-    usuario: k.usuarioId,
-    almacen: k.almacenNombre,
+    id: kardex.id,
+    fecha: kardex.fechaMovimiento,
+    productoId: kardex.productoId,
+    productoTitulo:
+      kardex.productoTitulo,
+    isbn: kardex.isbn,
+    tipo: kardex.tipoMovimiento,
+    cantidad: kardex.cantidad,
+    saldo: kardex.saldoPosterior,
+    documentoTipo:
+      kardex.documentoTipo,
+    documentoId:
+      kardex.documentoId,
+    usuario: kardex.usuarioId,
+    almacen: kardex.almacenNombre,
   }
 }
 

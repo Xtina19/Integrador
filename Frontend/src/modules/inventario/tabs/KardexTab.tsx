@@ -67,6 +67,7 @@ export function KardexTab({ lineas, filterProductoId, onOpenDocumento, onClearPr
                   { value: 'venta', label: 'Venta' },
                   { value: 'recepcion', label: 'Recepción' },
                   { value: 'compensacion', label: 'Compensación' },
+                  { value: 'existencia_inicial', label: 'Existencia inicial', },
                 ]}
               />
             }
@@ -117,8 +118,23 @@ export function KardexTab({ lineas, filterProductoId, onOpenDocumento, onClearPr
                 <button
                   type="button"
                   className="text-left text-xs font-semibold text-corporate hover:underline"
-                  onClick={() => onOpenDocumento(l.documentoTipo, l.documentoId)}
-                >
+                  onClick={() => {
+                    if (
+                      l.documentoTipo ===
+                      'existencia_inicial'
+                    ) {
+                      onOpenDocumento(
+                        'movimiento',
+                        l.id,
+                      )
+                      return
+                    }
+
+                    onOpenDocumento(
+                      l.documentoTipo,
+                      l.documentoId,
+                    )
+                  }}                >
                   {l.documentoId}
                   <span className="block font-normal capitalize text-slate-400">{l.documentoTipo}</span>
                 </button>
@@ -134,8 +150,23 @@ export function KardexTab({ lineas, filterProductoId, onOpenDocumento, onClearPr
                   size="sm"
                   variant="outline"
                   icon={ExternalLink}
-                  onClick={() => onOpenDocumento(l.documentoTipo, l.documentoId)}
-                >
+                  onClick={() => {
+                    if (
+                      l.documentoTipo ===
+                      'existencia_inicial'
+                    ) {
+                      onOpenDocumento(
+                        'movimiento',
+                        l.id,
+                      )
+                      return
+                    }
+
+                    onOpenDocumento(
+                      l.documentoTipo,
+                      l.documentoId,
+                    )
+                  }}                >
                   Abrir
                 </Button>
               ),

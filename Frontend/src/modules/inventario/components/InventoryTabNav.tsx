@@ -1,11 +1,21 @@
 import type { InventoryTabId } from '../types/inventoryUi'
 
-const tabs: { id: InventoryTabId; label: string }[] = [
-  { id: 'general', label: 'General' },
-  { id: 'movimientos', label: 'Movimientos' },
-  { id: 'kardex', label: 'Kardex' },
-  { id: 'auditoria', label: 'Auditoría' },
-]
+const tabs: {
+  id: InventoryTabId
+  label: string
+}[] = [
+    { id: 'general', label: 'General' },
+    {
+      id: 'movimientos',
+      label: 'Movimientos',
+    },
+    {
+      id: 'transferencias',
+      label: 'Transferencias',
+    },
+    { id: 'kardex', label: 'Kardex' },
+    { id: 'auditoria', label: 'Auditoría' },
+  ]
 
 interface Props {
   active: InventoryTabId
@@ -25,11 +35,10 @@ export function InventoryTabNav({ active, onChange }: Props) {
             key={tab.id}
             type="button"
             onClick={() => onChange(tab.id)}
-            className={`shrink-0 rounded-md px-3.5 py-2 text-sm font-medium transition-colors ${
-              isActive
+            className={`shrink-0 rounded-md px-3.5 py-2 text-sm font-medium transition-colors ${isActive
                 ? 'bg-corporate text-white shadow-sm'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-corporate'
-            }`}
+              }`}
           >
             {tab.label}
           </button>

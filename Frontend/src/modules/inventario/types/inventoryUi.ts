@@ -1,9 +1,9 @@
 /** Tipos UI alineados al dominio aprobado de Inventario (solo frontend). */
 
-export type InventoryTabId = 'general' | 'movimientos' | 'kardex' | 'auditoria'
+export type InventoryTabId = 'general' | 'movimientos' | 'transferencias' | 'kardex' | 'auditoria'
 
 /** Pestañas antiguas redirigidas a Movimientos con filtro. */
-export type InventoryLegacyTabId = 'transferencias' | 'conteos' | 'ajustes' | 'descartes'
+export type InventoryLegacyTabId =  'conteos' | 'ajustes' | 'descartes'
 
 export type MovimientoFiltroId =
   | 'all'
@@ -72,7 +72,10 @@ export interface StockPorAlmacen {
   almacenId: string
   almacenNombre: string
   sucursal: string
+  sucursalId?: string | null
   saldo: number
+  stockMinimo?: number
+  ubicacion?: string
 }
 
 export interface ProductoInventarioVista {
@@ -81,6 +84,7 @@ export interface ProductoInventarioVista {
   titulo: string
   autor: string
   categoria: string
+  editorial: string
   stockConsolidado: number
   stockMinimo: number
   porAlmacen: StockPorAlmacen[]
@@ -105,7 +109,7 @@ export interface MovimientoVista {
   cantidad: number
   saldoAnterior: number
   saldoPosterior: number
-  documentoTipo: 'transferencia' | 'descarte' | 'ajuste' | 'conteo' | 'venta' | 'recepcion' | 'compensacion'
+  documentoTipo: 'transferencia' | 'descarte' | 'ajuste' | 'conteo' | 'venta' | 'recepcion' | 'compensacion' | 'existencia_inicial'
   documentoId: string
   usuario: string
   sucursal: string
