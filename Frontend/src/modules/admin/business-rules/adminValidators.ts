@@ -19,6 +19,7 @@ export interface AdminProductForm {
   isbn: string
   title: string
   author: string
+  authorId?: string
   categoryId: string
   publisherId: string
   price: string | number
@@ -95,7 +96,7 @@ export function validateAdminProduct(
       : []),
     requireText(form.isbn, 'ISBN', 10, 20),
     requireText(form.title, 'Título'),
-    requireText(form.author, 'Autor'),
+    form.authorId ? requireSelect(form.authorId, 'un autor') : requireText(form.author, 'Autor'),
     requireSelect(form.categoryId, 'una categoría'),
     requireSelect(form.publisherId, 'una editorial'),
     validatePositiveDecimal(form.price, 'Precio'),

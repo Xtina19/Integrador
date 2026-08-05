@@ -1,12 +1,32 @@
 -- Espacio Registro de Productos -----------------------------------------------------------------------
 -- =============================
---  Documento Proyecto Definitivo
+--  Documento Proyecto Definitivo — LibroSys
 -- =============================
+-- Fuente oficial del equipo. El backend (routes/*.js) y el FE deben alinearse aquí.
+--
+-- GUÍA RÁPIDA (orden de lectura):
+--   1. MODULO CONTACTO          → Teléfonos, países, direcciones
+--   2. MODULO PERSONAS          → Persona, Usuario, Rol, Proveedor, catálogo libros
+--   3. MODULO CONFIGURACION     → Moneda, TasaCambio, FormaPago
+--   4. MODULO INVENTARIO        → Stock, transferencias, conteos; puente Ventas (MovimientoInventario)
+--   5. MODULO IMPORTACIONES     → Embarques internacionales
+--   6. MODULO COMPRAS           → Órdenes, recepciones, facturas proveedor
+--   7. MODULO VENTAS            → Facturas cliente (Persona, Producto, Inventario, Almacen)
+--   8. MODULO EVENTOS           → Eventos, Material (utensilios), editoriales en feria
+--   9. ÍNDICES                  → Optimización consultas inventario
+--  10. DATOS DE PRUEBA          → INSERT semilla Joselito / demo
+--
+-- ELIMINADO (no recrear en SQL Server):
+--   TipoTransferencia, Transferencia, DetalleTransferencia,
+--   RecibimientoTransferencias, DetalleRecibimientoMercancia, CosteoInventario
+--   → Duplicaban TransferenciaInventario o no tienen FE/backend activo.
+--
 -- Un libro puede cambiar de precio con el tiempo o sircunstancias
 -- CREATE TABLE Precio ();
 -- =============================================
 -- MODULO CONTACTO (TELÉFONOS Y DIRECCIONES)
 -- =============================================
+-- Base para Persona, Sucursal y Proveedor (teléfonos y domicilios).
 CREATE TABLE TipoTelefono (
     id_tipo_telefono INT PRIMARY KEY IDENTITY,
     nombre VARCHAR(50) NOT NULL,
@@ -76,6 +96,7 @@ CREATE TABLE Direccion (
 -- =============================================
 -- Mantenimientos admin → almacenamiento en BD:
 --   Clientes     → Persona (+ Telefono); NO existe tabla Clientes
+--                  id_sucursal_preferida → Sucursal; ventas → FacturaVenta.id_persona
 --   Usuarios     → Usuario + Persona
 --   Roles        → Rol (catálogo) + Usuario.rol (slug)
 --   Proveedores  → Proveedor + Persona + TipoProveedor
@@ -86,6 +107,9 @@ CREATE TABLE Direccion (
 --   Monedas      → Moneda
 --   Tasas cambio → TasaCambio + Moneda
 --   Formas pago  → FormaPago (NC no incluida; ver Ventas)
+--   Clientes     → Persona (tipo_cliente); ventas registradas → FacturaVenta.id_persona
+--
+-- --- Persona y vínculos de contacto ---
 CREATE TABLE Persona (
     id_persona INT PRIMARY KEY IDENTITY,
     tipo_persona VARCHAR(20) NOT NULL,
@@ -99,7 +123,10 @@ CREATE TABLE Persona (
     genero VARCHAR(20),
     tipo_cliente VARCHAR(30) NULL,
     -- persona|colegio|universidad|empresa|institucion (mantenimiento Clientes)
+    id_sucursal_preferida INT NULL,
+    -- FK → Sucursal (ver RELACIONES CRUZADAS; Persona se crea antes que Sucursal)
     sucursal_preferida VARCHAR(100) NULL,
+    -- etiqueta legible para FE (ej. Almacén Central); preferir id_sucursal_preferida
     observaciones VARCHAR(255) NULL,
     estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
     fecha_registro DATETIME NOT NULL DEFAULT GETDATE()
@@ -125,6 +152,7 @@ CREATE TABLE Persona_Tiene_Direccion (
     CONSTRAINT uq_ptd UNIQUE (id_persona, id_direccion)
 );
 
+-- --- Usuarios y roles (Admin → /administracion/usuarios, /roles) ---
 CREATE TABLE Usuario (
     id_usuario INT PRIMARY KEY IDENTITY,
     id_persona INT,
@@ -140,6 +168,7 @@ CREATE TABLE Usuario (
     CONSTRAINT fk_usuario_persona FOREIGN KEY (id_persona) REFERENCES Persona(id_persona),
 );
 
+-- Catálogo Rol; Usuario.rol guarda el slug (ej. administrador, cajero).
 CREATE TABLE Rol (
     id_rol INT PRIMARY KEY IDENTITY,
     codigo VARCHAR(30) NOT NULL,
@@ -152,6 +181,7 @@ CREATE TABLE Rol (
     CONSTRAINT UQ_Rol_slug UNIQUE (slug)
 );
 
+-- --- Proveedores (Compras → /compras/proveedores) ---
 CREATE TABLE TipoProveedor (
     id_tipo_proveedor INT PRIMARY KEY IDENTITY,
     nombre VARCHAR(100) NOT NULL,
@@ -180,7 +210,10 @@ CREATE TABLE Proveedor (
     CONSTRAINT fk_prov_pais FOREIGN KEY (id_pais) REFERENCES Pais(id_pais)
 );
 
--- Un autor puede tener varios libros y un libro puede contener varios autores
+-- --- Catálogo de libros (Inventario → /inventario/productos; Ventas → DetalleFacturaVenta) ---
+-- Producto ── Inventario (stock por almacén) ── MovimientoInventario / DetalleFacturaVenta
+-- Relación Autor ↔ Producto: 1:N (un autor, muchos libros; Producto.id_autor → Autor)
+-- API: GET/POST /api/autores · productos resuelven id_autor en alta/edición
 CREATE TABLE Autor (
     id_autor INT PRIMARY KEY IDENTITY,
     nombre VARCHAR(100) NOT NULL,
@@ -240,6 +273,8 @@ CREATE TABLE Producto (
 -- =============================================
 -- MODULO CONFIGURACION (MONEDAS, TASAS, FORMAS DE PAGO)
 -- =============================================
+-- FE: /configuracion/monedas | tasas-cambio | formas-pago
+-- API: /api/monedas | /api/tasas-cambio | /api/formas-pago
 CREATE TABLE Moneda (
     id_moneda INT PRIMARY KEY IDENTITY,
     codigo_iso CHAR(3) NOT NULL,
@@ -251,6 +286,7 @@ CREATE TABLE Moneda (
     CONSTRAINT UQ_Moneda_codigo UNIQUE (codigo_iso)
 );
 
+-- Tasas hacia moneda destino (Joselito: todas hacia DOP). FK id_moneda_origen / id_moneda_destino.
 CREATE TABLE TasaCambio (
     id_tasa_cambio INT PRIMARY KEY IDENTITY,
     id_moneda_origen INT NOT NULL,
@@ -266,6 +302,7 @@ CREATE TABLE TasaCambio (
     CONSTRAINT uq_tasa_par_fecha UNIQUE (id_moneda_origen, id_moneda_destino, fecha_tasa)
 );
 
+-- Medios de cobro en caja. NOTA_CREDITO no va aquí (documento Ventas).
 CREATE TABLE FormaPago (
     id_forma_pago INT PRIMARY KEY IDENTITY,
     codigo VARCHAR(30) NOT NULL,
@@ -280,6 +317,27 @@ CREATE TABLE FormaPago (
 -- =============================================
 -- MODULO INVENTARIO
 -- =============================================
+-- Frontend: modules/inventario + GET/POST /api/inventario/*
+-- Relaciones oficiales (productos/libros, no Material de eventos):
+--   Producto ──┬── Inventario ── Almacen ── Sucursal ── Direccion
+--              ├── TransferenciaInventario ── DetalleTransferenciaInventario
+--              │       └── RecepcionTransferencia ── DetalleRecepcionTransferencia
+--              ├── ConteoInventario ── SnapshotConteoInventario ── DetalleConteoInventario
+--              │       └── ProductoAlcanceConteoInventario
+--              ├── AjusteInventario ── DetalleAjusteInventario (→ DetalleConteoInventario opc.)
+--              ├── DescarteInventario ── DetalleDescarteInventario
+--              │       └── EvidenciaDescarteInventario
+--              └── MovimientoInventario (kardex FE) ── AuditoriaInventario
+--                    └── puente Ventas: id_factura_venta / id_detalle_factura → FacturaVenta
+--   OperacionIdempotenteInventario: idempotencia despacho/recepción transferencias
+-- NOTA: No existe tabla Kardex; la pantalla kardex lee MovimientoInventario.
+-- NOTA: Material (MODULO EVENTOS) no es inventario de productos.
+-- Puente Ventas (MODULO VENTAS):
+--   Emisión factura → MovimientoInventario (documento_tipo venta, salida stock)
+--   Devolución/cambio/anulación → MovimientoInventario (devolucion|compensacion, entrada stock)
+--   DetalleFacturaVenta.id_inventario → existencia (Producto+Almacen) descontada
+--
+-- --- Ubicación: sucursal + almacén ---
 CREATE TABLE Sucursal (
     id_sucursal INT PRIMARY KEY IDENTITY,
     id_direccion INT NOT NULL,
@@ -314,6 +372,7 @@ CREATE TABLE Almacen (
     CONSTRAINT uq_almacen_nombre_sucursal UNIQUE (id_sucursal, nombre),
 );
 
+-- Existencias por producto y almacén (pantalla Existencias / Ficha producto).
 CREATE TABLE Inventario (
     id_inventario INT PRIMARY KEY IDENTITY(1, 1),
     id_producto INT NOT NULL,
@@ -329,19 +388,7 @@ CREATE TABLE Inventario (
     CONSTRAINT uq_inv_producto_almacen UNIQUE (id_producto, id_almacen),
 );
 
-CREATE TABLE CosteoInventario (
-    id_costeo INT PRIMARY KEY IDENTITY(1, 1),
-    id_producto INT NOT NULL,
-    id_usuario INT NOT NULL,
-    costo_anterior DECIMAL(12, 2) NOT NULL,
-    costo_nuevo DECIMAL(12, 2) NOT NULL,
-    tipo_costeo VARCHAR(50) NOT NULL,
-    observacion VARCHAR(255),
-    fecha_costeo DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
-    CONSTRAINT fk_costeo_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto),
-    CONSTRAINT fk_costeo_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario),
-);
-
+-- --- Transferencias entre almacenes (FE: /inventario/transferencias) ---
 CREATE TABLE TransferenciaInventario (
     id_transferencia INT PRIMARY KEY IDENTITY(1, 1),
     codigo VARCHAR(30) NOT NULL UNIQUE,
@@ -401,6 +448,7 @@ CREATE TABLE DetalleRecepcionTransferencia (
     CONSTRAINT uq_det_recepcion_linea UNIQUE (id_recepcion, id_detalle_transferencia)
 );
 
+-- --- Conteo físico (FE: /inventario/conteos) ---
 CREATE TABLE ConteoInventario (
     id_conteo INT PRIMARY KEY IDENTITY(1, 1),
     codigo VARCHAR(30) NOT NULL UNIQUE,
@@ -472,8 +520,8 @@ CREATE TABLE ProductoAlcanceConteoInventario (
     CONSTRAINT uq_alcance_conteo_producto UNIQUE (id_conteo, id_producto)
 );
 
-GO
-    CREATE TABLE AjusteInventario (
+-- --- Ajustes de stock (FE: /inventario/ajustes) ---
+CREATE TABLE AjusteInventario (
         id_ajuste INT PRIMARY KEY IDENTITY(1, 1),
         codigo VARCHAR(30) NOT NULL UNIQUE,
         id_almacen INT NOT NULL,
@@ -510,6 +558,7 @@ CREATE TABLE DetalleAjusteInventario (
     CONSTRAINT uq_det_ajuste_producto UNIQUE (id_ajuste, id_producto),
 );
 
+-- --- Descarte / baja de mercancía (FE: /inventario/descartes) ---
 CREATE TABLE DescarteInventario (
     id_descarte INT PRIMARY KEY IDENTITY(1, 1),
     codigo VARCHAR(30) NOT NULL UNIQUE,
@@ -571,6 +620,8 @@ CREATE TABLE EvidenciaDescarteInventario (
     CONSTRAINT fk_evidencia_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario),
 );
 
+-- --- Kardex y trazabilidad (FE: /inventario/movimientos, /kardex, /auditoria) ---
+-- No hay tabla Kardex: MovimientoInventario es la fuente del kardex.
 CREATE TABLE MovimientoInventario (
     id_movimiento INT PRIMARY KEY IDENTITY(1, 1),
     id_inventario INT NOT NULL,
@@ -578,11 +629,18 @@ CREATE TABLE MovimientoInventario (
     id_almacen INT NOT NULL,
     id_usuario INT NOT NULL,
     tipo_movimiento VARCHAR(30) NOT NULL,
+    -- 'entrada', 'salida', 'ajuste', 'transferencia', 'venta', 'devolucion', 'compensacion'
     cantidad INT NOT NULL,
     saldo_anterior INT NOT NULL,
     saldo_posterior INT NOT NULL,
     documento_tipo VARCHAR(50) NOT NULL,
+    -- inventario: transferencia|ajuste|descarte|conteo|recepcion
+    -- ventas: venta|devolucion|compensacion|anulacion_venta
     documento_id INT NOT NULL,
+    id_factura_venta INT NULL,
+    -- FK → FacturaVenta (RELACIONES CRUZADAS); cuando documento_tipo es venta/postventa
+    id_detalle_factura INT NULL,
+    -- FK → DetalleFacturaVenta; trazabilidad por línea vendida
     motivo_codigo VARCHAR(50),
     observacion VARCHAR(255),
     fecha_movimiento DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
@@ -625,10 +683,13 @@ CREATE TABLE OperacionIdempotenteInventario (
     CONSTRAINT fk_operacion_idempotente_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario),
     CONSTRAINT chk_operacion_idempotente_estado CHECK (estado IN ('procesando', 'procesada', 'fallida'))
 );
+-- Evita doble despacho/recepción de la misma transferencia (POST idempotente).
 
+-- Fin MODULO INVENTARIO
 -- =============================================
 -- MODULO IMPORTACIONES / EMBARQUES
 -- =============================================
+-- FE: módulo importaciones (embarques internacionales → Consolidacion → Almacen).
 CREATE TABLE Embarque (
     id_embarque INT PRIMARY KEY IDENTITY,
     codigo_embarque VARCHAR(50) NOT NULL UNIQUE,
@@ -718,76 +779,9 @@ CREATE TABLE Consolidacion (
 );
 
 -- =============================================
--- MODULO TRANSFERENCIAS
--- =============================================
-CREATE TABLE TipoTransferencia (
-    id_tipo_transferencia INT PRIMARY KEY IDENTITY,
-    nombre VARCHAR(100) NOT NULL,
-    -- 'Sucursal', 'Descarte', 'Oferta', 'Despacho', 'Al por mayor', 'Contado'
-    descripcion VARCHAR(255),
-    aplica_a VARCHAR(50),
-    -- 'Almacen', 'Sucursal', 'Ambos'
-    estado VARCHAR(20) NOT NULL DEFAULT 'Activo'
-);
-
-CREATE TABLE Transferencia (
-    id_transferencia INT PRIMARY KEY IDENTITY,
-    codigo_transferencia VARCHAR(50) NOT NULL UNIQUE,
-    id_tipo_transferencia INT NOT NULL,
-    id_almacen_origen INT NOT NULL,
-    id_almacen_destino INT NOT NULL,
-    id_usuario_solicita INT NOT NULL,
-    motivo VARCHAR(255),
-    estado VARCHAR(50) NOT NULL DEFAULT 'Pendiente',
-    -- 'Pendiente', 'En Tránsito', 'Recibido', 'Cancelado'
-    fecha_solicitud DATETIME NOT NULL DEFAULT GETDATE(),
-    fecha_despacho DATETIME,
-    observacion VARCHAR(255),
-    CONSTRAINT fk_tr_tipo FOREIGN KEY (id_tipo_transferencia) REFERENCES TipoTransferencia(id_tipo_transferencia),
-    CONSTRAINT fk_tr_origen FOREIGN KEY (id_almacen_origen) REFERENCES Almacen(id_almacen),
-    CONSTRAINT fk_tr_destino FOREIGN KEY (id_almacen_destino) REFERENCES Almacen(id_almacen),
-    CONSTRAINT chk_tr_almacen CHECK (id_almacen_origen <> id_almacen_destino)
-);
-
-CREATE TABLE DetalleTransferencia (
-    id_detalle_transferencia INT PRIMARY KEY IDENTITY,
-    id_transferencia INT NOT NULL,
-    id_producto INT NOT NULL,
-    cantidad_solicitada INT NOT NULL,
-    cantidad_despachada INT NOT NULL DEFAULT 0,
-    observacion VARCHAR(255),
-    CONSTRAINT fk_dt_transferencia FOREIGN KEY (id_transferencia) REFERENCES Transferencia(id_transferencia),
-    CONSTRAINT fk_dt_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto)
-);
-
-CREATE TABLE RecibimientoTransferencias (
-    id_recibimiento INT PRIMARY KEY IDENTITY,
-    id_transferencia INT NOT NULL,
-    id_almacen_receptor INT NOT NULL,
-    id_usuario_recibe INT NOT NULL,
-    estado VARCHAR(50) NOT NULL DEFAULT 'Recibido',
-    -- 'Recibido', 'Recibido Parcial', 'Rechazado'
-    observacion VARCHAR(255),
-    fecha_recibimiento DATETIME NOT NULL DEFAULT GETDATE(),
-    CONSTRAINT fk_rt_transferencia FOREIGN KEY (id_transferencia) REFERENCES Transferencia(id_transferencia),
-    CONSTRAINT fk_rt_almacen FOREIGN KEY (id_almacen_receptor) REFERENCES Almacen(id_almacen)
-);
-
-CREATE TABLE DetalleRecibimientoMercancia (
-    id_detalle_recibimiento INT PRIMARY KEY IDENTITY,
-    id_recibimiento INT NOT NULL,
-    id_producto INT NOT NULL,
-    cantidad_esperada INT NOT NULL,
-    cantidad_recibida INT NOT NULL,
-    cantidad_con_dano INT NOT NULL DEFAULT 0,
-    observacion VARCHAR(255),
-    CONSTRAINT fk_drm_recibimiento FOREIGN KEY (id_recibimiento) REFERENCES RecibimientoTransferencias(id_recibimiento),
-    CONSTRAINT fk_drm_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto)
-);
-
--- =============================================
 -- MODULO COMPRAS Y FINANCIERO
 -- =============================================
+-- FE: /compras (órdenes, recepciones, facturas proveedor, CxP).
 CREATE TABLE OrdenCompra (
     id_orden_compra INT PRIMARY KEY IDENTITY,
     codigo_orden VARCHAR(50) NOT NULL UNIQUE,
@@ -881,10 +875,15 @@ CREATE TABLE CuentasPorPagar (
 CREATE TABLE CuentasPorCobrar (
     id_cuenta_cobrar INT PRIMARY KEY IDENTITY,
     id_referencia INT NOT NULL,
-    -- ID de la venta o pedido
+    -- ID de la venta o pedido (legacy; preferir id_factura_venta)
     tipo_referencia VARCHAR(50) NOT NULL,
     -- 'Venta', 'Pedido', 'Transferencia'
+    id_persona INT NULL,
+    -- Cliente → Persona (FK en RELACIONES CRUZADAS)
+    id_factura_venta INT NULL,
+    -- Venta origen → FacturaVenta (FK en RELACIONES CRUZADAS)
     cliente VARCHAR(150) NOT NULL,
+    -- snapshot nombre cliente al emitir
     monto_total DECIMAL(12, 2) NOT NULL,
     monto_cobrado DECIMAL(12, 2) NOT NULL DEFAULT 0,
     monto_pendiente AS (monto_total - monto_cobrado),
@@ -897,12 +896,239 @@ CREATE TABLE CuentasPorCobrar (
     fecha_registro DATETIME NOT NULL DEFAULT GETDATE()
 );
 
+-- =============================================
+-- MODULO VENTAS
+-- =============================================
+-- Frontend: modules/ventas + GET/POST /api/v1/ventas/*
+-- Backend: bootstrap/mountVentas.js (DDD; seed in-memory hasta persistencia SQL).
+-- Cliente registrado → Persona.id_persona. Mostrador → id_persona NULL.
+-- NOTA_CREDITO no es FormaPago; se aplica como documento en PagoFactura.id_nota_credito.
+-- Formas de cobro → PagoFactura.forma_pago (slug) + lib/formasPago.js
+--
+-- Persona (cliente) ── FacturaVenta ──┬── DetalleFacturaVenta ── Producto
+--                                     │         └── Inventario (existencia descontada)
+--                                     ├── PagoFactura ── Moneda
+--                                     ├── HistorialFacturaVenta
+--                                     ├── CambioFactura ── DetalleCambioFactura ── Producto / Inventario
+--                                     ├── DevolucionFactura ── DetalleDevolucionFactura ── Producto / Inventario
+--                                     ├── NotaCredito ── AplicacionNotaCredito
+--                                     └── MovimientoInventario (kardex: salida/entrada stock)
+-- Almacen + Sucursal + Usuario + Moneda en cabecera FacturaVenta
+-- SecuenciaFacturaVenta / SecuenciaNotaCredito: numeración por sucursal / global NC
+
+CREATE TABLE SecuenciaFacturaVenta (
+    id_secuencia INT PRIMARY KEY IDENTITY,
+    id_sucursal INT NOT NULL UNIQUE,
+    ultimo_numero INT NOT NULL DEFAULT 1000,
+    CONSTRAINT fk_sfv_sucursal FOREIGN KEY (id_sucursal) REFERENCES Sucursal(id_sucursal)
+);
+
+CREATE TABLE SecuenciaNotaCredito (
+    id_secuencia TINYINT NOT NULL PRIMARY KEY DEFAULT 1,
+    ultimo_numero INT NOT NULL DEFAULT 0,
+    CONSTRAINT chk_snc_singleton CHECK (id_secuencia = 1)
+);
+
+CREATE TABLE FacturaVenta (
+    id_factura INT PRIMARY KEY IDENTITY,
+    codigo_dominio VARCHAR(50) NOT NULL UNIQUE,
+    numero_factura VARCHAR(50) NOT NULL UNIQUE,
+    estado VARCHAR(20) NOT NULL DEFAULT 'emitida',
+    -- 'emitida', 'anulada'
+    tipo_venta VARCHAR(30) NOT NULL,
+    -- 'consumidor_final', 'cliente_registrado'
+    id_persona INT,
+    id_sucursal INT NOT NULL,
+    id_almacen INT NOT NULL,
+    id_usuario_emision INT NOT NULL,
+    id_moneda INT NOT NULL,
+    fecha_emision DATETIME NOT NULL DEFAULT GETDATE(),
+    subtotal DECIMAL(12, 2) NOT NULL,
+    total_descuentos DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    total DECIMAL(12, 2) NOT NULL,
+    version INT NOT NULL DEFAULT 1,
+    tiene_cambios BIT NOT NULL DEFAULT 0,
+    tiene_devoluciones BIT NOT NULL DEFAULT 0,
+    tiene_notas_credito BIT NOT NULL DEFAULT 0,
+    motivo_anulacion VARCHAR(255),
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_fv_persona FOREIGN KEY (id_persona) REFERENCES Persona(id_persona),
+    CONSTRAINT fk_fv_sucursal FOREIGN KEY (id_sucursal) REFERENCES Sucursal(id_sucursal),
+    CONSTRAINT fk_fv_almacen FOREIGN KEY (id_almacen) REFERENCES Almacen(id_almacen),
+    CONSTRAINT fk_fv_usuario FOREIGN KEY (id_usuario_emision) REFERENCES Usuario(id_usuario),
+    CONSTRAINT fk_fv_moneda FOREIGN KEY (id_moneda) REFERENCES Moneda(id_moneda),
+    CONSTRAINT chk_fv_cliente_registrado CHECK (
+        tipo_venta <> 'cliente_registrado' OR id_persona IS NOT NULL
+    )
+);
+
+CREATE TABLE DetalleFacturaVenta (
+    id_detalle INT PRIMARY KEY IDENTITY,
+    id_factura INT NOT NULL,
+    codigo_dominio VARCHAR(50) NOT NULL,
+    id_producto INT NOT NULL,
+    id_inventario INT NULL,
+    -- existencia (Producto+Almacen) afectada al emitir; FK → Inventario
+    descripcion_snapshot VARCHAR(255) NOT NULL,
+    cantidad INT NOT NULL,
+    precio_unitario DECIMAL(12, 2) NOT NULL,
+    descuento_tipo VARCHAR(20),
+    -- 'monto', 'porcentaje'
+    descuento_valor DECIMAL(12, 2),
+    importe_neto DECIMAL(12, 2) NOT NULL,
+    CONSTRAINT fk_dfv_factura FOREIGN KEY (id_factura) REFERENCES FacturaVenta(id_factura),
+    CONSTRAINT fk_dfv_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto),
+    CONSTRAINT fk_dfv_inventario FOREIGN KEY (id_inventario) REFERENCES Inventario(id_inventario)
+);
+
+CREATE TABLE PagoFactura (
+    id_pago INT PRIMARY KEY IDENTITY,
+    id_factura INT NOT NULL,
+    codigo_dominio VARCHAR(50) NOT NULL,
+    forma_pago VARCHAR(30) NOT NULL,
+    -- slug: efectivo, tarjeta, transferencia… (lib/formasPago.js)
+    monto DECIMAL(12, 2) NOT NULL,
+    id_moneda INT NOT NULL,
+    id_nota_credito INT NULL,
+    -- NC aplicada como medio de pago (FK → NotaCredito en RELACIONES CRUZADAS)
+    vuelto DECIMAL(12, 2),
+    CONSTRAINT fk_pf_factura FOREIGN KEY (id_factura) REFERENCES FacturaVenta(id_factura),
+    CONSTRAINT fk_pf_moneda FOREIGN KEY (id_moneda) REFERENCES Moneda(id_moneda)
+);
+
+CREATE TABLE HistorialFacturaVenta (
+    id_historial INT PRIMARY KEY IDENTITY,
+    id_factura INT NOT NULL,
+    codigo_dominio VARCHAR(50) NOT NULL,
+    tipo_evento VARCHAR(50) NOT NULL,
+    id_usuario INT NOT NULL,
+    fecha DATETIME NOT NULL DEFAULT GETDATE(),
+    resultado VARCHAR(20) NOT NULL,
+    detalle VARCHAR(500),
+    CONSTRAINT fk_hfv_factura FOREIGN KEY (id_factura) REFERENCES FacturaVenta(id_factura),
+    CONSTRAINT fk_hfv_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario)
+);
+
+CREATE TABLE CambioFactura (
+    id_cambio INT PRIMARY KEY IDENTITY,
+    id_factura INT NOT NULL,
+    codigo_dominio VARCHAR(50) NOT NULL,
+    fecha DATETIME NOT NULL DEFAULT GETDATE(),
+    id_usuario INT NOT NULL,
+    diferencia_monto DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    id_moneda INT NOT NULL,
+    resolucion VARCHAR(50) NOT NULL,
+    CONSTRAINT fk_cf_factura FOREIGN KEY (id_factura) REFERENCES FacturaVenta(id_factura),
+    CONSTRAINT fk_cf_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario),
+    CONSTRAINT fk_cf_moneda FOREIGN KEY (id_moneda) REFERENCES Moneda(id_moneda)
+);
+
+CREATE TABLE DetalleCambioFactura (
+    id_detalle_cambio INT PRIMARY KEY IDENTITY,
+    id_cambio INT NOT NULL,
+    tipo_linea VARCHAR(20) NOT NULL,
+    -- 'devuelta', 'nueva'
+    id_producto INT NOT NULL,
+    id_inventario INT NULL,
+    -- existencia afectada (entrada devuelta / salida nueva)
+    cantidad INT NOT NULL,
+    precio_unitario DECIMAL(12, 2),
+    descripcion_snapshot VARCHAR(255),
+    CONSTRAINT fk_dcf_cambio FOREIGN KEY (id_cambio) REFERENCES CambioFactura(id_cambio),
+    CONSTRAINT fk_dcf_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto),
+    CONSTRAINT fk_dcf_inventario FOREIGN KEY (id_inventario) REFERENCES Inventario(id_inventario)
+);
+
+CREATE TABLE DevolucionFactura (
+    id_devolucion INT PRIMARY KEY IDENTITY,
+    id_factura INT NOT NULL,
+    codigo_dominio VARCHAR(50) NOT NULL,
+    fecha DATETIME NOT NULL DEFAULT GETDATE(),
+    id_usuario INT NOT NULL,
+    aptitud_reingreso VARCHAR(50) NOT NULL,
+    compensacion VARCHAR(50) NOT NULL,
+    monto_compensacion DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    id_moneda INT NOT NULL,
+    CONSTRAINT fk_devf_factura FOREIGN KEY (id_factura) REFERENCES FacturaVenta(id_factura),
+    CONSTRAINT fk_devf_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario),
+    CONSTRAINT fk_devf_moneda FOREIGN KEY (id_moneda) REFERENCES Moneda(id_moneda)
+);
+
+CREATE TABLE DetalleDevolucionFactura (
+    id_detalle_devolucion INT PRIMARY KEY IDENTITY,
+    id_devolucion INT NOT NULL,
+    id_producto INT NOT NULL,
+    id_inventario INT NULL,
+    -- existencia donde reingresa la mercancía devuelta
+    cantidad INT NOT NULL,
+    CONSTRAINT fk_ddf_devolucion FOREIGN KEY (id_devolucion) REFERENCES DevolucionFactura(id_devolucion),
+    CONSTRAINT fk_ddf_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto),
+    CONSTRAINT fk_ddf_inventario FOREIGN KEY (id_inventario) REFERENCES Inventario(id_inventario)
+);
+
+CREATE TABLE NotaCredito (
+    id_nota_credito INT PRIMARY KEY IDENTITY,
+    codigo_dominio VARCHAR(50) NOT NULL UNIQUE,
+    id_factura_origen INT NOT NULL,
+    id_persona INT NOT NULL,
+    fecha DATETIME NOT NULL DEFAULT GETDATE(),
+    id_usuario INT NOT NULL,
+    monto DECIMAL(12, 2) NOT NULL,
+    id_moneda INT NOT NULL,
+    motivo VARCHAR(255) NOT NULL,
+    estado VARCHAR(30) NOT NULL DEFAULT 'activa',
+    monto_aplicado DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    CONSTRAINT fk_nc_factura FOREIGN KEY (id_factura_origen) REFERENCES FacturaVenta(id_factura),
+    CONSTRAINT fk_nc_persona FOREIGN KEY (id_persona) REFERENCES Persona(id_persona),
+    CONSTRAINT fk_nc_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(id_usuario),
+    CONSTRAINT fk_nc_moneda FOREIGN KEY (id_moneda) REFERENCES Moneda(id_moneda)
+);
+
+CREATE TABLE AplicacionNotaCredito (
+    id_aplicacion INT PRIMARY KEY IDENTITY,
+    id_nota_credito INT NOT NULL,
+    id_factura_destino INT NOT NULL,
+    monto_aplicado DECIMAL(12, 2) NOT NULL,
+    fecha DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_anc_nc FOREIGN KEY (id_nota_credito) REFERENCES NotaCredito(id_nota_credito),
+    CONSTRAINT fk_anc_factura FOREIGN KEY (id_factura_destino) REFERENCES FacturaVenta(id_factura)
+);
+
+-- =============================================
+-- RELACIONES CRUZADAS (Ventas ↔ Inventario ↔ Personas)
+-- =============================================
+-- FK diferidas: tablas creadas en distinto orden dentro del script.
+-- Ejecutar en el mismo batch después de MODULO VENTAS.
+
+-- Cliente → sucursal preferida
+ALTER TABLE Persona ADD CONSTRAINT fk_persona_sucursal_pref
+    FOREIGN KEY (id_sucursal_preferida) REFERENCES Sucursal(id_sucursal);
+
+-- Kardex → factura y línea vendida
+ALTER TABLE MovimientoInventario ADD CONSTRAINT fk_mov_factura_venta
+    FOREIGN KEY (id_factura_venta) REFERENCES FacturaVenta(id_factura);
+
+ALTER TABLE MovimientoInventario ADD CONSTRAINT fk_mov_detalle_factura
+    FOREIGN KEY (id_detalle_factura) REFERENCES DetalleFacturaVenta(id_detalle);
+
+-- Cuentas por cobrar → cliente y factura
+ALTER TABLE CuentasPorCobrar ADD CONSTRAINT fk_cpc_persona
+    FOREIGN KEY (id_persona) REFERENCES Persona(id_persona);
+
+ALTER TABLE CuentasPorCobrar ADD CONSTRAINT fk_cpc_factura_venta
+    FOREIGN KEY (id_factura_venta) REFERENCES FacturaVenta(id_factura);
+
+-- Pago con nota de crédito aplicada
+ALTER TABLE PagoFactura ADD CONSTRAINT fk_pf_nota_credito
+    FOREIGN KEY (id_nota_credito) REFERENCES NotaCredito(id_nota_credito);
+
 -- Fin Modulos Financieros
 -- Bloque Siguiente
 -- Espacio Registro de Personas o Entidades Comerciales -----------------------------------------------------------------------
 -- =============================================
 -- MODULO EVENTOS
 -- =============================================
+-- FE: /eventos — ferias, firmas, talleres. Material = utensilios, NO libros.
 CREATE TABLE Evento (
     id_evento INT PRIMARY KEY IDENTITY,
     nombre VARCHAR(200) NOT NULL,
@@ -928,6 +1154,7 @@ CREATE TABLE Evento (
     CONSTRAINT chk_ev_fechas CHECK (fecha_fin >= fecha_inicio)
 );
 
+-- Utensilios/materiales de evento (FE: /api/eventos/materiales). No es inventario de libros.
 CREATE TABLE Material (
     id_material INT PRIMARY KEY IDENTITY,
     nombre VARCHAR(150) NOT NULL,
@@ -1017,8 +1244,6 @@ CREATE TABLE DetalleProveedorEvento (
     CONSTRAINT fk_dpe_material FOREIGN KEY (id_material) REFERENCES Material(id_material)
 );
 
--- Apartado de Facturacion de Productos
--- CREATE TABLE Factura () CREATE TABLE DetalleFactura ();
 -- ======================================================
 -- SECCION DE INDICES PARA OPTIMIZACION DE CONSULTAS
 -- ======================================================
@@ -1034,9 +1259,26 @@ CREATE INDEX ix_movimiento_tipo_fecha ON MovimientoInventario(
     fecha_movimiento DESC
 );
 
+CREATE INDEX ix_factura_venta_fecha ON FacturaVenta(fecha_emision DESC);
+
+CREATE INDEX ix_factura_venta_sucursal ON FacturaVenta(id_sucursal, fecha_emision DESC);
+
+CREATE INDEX ix_factura_venta_cliente ON FacturaVenta(id_persona, fecha_emision DESC);
+
+CREATE INDEX ix_nota_credito_persona ON NotaCredito(id_persona, estado);
+
+CREATE INDEX ix_movimiento_factura_venta ON MovimientoInventario(id_factura_venta, fecha_movimiento DESC);
+
+CREATE INDEX ix_detalle_factura_producto ON DetalleFacturaVenta(id_producto, id_factura);
+
+CREATE INDEX ix_persona_sucursal_pref ON Persona(id_sucursal_preferida);
+
 -- ======================================================
--- DATOS DE PRUEBAS PARA EL SISTEMA.
+-- DATOS DE PRUEBAS PARA EL SISTEMA
 -- ======================================================
+-- Semilla demo + Joselito. Orden respetando FK (padres antes que hijos).
+--
+-- === BLOQUE 1: Contacto y configuración ===
 -- Tabla: TipoTelefono
 -- Depende de: ninguna
 INSERT INTO
@@ -1106,7 +1348,7 @@ VALUES
     ('Brasil', 'BRA', '+55', 'BRL', 'Activo');
 
 -- Tabla: Moneda
--- Depende de: ninguna
+-- Depende de: ninguna | API: GET /api/monedas | Joselito: 12 monedas, DOP predeterminada
 INSERT INTO
     Moneda (codigo_iso, simbolo, nombre, estado, es_predeterminada)
 VALUES
@@ -1166,7 +1408,7 @@ INNER JOIN Moneda mo ON mo.codigo_iso = v.origen
 INNER JOIN Moneda md ON md.codigo_iso = 'DOP';
 
 -- Tabla: FormaPago
--- Depende de: ninguna (NOTA_CREDITO no es forma de pago; ver Ventas)
+-- Depende de: ninguna | API: GET /api/formas-pago | 9 activas (sin NOTA_CREDITO)
 INSERT INTO
     FormaPago (codigo, slug, nombre, estado)
 VALUES
@@ -1247,6 +1489,7 @@ VALUES
     ),
     ('Oficina', 'Dirección administrativa', 'Activo');
 
+-- === BLOQUE 2: Personas, roles, usuarios, proveedores ===
 -- Tabla: Persona
 -- Depende de: ninguna
 -- Clientes: Persona con tipo_cliente (excluir Usuario/Proveedor en consultas API)
@@ -2100,74 +2343,8 @@ VALUES
         'Consolidado regional'
     );
 
--- Tabla: TipoTransferencia
--- Depende de: ninguna
-INSERT INTO
-    TipoTransferencia (nombre, descripcion, aplica_a, estado)
-VALUES
-    (
-        'Reposición Sucursal',
-        'Del almacén central a sucursales',
-        'Sucursal',
-        'Activo'
-    ),
-    (
-        'Descarte',
-        'Movimiento hacia almacén de descarte',
-        'Almacen',
-        'Activo'
-    ),
-    (
-        'Oferta',
-        'Traslado de productos para descuentos',
-        'Ambos',
-        'Activo'
-    ),
-    (
-        'Despacho al por mayor',
-        'Movimiento para venta mayorista',
-        'Ambos',
-        'Activo'
-    ),
-    (
-        'Devolución',
-        'Retorno al almacén central',
-        'Ambos',
-        'Activo'
-    ),
-    (
-        'Importación',
-        'Movimiento desde zona franca',
-        'Almacen',
-        'Activo'
-    ),
-    (
-        'Evento',
-        'Traslado al almacén de eventos',
-        'Ambos',
-        'Activo'
-    ),
-    (
-        'Reubicación',
-        'Cambio de ubicación interna',
-        'Almacen',
-        'Activo'
-    ),
-    (
-        'Préstamo',
-        'Préstamo temporal entre sucursales',
-        'Sucursal',
-        'Activo'
-    ),
-    (
-        'Consignación',
-        'Mercancía bajo consignación',
-        'Ambos',
-        'Activo'
-    );
-
 -- Tabla: CuentasPorCobrar
--- Depende de: ninguna
+-- Depende de: Persona (id_persona), FacturaVenta (id_factura_venta) — opcionales
 INSERT INTO
     CuentasPorCobrar (
         id_referencia,
@@ -2397,7 +2574,7 @@ VALUES
     );
 
 -- ===========================================================
--- NIVEL 1: TABLAS CUYOS PADRES YA FUERON INSERTADOS
+-- NIVEL 1: Hijos de catálogos base (Teléfono, Ciudad, Rol, Usuario…)
 -- ===========================================================
 -- Tabla: Telefono
 -- Depende de: TipoTelefono
@@ -2442,6 +2619,7 @@ VALUES
     (5, 'Londres', 'SW1A1AA', 'Activo'),
     (6, 'Ciudad de México', '06000', 'Activo');
 
+-- === BLOQUE 2 (continúa en NIVEL 1): Roles y usuarios Joselito ===
 -- Tabla: Rol
 -- Depende de: ninguna (Usuario.rol = Rol.slug)
 INSERT INTO
@@ -2766,6 +2944,7 @@ VALUES
         'Activo'
     );
 
+-- === BLOQUE 3: Catálogo libros (Autor → Editorial → Categoría → Producto) ===
 -- Tabla: Producto
 -- Depende de: Autor, CategoriaProducto, Editorial
 INSERT INTO
@@ -3234,7 +3413,7 @@ VALUES
     );
 
 -- ===========================================================
--- NIVEL 2: TABLAS CUYOS PADRES YA FUERON INSERTADOS
+-- NIVEL 2: Direcciones y vínculos Persona ↔ contacto
 -- ===========================================================
 -- Tabla: Direccion
 -- Depende de: Ciudad, TipoDireccion
@@ -3388,85 +3567,6 @@ VALUES
 (8, 8),
 (9, 9),
 (10, 10);
-
--- Tabla: CosteoInventario
--- Depende de: Producto, Usuario
-INSERT INTO
-    CosteoInventario (
-        id_producto,
-        id_usuario,
-        costo_anterior,
-        costo_nuevo,
-        tipo_costeo,
-        observacion
-    )
-VALUES
-    (
-        1,
-        1,
-        1050,
-        1100,
-        'Promedio ponderado',
-        'Actualización por nueva recepción'
-    ),
-    (
-        2,
-        2,
-        850,
-        900,
-        'Promedio ponderado',
-        'Variación de costo internacional'
-    ),
-    (
-        3,
-        3,
-        825,
-        875,
-        'Última compra',
-        'Costo de la orden más reciente'
-    ),
-    (
-        4,
-        4,
-        600,
-        625,
-        'Promedio ponderado',
-        'Ajuste por flete local'
-    ),
-    (5, 5, 650, 675, 'Estándar', 'Revisión trimestral'),
-    (
-        6,
-        1,
-        900,
-        950,
-        'Última compra',
-        'Nueva edición importada'
-    ),
-    (
-        7,
-        2,
-        760,
-        800,
-        'Promedio ponderado',
-        'Recepción parcial'
-    ),
-    (8, 3, 950, 1000, 'Estándar', 'Actualización anual'),
-    (
-        9,
-        4,
-        450,
-        500,
-        'Promedio ponderado',
-        'Ajuste de importación'
-    ),
-    (
-        10,
-        5,
-        925,
-        975,
-        'Última compra',
-        'Nueva factura de proveedor'
-    );
 
 -- Tabla: OperacionIdempotenteInventario
 -- Depende de: Usuario
@@ -3634,7 +3734,7 @@ VALUES
     (10, 10, 'Inferno', 30, 16.50, 495, 0, 'En tránsito');
 
 -- ===========================================================
--- NIVEL 3: TABLAS CUYOS PADRES YA FUERON INSERTADOS
+-- NIVEL 3: Persona ↔ Dirección; detalle facturas importación
 -- ===========================================================
 -- Tabla: Persona_Tiene_Direccion
 -- Depende de: Direccion, Persona
@@ -3768,7 +3868,7 @@ VALUES
     );
 
 -- ===========================================================
--- NIVEL 4: TABLAS CUYOS PADRES YA FUERON INSERTADOS
+-- NIVEL 4: Sucursales, almacenes, eventos (requieren Direccion)
 -- ===========================================================
 -- Tabla: Almacen
 -- Depende de: Sucursal
@@ -4067,7 +4167,8 @@ VALUES
     );
 
 -- ===========================================================
--- NIVEL 5: TABLAS CUYOS PADRES YA FUERON INSERTADOS
+-- NIVEL 5: INVENTARIO — stock, transferencias, conteos, ajustes, descartes
+-- (API /api/inventario; FE modules/inventario)
 -- ===========================================================
 -- Tabla: Inventario
 -- Depende de: Almacen, Producto
@@ -4976,143 +5077,6 @@ VALUES
         'Consolidado'
     );
 
--- Tabla: Transferencia
--- Depende de: Almacen, TipoTransferencia, Usuario
-INSERT INTO
-    Transferencia (
-        codigo_transferencia,
-        id_tipo_transferencia,
-        id_almacen_origen,
-        id_almacen_destino,
-        id_usuario_solicita,
-        motivo,
-        estado,
-        fecha_solicitud,
-        fecha_despacho,
-        observacion
-    )
-VALUES
-    (
-        'TRF-001',
-        1,
-        1,
-        2,
-        1,
-        'Reposición Santiago',
-        'Recibido',
-        '2026-04-01',
-        '2026-04-02',
-        'Completa'
-    ),
-    (
-        'TRF-002',
-        1,
-        1,
-        4,
-        2,
-        'Reposición La Romana',
-        'Recibido',
-        '2026-04-03',
-        '2026-04-04',
-        'Completa'
-    ),
-    (
-        'TRF-003',
-        2,
-        1,
-        3,
-        3,
-        'Productos dañados',
-        'Recibido',
-        '2026-04-05',
-        '2026-04-06',
-        'Descarte'
-    ),
-    (
-        'TRF-004',
-        3,
-        1,
-        2,
-        4,
-        'Campaña de descuentos',
-        'En Tránsito',
-        '2026-04-07',
-        '2026-04-08',
-        'Oferta'
-    ),
-    (
-        'TRF-005',
-        4,
-        1,
-        7,
-        5,
-        'Pedido mayorista',
-        'Pendiente',
-        '2026-04-09',
-        NULL,
-        'Pendiente'
-    ),
-    (
-        'TRF-006',
-        5,
-        4,
-        1,
-        6,
-        'Devolución de excedentes',
-        'Recibido',
-        '2026-04-10',
-        '2026-04-11',
-        'Completa'
-    ),
-    (
-        'TRF-007',
-        6,
-        5,
-        1,
-        7,
-        'Ingreso importación',
-        'Recibido',
-        '2026-04-12',
-        '2026-04-13',
-        'Completa'
-    ),
-    (
-        'TRF-008',
-        7,
-        1,
-        8,
-        8,
-        'Material de evento',
-        'En Tránsito',
-        '2026-04-14',
-        '2026-04-15',
-        'Evento'
-    ),
-    (
-        'TRF-009',
-        9,
-        2,
-        4,
-        9,
-        'Préstamo temporal',
-        'Pendiente',
-        '2026-04-16',
-        NULL,
-        'Pendiente'
-    ),
-    (
-        'TRF-010',
-        10,
-        1,
-        6,
-        10,
-        'Consignación regional',
-        'Pendiente',
-        '2026-04-18',
-        NULL,
-        'Pendiente'
-    );
-
 -- Tabla: OrdenCompra
 -- Depende de: Almacen, Usuario
 INSERT INTO
@@ -5497,7 +5461,7 @@ VALUES
     );
 
 -- ===========================================================
--- NIVEL 6: TABLAS CUYOS PADRES YA FUERON INSERTADOS
+-- NIVEL 6: Detalle transferencias; editoriales/proveedores en eventos
 -- ===========================================================
 -- Tabla: DetalleTransferenciaInventario
 -- Depende de: Producto, TransferenciaInventario
@@ -5823,50 +5787,6 @@ VALUES
         'Ajuste positivo'
     );
 
--- Tabla: DetalleTransferencia
--- Depende de: Producto, Transferencia
-INSERT INTO
-    DetalleTransferencia (
-        id_transferencia,
-        id_producto,
-        cantidad_solicitada,
-        cantidad_despachada,
-        observacion
-    )
-VALUES
-    (1, 1, 5, 5, 'Completo'),
-(2, 2, 4, 4, 'Completo'),
-(3, 3, 2, 2, 'Dañados'),
-    (4, 4, 8, 8, 'En tránsito'),
-(5, 5, 10, 0, 'Pendiente'),
-(6, 6, 3, 3, 'Devuelto'),
-    (7, 7, 12, 12, 'Importación'),
-(8, 8, 6, 6, 'Evento'),
-(9, 9, 5, 0, 'Pendiente'),
-(10, 10, 7, 0, 'Pendiente');
-
--- Tabla: RecibimientoTransferencias
--- Depende de: Almacen, Transferencia, Usuario
-INSERT INTO
-    RecibimientoTransferencias (
-        id_transferencia,
-        id_almacen_receptor,
-        id_usuario_recibe,
-        estado,
-        observacion
-    )
-VALUES
-    (1, 2, 2, 'Recibido', 'Completo'),
-    (2, 4, 4, 'Recibido', 'Completo'),
-    (3, 3, 3, 'Recibido', 'Registrado'),
-    (4, 2, 2, 'Recibido Parcial', 'En proceso'),
-    (5, 7, 7, 'Rechazado', 'Aún no despachado'),
-    (6, 1, 1, 'Recibido', 'Devolución'),
-    (7, 1, 1, 'Recibido', 'Importación'),
-    (8, 8, 6, 'Recibido Parcial', 'Evento'),
-    (9, 4, 4, 'Rechazado', 'Pendiente'),
-    (10, 6, 6, 'Rechazado', 'Pendiente');
-
 -- Tabla: DetalleOrdenCompra
 -- Depende de: OrdenCompra, Producto
 INSERT INTO
@@ -6165,7 +6085,7 @@ VALUES
     );
 
 -- ===========================================================
--- NIVEL 7: TABLAS CUYOS PADRES YA FUERON INSERTADOS
+-- NIVEL 7: Recepciones transferencia; líneas conteo; compras (OC)
 -- ===========================================================
 -- Tabla: DetalleRecepcionTransferencia
 -- Depende de: DetalleTransferenciaInventario, RecepcionTransferencia
@@ -6486,29 +6406,6 @@ VALUES
         'Conteo aprobado'
     );
 
--- Tabla: DetalleRecibimientoMercancia
--- Depende de: Producto, RecibimientoTransferencias
-INSERT INTO
-    DetalleRecibimientoMercancia (
-        id_recibimiento,
-        id_producto,
-        cantidad_esperada,
-        cantidad_recibida,
-        cantidad_con_dano,
-        observacion
-    )
-VALUES
-    (1, 1, 5, 5, 0, 'Completo'),
-(2, 2, 4, 4, 0, 'Completo'),
-(3, 3, 2, 2, 2, 'Dañados'),
-    (4, 4, 8, 6, 0, 'Parcial'),
-(5, 5, 10, 0, 0, 'No recibido'),
-(6, 6, 3, 3, 0, 'Completo'),
-    (7, 7, 12, 12, 0, 'Completo'),
-(8, 8, 6, 4, 1, 'Parcial'),
-(9, 9, 5, 0, 0, 'Pendiente'),
-(10, 10, 7, 0, 0, 'Pendiente');
-
 -- Tabla: DetalleRecepcionOrdenCompra
 -- Depende de: Producto, RecepcionOrdenCompra
 INSERT INTO
@@ -6638,7 +6535,7 @@ VALUES
     );
 
 -- ===========================================================
--- NIVEL 8: TABLAS CUYOS PADRES YA FUERON INSERTADOS
+-- NIVEL 8: Detalle ajustes/descartes; CxP (hijos finales)
 -- ===========================================================
 -- Tabla: DetalleAjusteInventario
 -- Depende de: AjusteInventario, DetalleConteoInventario, Producto

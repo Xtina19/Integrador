@@ -14,6 +14,7 @@ import { trim } from '@/utils/formValidation'
 import { productosApi } from '@/services/api/productosApi'
 import { categoriasApi } from '@/services/api/categoriasApi'
 import { editorialesApi } from '@/services/api/editorialesApi'
+import { autoresApi } from '@/services/api/autoresApi'
 import { getFriendlyErrorMessage } from '@/services/http'
 import { useToast } from '@/context/ToastContext'
 import { formatMoney } from '@/lib/money'
@@ -24,6 +25,7 @@ type Product = {
   isbn: string
   title: string
   author: string
+  authorId: string
   category: string
   categoryId: string
   publisher: string
@@ -51,6 +53,7 @@ export function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<CatalogOption[]>([])
   const [publishers, setPublishers] = useState<CatalogOption[]>([])
+  const [authors, setAuthors] = useState<CatalogOption[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('all')
@@ -62,6 +65,7 @@ export function AdminProducts() {
     isbn: '',
     title: '',
     author: '',
+    authorId: '',
     categoryId: '',
     publisherId: '',
     price: '',
@@ -72,16 +76,37 @@ export function AdminProducts() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [list, cats, pubs] = await Promise.all([
+      const [productsRes, catsRes, pubsRes, autsRes] = await Promise.allSettled([
         productosApi.list({ q: search || undefined }),
         categoriasApi.list(),
         editorialesApi.list(),
+        autoresApi.list(),
       ])
-      setProducts(list as Product[])
-      setCategories((cats as CatalogOption[]).map((c) => ({ id: c.id, name: c.name })))
-      setPublishers((pubs as CatalogOption[]).map((p) => ({ id: p.id, name: p.name })))
-    } catch (err) {
-      showError(getFriendlyErrorMessage(err))
+
+      if (productsRes.status === 'fulfilled') {
+        setProducts(productsRes.value as Product[])
+      } else {
+        setProducts([])
+        showError(getFriendlyErrorMessage(productsRes.reason))
+      }
+
+      if (catsRes.status === 'fulfilled') {
+        setCategories((catsRes.value as CatalogOption[]).map((c) => ({ id: c.id, name: c.name })))
+      } else {
+        setCategories([])
+      }
+
+      if (pubsRes.status === 'fulfilled') {
+        setPublishers((pubsRes.value as CatalogOption[]).map((p) => ({ id: p.id, name: p.name })))
+      } else {
+        setPublishers([])
+      }
+
+      if (autsRes.status === 'fulfilled') {
+        setAuthors((autsRes.value as CatalogOption[]).map((a) => ({ id: a.id, name: a.name })))
+      } else {
+        setAuthors([])
+      }
     } finally {
       setLoading(false)
     }
@@ -100,6 +125,7 @@ export function AdminProducts() {
         isbn: selected.isbn,
         title: selected.title,
         author: selected.author,
+        authorId: selected.authorId || '',
         categoryId: selected.categoryId || '',
         publisherId: selected.publisherId || '',
         price: String(selected.price),
@@ -114,6 +140,7 @@ export function AdminProducts() {
       const matchSearch =
         search === '' ||
         p.title.toLowerCase().includes(search.toLowerCase()) ||
+        p.author.toLowerCase().includes(search.toLowerCase()) ||
         p.isbn.includes(search) ||
         p.code.toLowerCase().includes(search.toLowerCase())
       const matchCategory = category === 'all' || p.category === category
@@ -135,7 +162,8 @@ export function AdminProducts() {
       await productosApi.update(selected.id, {
         isbn: trim(form.isbn),
         title: trim(form.title),
-        author: trim(form.author),
+        author: authors.find((a) => a.id === form.authorId)?.name ?? trim(form.author),
+        authorId: form.authorId || undefined,
         categoryId: form.categoryId,
         publisherId: form.publisherId,
         price: Number(form.price) || 0,
@@ -180,7 +208,7 @@ export function AdminProducts() {
             <div className="md:col-span-2">
               <Input
                 icon={Search}
-                placeholder="Buscar por código, ISBN o título..."
+                placeholder="Buscar por código, ISBN, título o autor..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -235,6 +263,7 @@ export function AdminProducts() {
               { key: 'code', header: 'Código Interno', render: (p) => <span className="font-mono text-xs font-medium text-corporate">{p.code}</span> },
               { key: 'isbn', header: 'ISBN', className: 'text-xs font-mono text-gray-500' },
               { key: 'title', header: 'Título', render: (p) => <span className="font-medium text-gray-900">{p.title}</span> },
+              { key: 'author', header: 'Autor', render: (p) => <span className="text-gray-700">{p.author || '—'}</span> },
               { key: 'category', header: 'Categoría', render: (p) => <Badge variant="neutral">{p.category}</Badge> },
               { key: 'publisher', header: 'Editorial' },
               {
@@ -304,7 +333,17 @@ export function AdminProducts() {
             <Input label="Código Interno" value={form.code} readOnly disabled />
             <Input label="ISBN" value={form.isbn} onChange={(e) => setForm({ ...form, isbn: e.target.value })} />
             <Input label="Título" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="md:col-span-2" />
-            <Input label="Autor *" value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} className="md:col-span-2" />
+            <Select
+              label="Autor *"
+              value={form.authorId}
+              onChange={(e) => {
+                const authorId = e.target.value
+                const name = authors.find((a) => a.id === authorId)?.name ?? ''
+                setForm({ ...form, authorId, author: name })
+              }}
+              options={authors.map((a) => ({ value: a.id, label: a.name }))}
+              className="md:col-span-2"
+            />
             <Select label="Categoría *" value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} options={categories.map((c) => ({ value: c.id, label: c.name }))} />
             <Select label="Editorial *" value={form.publisherId} onChange={(e) => setForm({ ...form, publisherId: e.target.value })} options={publishers.map((c) => ({ value: c.id, label: c.name }))} />
             <Input label="Precio" type="number" min={0} step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />

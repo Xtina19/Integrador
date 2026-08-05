@@ -7,19 +7,37 @@ export interface PageResult<T> {
   total: number
 }
 
+type ListResponse<T> = T[] | PageResult<T> | { success?: boolean; data: T[]; total?: number }
+
 export async function listAll<T>(url: string, params?: Record<string, string | number | undefined>): Promise<T[]> {
-  const qs = new URLSearchParams()
-  if (params) {
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== '') qs.set(k, String(v))
-    })
+  const pageSize = 200
+  const all: T[] = []
+  let page = 1
+  let total = Number.POSITIVE_INFINITY
+
+  while (all.length < total) {
+    const qs = new URLSearchParams()
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== '') qs.set(k, String(v))
+      })
+    }
+    qs.set('pageSize', String(pageSize))
+    qs.set('page', String(page))
+    const res = await httpGet<ListResponse<T>>(`${url}?${qs}`)
+
+    if (Array.isArray(res)) return res
+
+    const batch = res && Array.isArray(res.data) ? res.data : []
+    if (!batch.length) break
+
+    all.push(...batch)
+    total = res && typeof res.total === 'number' ? res.total : all.length
+    if (batch.length < pageSize) break
+    page += 1
   }
-  qs.set('pageSize', '100')
-  const full = qs.toString() ? `${url}?${qs}` : `${url}?pageSize=100`
-  const res = await httpGet<T[] | PageResult<T> | { success?: boolean; data: T[]; total?: number }>(full)
-  if (Array.isArray(res)) return res
-  if (res && Array.isArray(res.data)) return res.data
-  return []
+
+  return all
 }
 
 /** Genera código de catálogo si el formulario no lo trae (alta). */

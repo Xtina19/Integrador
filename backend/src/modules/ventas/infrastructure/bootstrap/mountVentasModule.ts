@@ -4,6 +4,7 @@
  */
 import type { Express, Request, Response, NextFunction } from 'express'
 import type { InventarioComposition } from '../../../inventario/infrastructure/composition/createInventarioComposition'
+import type { ProductoConsultaPort } from '../../application/ports/outbound'
 import { createVentasComposition } from '../composition/createVentasComposition'
 import { createVentasRouter } from '../api/http/routes/ventasRoutes'
 import { sendHttpError } from '../api/http/errorHandler'
@@ -11,9 +12,15 @@ import { ventasOpenApiDocument } from '../api/openapi/ventasOpenApi'
 
 let mounted = false
 
+export interface MountVentasOptions {
+  seedJoselito?: boolean
+  productos?: ProductoConsultaPort
+}
+
 export function mountVentasModule(
   legacyApp: Express,
   inventario?: InventarioComposition,
+  options?: MountVentasOptions,
 ): void {
   if (mounted) return
 
@@ -25,8 +32,9 @@ export function mountVentasModule(
 
   const composition = createVentasComposition({
     sequentialIds: false,
-    seedJoselito: true,
+    seedJoselito: options?.seedJoselito !== false,
     inventario,
+    productos: options?.productos,
   })
 
   legacyApp.get('/api/v1/ventas/openapi.json', (_req, res) => {

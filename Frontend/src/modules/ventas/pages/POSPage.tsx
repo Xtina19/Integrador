@@ -11,6 +11,7 @@ import { useClientesCatalog } from '@/context/ClientesCatalogContext'
 import { VentasApiRequiredBanner } from '../components/VentasApiRequiredBanner'
 import { POS_DEFAULTS, buildPosCatalogDesdeMaestro, type PosCatalogProduct } from '../data/posCatalog'
 import { useProductosMaestro } from '@/hooks/useProductosMaestro'
+import { almacenesApi } from '@/services/api/almacenesApi'
 import {
   ventasApi,
   type FormaPagoDto,
@@ -80,6 +81,28 @@ export function POSPage() {
   /** NCs elegidas para aplicar como crédito a la venta (antes de Pagos). */
   const [ncSeleccionIds, setNcSeleccionIds] = useState<string[]>([])
   const [ncPickerId, setNcPickerId] = useState('')
+  const [posContext, setPosContext] = useState(POS_DEFAULTS)
+
+  useEffect(() => {
+    void almacenesApi
+      .list({ estado: 'Activo' })
+      .then((rows) => {
+        const central =
+          rows.find((a) => !a.bloqueado && /central/i.test(a.nombre || a.codigo || '')) ??
+          rows.find((a) => !a.bloqueado) ??
+          rows[0]
+        if (central?.id && central.sucursalId) {
+          setPosContext({
+            almacenId: central.id,
+            sucursalId: central.sucursalId,
+            moneda: 'DOP',
+          })
+        }
+      })
+      .catch(() => {
+        /* conserva POS_DEFAULTS */
+      })
+  }, [])
 
   async function detectarCreditoCliente(id: string, options?: { prompt?: boolean }) {
     if (!id) {
@@ -304,9 +327,9 @@ export function POSPage() {
               return { nombre: c.nombre, activo: c.estado === 'activo' }
             })()
           : undefined,
-      sucursalId: POS_DEFAULTS.sucursalId,
-      almacenId: POS_DEFAULTS.almacenId,
-      moneda: POS_DEFAULTS.moneda,
+      sucursalId: posContext.sucursalId,
+      almacenId: posContext.almacenId,
+      moneda: posContext.moneda,
       lineas: cartDetails.map((l) => ({
         productoId: l.productId,
         cantidad: l.qty,

@@ -4,8 +4,8 @@
   "description": "LibroSys backend — Inventario (DDD) + legacy Express",
   "main": "index.js",
   "scripts": {
-    "start": "node --preserve-symlinks -r ./register-paths.js server.js",
-    "dev": "nodemon --preserve-symlinks -r ./register-paths.js server.js",
+    "start": "node --preserve-symlinks -r ./register-paths.js -r tsx/cjs server.js",
+    "dev": "nodemon --preserve-symlinks -r ./register-paths.js -r tsx/cjs server.js",
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",

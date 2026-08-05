@@ -15,7 +15,9 @@ const usuariosRoutes = require('./routes/usuarios');
 const formasPagoRoutes = require('./routes/formasPago');
 const tasasCambioRoutes = require('./routes/tasasCambio');
 const eventosRoutes = require('./routes/eventos');
+const autoresRoutes = require('./routes/autores');
 const inventoryRoutes = require('./routes/inventario');
+const { mountVentasDdd } = require('./bootstrap/mountVentas');
 
 const app = express();
 app.use(cors());
@@ -49,7 +51,19 @@ app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/formas-pago', formasPagoRoutes);
 app.use('/api/tasas-cambio', tasasCambioRoutes);
 app.use('/api/eventos', eventosRoutes);
+app.use('/api/autores', autoresRoutes);
 app.use('/api/inventario', inventoryRoutes);
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));
+
+async function start() {
+  try {
+    await mountVentasDdd(app);
+    app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));
+  } catch (err) {
+    console.error('[Backend] Error al iniciar:', err);
+    process.exit(1);
+  }
+}
+
+start();

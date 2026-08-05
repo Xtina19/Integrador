@@ -31,6 +31,7 @@ import {
   UuidIdGeneratorAdapter,
 } from '../adapters'
 import { seedVentasJoselito } from './seedVentasJoselito'
+import type { ProductoConsultaPort } from '../../application/ports/outbound'
 
 export interface VentasComposition {
   store: InMemoryVentasStore
@@ -79,6 +80,8 @@ export function createVentasComposition(options?: {
   sql?: SqlExecutor
   /** Composition Inventario compartida — Production path. */
   inventario?: InventarioComposition
+  /** Si se provee, consulta productos desde SQL Server (tabla Producto). */
+  productos?: ProductoConsultaPort
 }): VentasComposition {
   const store = new InMemoryVentasStore()
   if (options?.seedJoselito !== false) {
@@ -117,7 +120,7 @@ export function createVentasComposition(options?: {
   const ventaService = new VentaApplicationService({
     ventas,
     clientes,
-    productos: new InMemoryProductoConsultaAdapter(store),
+    productos: options?.productos ?? new InMemoryProductoConsultaAdapter(store),
     inventarioConsulta,
     inventarioEfectos,
     permisos,
