@@ -49,15 +49,21 @@ export function validatePurchaseOrderCreate(
   currency: string,
   lines: PurchaseOrderLine[],
   existingOrderIds: string[],
-  excludeOrderId?: string
+  excludeOrderId?: string,
+  options?: { autoCode?: boolean }
 ): ValidationResult {
   const lineValidation = validatePurchaseOrder(lines, supplier)
+  const codeErrors = options?.autoCode
+    ? []
+    : collectErrors(
+        validateCode(orderNumber, 'Número de orden'),
+        validateUnique(orderNumber, existingOrderIds, 'número de orden', excludeOrderId)
+      )
   const errors = collectErrors(
-    validateCode(orderNumber, 'Número de orden'),
+    ...codeErrors,
     requireSelect(supplier, 'un proveedor'),
     validateDate(date, 'Fecha'),
-    requireSelect(currency, 'una moneda'),
-    validateUnique(orderNumber, existingOrderIds, 'número de orden', excludeOrderId)
+    requireSelect(currency, 'una moneda')
   )
   return toValidationResult([...new Set([...errors, ...lineValidation.errors])])
 }

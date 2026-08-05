@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { PackageCheck } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { PackageCheck, Receipt } from 'lucide-react'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Table } from '@/components/ui/Table'
@@ -8,20 +8,39 @@ import { Toolbar } from '@/components/ui/Toolbar'
 import { Select } from '@/components/ui/Input'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ReceptionRecordDialog } from '@/modules/compras/components/ReceptionRecordDialog'
+import { RegistrarFacturaProveedorDialog } from '@/modules/compras/components/RegistrarFacturaProveedorDialog'
 import type { Reception } from '@/types/domain'
 import { useERP } from '@/store/ERPProvider'
 import { useToast } from '@/context/ToastContext'
 import { Button } from '@/components/ui/Button'
 import { receptionStatusMap } from '@/modules/compras/constants/comprasUi'
+import { ordersEligibleForFactura } from '@/modules/compras/services/facturaProveedorUi'
 
 export function RecepcionesPage() {
   const { state, completeReception, deleteReception } = useERP()
-  const { showSuccess } = useToast()
+  const { showSuccess, showError } = useToast()
   const receptions = state.receptions
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [dialog, setDialog] = useState<{ receptionId: string; mode: 'view' | 'edit' } | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [registerForOrderId, setRegisterForOrderId] = useState<string | undefined>(undefined)
+
+  const eligibleOrderIds = useMemo(() => {
+    return new Set(
+      ordersEligibleForFactura(state.purchaseOrders, state.receptions, state.supplierInvoices).map(
+        (o) => o.id
+      )
+    )
+  }, [state.purchaseOrders, state.receptions, state.supplierInvoices])
+
+  function canRegisterFactura(reception: Reception): boolean {
+    return (
+      reception.status === 'complete' &&
+      reception.purchaseType !== 'international' &&
+      eligibleOrderIds.has(reception.orderId)
+    )
+  }
 
   const selectedReception = dialog ? receptions.find((r) => r.id === dialog.receptionId) ?? null : null
 
@@ -37,10 +56,22 @@ export function RecepcionesPage() {
     })
   }, [search, statusFilter, receptions])
 
+  async function handleComplete(receptionId: string) {
+    const result = await completeReception(receptionId)
+    if (!result.success) {
+      showError(result.errors?.join(' ') ?? 'No se pudo completar la recepción.')
+      return
+    }
+    showSuccess('Recepción confirmada. Puede registrar la factura del proveedor.')
+  }
+
   async function handleDelete() {
     if (!deleteId) return
     const result = await deleteReception(deleteId)
-    if (!result.success) return
+    if (!result.success) {
+      showError(result.errors?.join(' ') ?? 'No se pudo eliminar la recepción.')
+      return
+    }
     showSuccess('Recepción eliminada correctamente')
     setDeleteId(null)
   }
@@ -116,9 +147,19 @@ export function RecepcionesPage() {
                 render: (r) => (
                   <div className="flex items-center gap-2">
                     {r.status === 'pending' && (
-                      <Button size="sm" onClick={() => void completeReception(r.id)}>
-                  Completar
-                    </Button>
+                      <Button size="sm" onClick={() => void handleComplete(r.id)}>
+                        Completar
+                      </Button>
+                    )}
+                    {canRegisterFactura(r) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        icon={Receipt}
+                        onClick={() => setRegisterForOrderId(r.orderId)}
+                      >
+                        Facturar
+                      </Button>
                     )}
                     <TableActions
                       onView={() => setDialog({ receptionId: r.id, mode: 'view' })}
@@ -144,8 +185,15 @@ export function RecepcionesPage() {
       <ConfirmDialog
         open={Boolean(deleteId)}
         onClose={() => setDeleteId(null)}
-        onConfirm={handleDelete}
+        onConfirm={() => void handleDelete()}
         message="¿Está seguro de eliminar esta recepción?"
+      />
+
+      <RegistrarFacturaProveedorDialog
+        open={registerForOrderId != null}
+        preselectedOrderId={registerForOrderId}
+        onClose={() => setRegisterForOrderId(undefined)}
+        onRegistered={() => setRegisterForOrderId(undefined)}
       />
     </div>
   )

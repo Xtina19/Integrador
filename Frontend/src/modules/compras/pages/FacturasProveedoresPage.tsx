@@ -1,47 +1,54 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Receipt } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Plus, Receipt, Wallet } from 'lucide-react'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { Button } from '@/components/ui/Button'
 import { Table } from '@/components/ui/Table'
 import { TableActions } from '@/components/ui/TableActions'
 import { Toolbar } from '@/components/ui/Toolbar'
 import { Select } from '@/components/ui/Input'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { SupplierInvoiceRecordDialog, type SupplierInvoice } from '@/modules/compras/components/SupplierInvoiceRecordDialog'
+import { RegistrarFacturaProveedorDialog } from '@/modules/compras/components/RegistrarFacturaProveedorDialog'
 import { useToast } from '@/context/ToastContext'
+import { useERP } from '@/store/ERPProvider'
 import { comprasApi } from '@/services/api/comprasApi'
-import { loadComprasFromApi } from '@/services/api/comprasLoader'
 import { getFriendlyErrorMessage } from '@/services/http'
 import {
   invoiceStatusMap,
   canEditFacturaProveedor,
   canAnularFacturaProveedor,
+  canRegistrarPagoFacturaProveedor,
+  invoiceStatusBadge,
 } from '@/modules/compras/constants/comprasUi'
+import { ordersEligibleForFactura } from '@/modules/compras/services/facturaProveedorUi'
 import { formatMoney } from '@/lib/money'
 
 export function FacturasProveedoresPage() {
   const { showSuccess, showError } = useToast()
+  const { state, refreshCompras, comprasReady, anularSupplierInvoice, registerSupplierInvoicePayment } = useERP()
   const fromApi = comprasApi.isEnabled()
-  const [invoices, setInvoices] = useState<SupplierInvoice[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(fromApi)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [dialog, setDialog] = useState<{ invoiceId: string; mode: 'view' | 'edit' } | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [payId, setPayId] = useState<string | null>(null)
+  const [registerOpen, setRegisterOpen] = useState(false)
+
+  const invoices = state.supplierInvoices
 
   useEffect(() => {
+    if (!fromApi) {
+      setLoading(false)
+      return
+    }
     let cancelled = false
     ;(async () => {
-      if (!fromApi) {
-        setLoading(false)
-        setInvoices([])
-        return
-      }
       try {
-        const loaded = await loadComprasFromApi()
-        if (!cancelled) setInvoices(loaded.supplierInvoices)
+        await refreshCompras()
       } catch (e) {
-        if (!cancelled) showError(getFriendlyErrorMessage(e))
+        if (!cancelled) console.warn('[Compras] Facturas:', getFriendlyErrorMessage(e))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -49,7 +56,12 @@ export function FacturasProveedoresPage() {
     return () => {
       cancelled = true
     }
-  }, [fromApi, showError])
+  }, [fromApi, refreshCompras])
+
+  const eligibleCount = useMemo(
+    () => ordersEligibleForFactura(state.purchaseOrders, state.receptions, state.supplierInvoices).length,
+    [state.purchaseOrders, state.receptions, state.supplierInvoices]
+  )
 
   const selectedInvoice = dialog ? invoices.find((f) => f.id === dialog.invoiceId) ?? null : null
   const selectedCanEdit = selectedInvoice ? canEditFacturaProveedor(selectedInvoice) : false
@@ -60,11 +72,16 @@ export function FacturasProveedoresPage() {
         search === '' ||
         f.id.toLowerCase().includes(search.toLowerCase()) ||
         f.supplier.toLowerCase().includes(search.toLowerCase()) ||
-        f.orderId.toLowerCase().includes(search.toLowerCase())
+        f.orderId.toLowerCase().includes(search.toLowerCase()) ||
+        (f.numeroFactura ?? '').toLowerCase().includes(search.toLowerCase())
       const matchStatus = statusFilter === 'all' || f.status === statusFilter
       return matchSearch && matchStatus
     })
   }, [search, statusFilter, invoices])
+
+  const handleRegistered = useCallback(async () => {
+    if (fromApi) await refreshCompras()
+  }, [fromApi, refreshCompras])
 
   async function handleDelete() {
     if (!deleteId) return
@@ -74,19 +91,25 @@ export function FacturasProveedoresPage() {
       setDeleteId(null)
       return
     }
-    try {
-      if (fromApi && inv?.dbId) {
-        await comprasApi.anularFactura(inv.dbId)
-        const loaded = await loadComprasFromApi()
-        setInvoices(loaded.supplierInvoices)
-      } else {
-        setInvoices((prev) => prev.filter((f) => f.id !== deleteId))
-      }
-      showSuccess(fromApi ? 'Factura anulada correctamente' : 'Factura eliminada correctamente')
-    } catch (e) {
-      showError(getFriendlyErrorMessage(e))
+    const result = await anularSupplierInvoice(deleteId)
+    if (!result.success) {
+      showError(result.errors?.join(' ') ?? 'No se pudo anular la factura.')
+    } else {
+      showSuccess('Factura anulada correctamente')
     }
     setDeleteId(null)
+  }
+
+  async function handleRegisterPayment() {
+    if (!payId) return
+    const inv = invoices.find((f) => f.id === payId)
+    const result = await registerSupplierInvoicePayment(payId)
+    if (!result.success) {
+      showError(result.errors?.join(' ') ?? 'No se pudo registrar el pago.')
+    } else {
+      showSuccess(`Pago registrado — ${inv?.id ?? payId} marcada como pagada.`)
+    }
+    setPayId(null)
   }
 
   return (
@@ -111,6 +134,12 @@ export function FacturasProveedoresPage() {
               />
             }
             activeFilters={statusFilter !== 'all' ? [invoiceStatusMap[statusFilter]?.label ?? statusFilter] : []}
+            actions={
+              <Button size="sm" icon={Plus} onClick={() => setRegisterOpen(true)} disabled={!comprasReady}>
+                Registrar factura
+                {eligibleCount > 0 ? ` (${eligibleCount})` : ''}
+              </Button>
+            }
           />
         </CardBody>
       </Card>
@@ -118,7 +147,11 @@ export function FacturasProveedoresPage() {
       <Card>
         <CardHeader
           title="Facturas de Proveedores"
-          subtitle={loading ? 'Cargando…' : fromApi ? 'Registro de facturas' : undefined}
+          subtitle={
+            loading
+              ? 'Cargando…'
+              : `${filtered.length} factura${filtered.length === 1 ? '' : 's'} — compras nacionales`
+          }
         />
         <CardBody className="!p-0">
           <Table
@@ -127,12 +160,17 @@ export function FacturasProveedoresPage() {
             columns={[
               {
                 key: 'id',
-                header: 'Factura',
+                header: 'Código',
                 render: (f) => (
                   <span className="font-mono text-xs text-corporate flex items-center gap-1">
                     <Receipt size={14} /> {f.id}
                   </span>
                 ),
+              },
+              {
+                key: 'numeroFactura',
+                header: 'Nº proveedor',
+                render: (f) => <span className="font-mono text-xs">{f.numeroFactura ?? '—'}</span>,
               },
               { key: 'supplier', header: 'Proveedor', render: (f) => <span className="font-medium">{f.supplier}</span> },
               { key: 'orderId', header: 'Orden', className: 'font-mono text-xs' },
@@ -149,10 +187,9 @@ export function FacturasProveedoresPage() {
               },
               {
                 key: 'status',
-                header: 'Estado',
+                header: 'Estado pago',
                 render: (f) => {
-                  const key = f.documentEstado === 'anulada' ? 'anulada' : f.status
-                  const meta = invoiceStatusMap[key] ?? { label: f.status, variant: 'warning' as const }
+                  const meta = invoiceStatusBadge(f)
                   return <Badge variant={meta.variant}>{meta.label}</Badge>
                 },
               },
@@ -162,12 +199,25 @@ export function FacturasProveedoresPage() {
                 render: (f) => {
                   const editable = canEditFacturaProveedor(f)
                   const canAnular = canAnularFacturaProveedor(f)
+                  const canPay = canRegistrarPagoFacturaProveedor(f)
                   return (
-                    <TableActions
-                      onView={() => setDialog({ invoiceId: f.id, mode: 'view' })}
-                      onEdit={editable ? () => setDialog({ invoiceId: f.id, mode: 'edit' }) : undefined}
-                      onDelete={canAnular ? () => setDeleteId(f.id) : undefined}
-                    />
+                    <div className="flex items-center gap-2">
+                      {canPay && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          icon={Wallet}
+                          onClick={() => setPayId(f.id)}
+                        >
+                          Registrar pago
+                        </Button>
+                      )}
+                      <TableActions
+                        onView={() => setDialog({ invoiceId: f.id, mode: 'view' })}
+                        onEdit={editable ? () => setDialog({ invoiceId: f.id, mode: 'edit' }) : undefined}
+                        onDelete={canAnular ? () => setDeleteId(f.id) : undefined}
+                      />
+                    </div>
                   )
                 },
               },
@@ -184,21 +234,32 @@ export function FacturasProveedoresPage() {
         allowEdit={selectedCanEdit}
         onEdit={() => selectedInvoice && setDialog({ invoiceId: selectedInvoice.id, mode: 'edit' })}
         onSave={(invoice) => {
-          setInvoices((prev) => prev.map((f) => (f.id === invoice.id ? invoice : f)))
           setDialog(null)
           showSuccess('Factura actualizada')
+          void invoice
         }}
+      />
+
+      <RegistrarFacturaProveedorDialog
+        open={registerOpen}
+        onClose={() => setRegisterOpen(false)}
+        onRegistered={handleRegistered}
+      />
+
+      <ConfirmDialog
+        open={!!payId}
+        title="Registrar pago"
+        message="Se marcará la factura como pagada en su totalidad. ¿Continuar?"
+        confirmLabel="Confirmar pago"
+        onConfirm={() => void handleRegisterPayment()}
+        onClose={() => setPayId(null)}
       />
 
       <ConfirmDialog
         open={!!deleteId}
-        title={fromApi ? 'Anular factura' : 'Eliminar factura'}
-        message={
-          fromApi
-            ? 'Se anulará la factura del proveedor. ¿Continuar?'
-            : '¿Eliminar esta factura de proveedor?'
-        }
-        confirmLabel={fromApi ? 'Anular' : 'Eliminar'}
+        title="Anular factura"
+        message="Se anulará la factura del proveedor. ¿Continuar?"
+        confirmLabel="Anular"
         onConfirm={() => void handleDelete()}
         onClose={() => setDeleteId(null)}
       />

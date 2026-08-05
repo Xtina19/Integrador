@@ -57,10 +57,12 @@ export function resolveProductoIdByTitle(title: string): number | null {
 
 
 export function mapOrdenEstadoToUi(estado: string): PurchaseStatus {
-  switch (estado) {
+  const e = String(estado || '').toLowerCase()
+  switch (e) {
     case 'borrador':
       return 'draft'
     case 'pendiente_aprobacion':
+    case 'pendiente':
       return 'pending'
     case 'aprobada':
     case 'parcialmente_recibida':
@@ -81,7 +83,9 @@ export function mapTipoCompraToUi(tipo: string): PurchaseType {
 }
 
 export function mapRecepcionEstadoToUi(estado: string): Reception['status'] {
-  return estado === 'confirmada' ? 'complete' : 'pending'
+  const e = String(estado || '').toLowerCase()
+  if (e === 'confirmada' || e === 'recibido') return 'complete'
+  return 'pending'
 }
 
 export function mapPagoEstadoToUi(estadoPago: string): SupplierInvoice['status'] {
@@ -155,6 +159,8 @@ export function facturaToSupplierInvoice(
     orderId: orderCodigo,
     date: String(dto.fechaEmision).slice(0, 10),
     amount: Number(dto.total),
+    numeroFactura: dto.numeroFactura,
+    ncf: dto.ncf ?? undefined,
     status: mapPagoEstadoToUi(dto.estadoPago),
     currency: monedaCode(dto.monedaId, monedas),
     documentEstado: dto.estado,

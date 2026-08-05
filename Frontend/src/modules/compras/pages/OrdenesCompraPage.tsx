@@ -21,7 +21,7 @@ import { formatMoney } from '@/lib/money'
 export function OrdenesCompraPage() {
   const navigate = useNavigate()
   const { state, approvePurchaseOrder, deletePurchaseOrder } = useERP()
-  const { showSuccess } = useToast()
+  const { showSuccess, showError } = useToast()
   const purchaseOrders = state.purchaseOrders
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -48,10 +48,28 @@ export function OrdenesCompraPage() {
     })
   }, [search, statusFilter, purchaseOrders])
 
+  async function handleApprove(orderId: string) {
+    try {
+      const result = await approvePurchaseOrder(orderId)
+      if (!result.success) {
+        showError(result.errors?.join(' ') ?? 'No se pudo aprobar la orden.')
+        return
+      }
+      showSuccess('Orden aprobada correctamente.')
+    } catch (err) {
+      console.error('[Compras] aprobar orden', err)
+      showError('No se pudo aprobar la orden. Intente nuevamente.')
+    }
+  }
+
   async function handleDelete() {
     if (!deleteId) return
     const result = await deletePurchaseOrder(deleteId)
-    if (!result.success) return
+    if (!result.success) {
+      showError(result.errors?.join(' ') ?? 'No se pudo eliminar la orden.')
+      setDeleteId(null)
+      return
+    }
     showSuccess('Orden de compra eliminada correctamente')
     setDeleteId(null)
   }
@@ -143,7 +161,15 @@ export function OrdenesCompraPage() {
                 render: (o) => (
                   <div className="flex items-center gap-2">
                     {(o.status === 'pending' || o.status === 'draft') && (
-                      <Button size="sm" variant="outline" onClick={() => void approvePurchaseOrder(o.id)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void handleApprove(o.id)
+                        }}
+                      >
                         Aprobar
                       </Button>
                     )}

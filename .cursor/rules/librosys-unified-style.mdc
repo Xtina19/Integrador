@@ -25,6 +25,7 @@ Referencia oficial: `public/scriptdb`. El código debe leerse como escrito por u
 | Catálogo | Fuente |
 |----------|--------|
 | Maestros | Tablas scriptdb |
+| **Compras** | `OrdenCompra`, `DetalleOrdenCompra`, `RecepcionOrdenCompra`, `DetalleRecepcionOrdenCompra`, `FacturaProveedores`, `CuentasPorPagar` |
 | Formas de pago | `PagoFactura.forma_pago` → `lib/formasPago.js` |
 | Roles | `Usuario.rol` → SQL + `lib/rolesSemilla.js` |
 | Tipo persona | `Natural` / `Jurídica` → `lib/personaTipo.js` |

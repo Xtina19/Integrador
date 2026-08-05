@@ -1,7 +1,7 @@
 /**
  * API Proveedores — adaptada exclusivamente a public/scriptdb
  * Tablas: Proveedor, Persona, TipoProveedor, Pais, Telefono, Persona_Tiene_Telefono
- * Contrato FE: id, code, name, contact, email, phone, country, supplierType, status, purchasesCount
+ * Contrato FE: id, code, name, contact, email, phone, country, supplierType, scope, status, purchasesCount
  * Código: PROV###### auto en codigo_proveedor (inmutable en PUT)
  * No implementa Órdenes de Compra, Recepciones ni Facturas de Proveedores.
  */
@@ -64,6 +64,8 @@ function mapProveedor(row) {
     phone: row.telefono || '',
     country,
     supplierType: row.tipo_nombre || 'Distribuidor',
+    scope: row.es_internacional ? 'international' : 'national',
+    international: Boolean(row.es_internacional),
     status: mapEstadoToFe(row.estado),
     purchasesCount: 0,
   };

@@ -30,6 +30,8 @@ export interface OrdenCompraDto {
   id: number
   codigo: string
   proveedorId: number
+  /** Nombre en OrdenCompra.proveedor (scriptdb) */
+  proveedorNombre?: string
   sucursalId?: number | null
   monedaId: number
   tasaCambio: number
@@ -62,6 +64,9 @@ export interface RecepcionDto {
   id: number
   codigo: string
   ordenCompraId: number
+  proveedorNombre?: string
+  ordenCodigo?: string
+  tipoCompra?: 'nacional' | 'internacional'
   almacenId: number
   fechaRecepcion: string
   usuarioReceptor: number
@@ -86,6 +91,8 @@ export interface FacturaProveedorDto {
   codigo: string
   ordenCompraId: number
   proveedorId: number
+  proveedorNombre?: string
+  ordenCodigo?: string
   numeroFactura: string
   ncf?: string | null
   monedaId: number
@@ -320,6 +327,16 @@ export const comprasApi = {
     safeCall(async () => {
       const res = await httpPost<ApiEnvelope<FacturaProveedorDto>>(
         `${BASE}/facturas/${id}/anular`,
+        {},
+        withAuth()
+      )
+      return unwrap(res)
+    }),
+
+  registrarPagoFactura: (id: number) =>
+    safeCall(async () => {
+      const res = await httpPost<ApiEnvelope<FacturaProveedorDto>>(
+        `${BASE}/facturas/${id}/registrar-pago`,
         {},
         withAuth()
       )

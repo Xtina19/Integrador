@@ -40,6 +40,10 @@ function parseAnular(req) {
   return { id: parseIdParam(req.params.id), actorUserId: actorFromReq(req) }
 }
 
+function parseRegistrarPago(req) {
+  return { id: parseIdParam(req.params.id), actorUserId: actorFromReq(req) }
+}
+
 module.exports = {
   parseList,
   parseGetById,
@@ -47,4 +51,5 @@ module.exports = {
   parseRegistrar,
   parseUpdate,
   parseAnular,
+  parseRegistrarPago,
 }

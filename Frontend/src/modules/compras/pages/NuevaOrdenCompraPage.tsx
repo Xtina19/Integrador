@@ -21,12 +21,11 @@ interface OrderLine {
 }
 
 export function NuevaOrdenCompraPage() {
-  const { state, createPurchaseOrder } = useERP()
+  const { createPurchaseOrder } = useERP()
   const catalog = useComprasCatalogos()
   const fromApi = comprasApi.isEnabled()
   const [error, setError] = useState('')
   const [form, setForm] = useState({
-    orderNumber: '',
     purchaseType: 'national' as PurchaseType,
     supplier: '',
     date: new Date().toISOString().slice(0, 10),
@@ -69,17 +68,20 @@ export function NuevaOrdenCompraPage() {
     [lines]
   )
 
-  const validation = useMemo(() => {
-    const codeForValidation = fromApi ? `AUTO-${Date.now()}` : form.orderNumber
-    return validatePurchaseOrderCreate(
-      codeForValidation,
-      form.supplier,
-      form.date,
-      form.currency,
-      lines.map((l) => ({ product: l.product, qty: l.qty, unitCost: l.unitCost, productoId: l.productoId })),
-      fromApi ? [] : state.purchaseOrders.map((o) => o.id)
-    )
-  }, [form, lines, state.purchaseOrders, fromApi])
+  const validation = useMemo(
+    () =>
+      validatePurchaseOrderCreate(
+        '',
+        form.supplier,
+        form.date,
+        form.currency,
+        lines.map((l) => ({ product: l.product, qty: l.qty, unitCost: l.unitCost, productoId: l.productoId })),
+        [],
+        undefined,
+        { autoCode: true }
+      ),
+    [form, lines]
+  )
 
   function handlePurchaseTypeChange(purchaseType: PurchaseType) {
     const suppliers = catalog.suppliersForType(purchaseType)
@@ -135,16 +137,11 @@ export function NuevaOrdenCompraPage() {
         { label: 'Nueva Orden' },
       ]}
       title="Nueva Orden de Compra"
-      subtitle={
-        fromApi
-          ? 'El código OC se asigna automáticamente vía numeración documental'
-          : 'Registro de orden con detalle de productos'
-      }
+      subtitle="El código OC se asigna automáticamente al guardar"
       listPath="/compras/ordenes"
       saveDisabled={!validation.valid || catalog.loading}
       onSave={async () => {
         const result = await createPurchaseOrder({
-          orderNumber: fromApi ? '' : trim(form.orderNumber),
           supplier: trim(form.supplier),
           date: form.date,
           currency: form.currency,
@@ -179,19 +176,12 @@ export function NuevaOrdenCompraPage() {
       )}
       <div className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {!fromApi && (
-            <Input
-              label="Número OC *"
-              value={form.orderNumber}
-              onChange={(e) => setForm({ ...form, orderNumber: e.target.value })}
-            />
-          )}
-          {fromApi && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Número OC</label>
-              <p className="py-2 text-sm text-gray-600">Automático (OC-YYYY-######)</p>
-            </div>
-          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Número OC</label>
+            <p className="py-2 text-sm text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-3">
+              {fromApi ? 'Automático (OC-YYYY-######)' : 'Automático al guardar (OC-YYYY-### / OC-INT-YYYY-###)'}
+            </p>
+          </div>
           <Select
             label="Tipo de Compra *"
             value={form.purchaseType}

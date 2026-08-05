@@ -1,7 +1,6 @@
 ﻿import type { ERPState } from '@/store/initialState'
 import { adminProducts, adminCategories, adminPublishers, adminSuppliers, adminBranches, adminCurrencies, publisherContracts } from '@/mocks/mockAdmin'
 import { salesHistory } from '@/mocks/mockVentas'
-import { supplierInvoices } from '@/mocks/mockCompras'
 import { auditActivities, auditChanges, auditAccess, auditDeletions } from '@/mocks/mockAuditoria'
 import { configSections } from '@/mocks/mockConfiguracion'
 import { mfaSettings, activeSessions } from '@/mocks/mockUsuarios'
@@ -157,7 +156,7 @@ export function searchGlobal(query: string, state: ERPState): GlobalSearchResult
     )
   }
 
-  for (const inv of supplierInvoices) {
+  for (const inv of state.supplierInvoices) {
     push(
       results,
       { id: inv.id, title: inv.id, subtitle: `${inv.supplier} · OC ${inv.orderId}`, moduleLabel: 'Compras', path: '/compras/facturas', recordType: 'purchase_order' },

@@ -13,6 +13,7 @@ router.get('/por-orden/:ordenId', validate(http.parseByOrdenId), asyncHandler(ct
 router.get('/:id', validate(http.parseGetById), asyncHandler(ctrl.getById))
 router.post('/', ...criticalWrite, validate(http.parseRegistrar), asyncHandler(ctrl.create))
 router.put('/:id', ...criticalWrite, validate(http.parseUpdate), asyncHandler(ctrl.update))
+router.post('/:id/registrar-pago', ...criticalWrite, validate(http.parseRegistrarPago), asyncHandler(ctrl.registrarPago))
 router.post('/:id/anular', ...criticalWrite, validate(http.parseAnular), asyncHandler(ctrl.anular))
 
 module.exports = router

@@ -44,6 +44,12 @@ async function anular(req, res) {
   return sendSuccess(res, result, { message: 'Factura de proveedor anulada correctamente.' })
 }
 
+async function registrarPago(req, res) {
+  const { id, actorUserId } = req.validated
+  const result = await servicio.registrarPago(id, actorUserId)
+  return sendSuccess(res, result, { message: 'Pago de factura registrado correctamente.' })
+}
+
 module.exports = {
   list,
   getById,
@@ -51,4 +57,5 @@ module.exports = {
   create,
   update,
   anular,
+  registrarPago,
 }

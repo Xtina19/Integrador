@@ -16,7 +16,7 @@ export const apiConfig = {
 export const dataSourceConfig = {
   inventario: envFlag('VITE_USE_API_INVENTARIO'),
   ventas: envFlag('VITE_USE_API_VENTAS'),
-  compras: envFlag('VITE_USE_API_COMPRAS'),
+  compras: envFlag('VITE_USE_API_COMPRAS', true),
   importaciones: envFlag('VITE_USE_API_IMPORTACIONES'),
   eventos: envFlag('VITE_USE_API_EVENTOS'),
   editoriales: envFlag('VITE_USE_API_EDITORIALES'),

@@ -6,11 +6,23 @@ import { trim } from '@/utils/formValidation'
 import { isInternationalSupplier } from '@/business-rules/internationalPurchaseFlow'
 import { internationalSupplierNames } from '@/mocks/mockAdmin'
 import { createActivity, createNotification } from '@/services/activityService'
-import { nextId } from '@/utils/idGenerator'
+import { nextId, nextOrdenCompraCode } from '@/utils/idGenerator'
 import { nowFormatted } from '@/utils/timeUtils'
 
+/** Líneas efectivas: usa detalle guardado o reconstruye desde ítems/total (órdenes legacy). */
+export function resolvePurchaseOrderLines(order: PurchaseOrder): PurchaseOrderLine[] {
+  if (order.lines?.length) return order.lines
+  if (order.items <= 0) return []
+  const unitCost =
+    order.total > 0 && order.items > 0
+      ? Number((order.total / order.items).toFixed(2))
+      : 0
+  return [{ product: 'Mercancía de la orden', qty: order.items, unitCost }]
+}
+
 export interface CreatePurchaseInput {
-  orderNumber: string
+  /** Ignorado en alta: el código OC se genera automáticamente. */
+  orderNumber?: string
   supplier: string
   date: string
   currency: string
@@ -36,13 +48,17 @@ export interface UpdateReceptionInput {
 
 export const purchaseService = {
   createOrder(state: ERPState, input: CreatePurchaseInput) {
+    const existingIds = state.purchaseOrders.map((o) => o.id)
+    const orderNumber = nextOrdenCompraCode(existingIds, input.purchaseType)
     const validation = validatePurchaseOrderCreate(
-      input.orderNumber,
+      orderNumber,
       input.supplier,
       input.date,
       input.currency,
       input.lines,
-      state.purchaseOrders.map((o) => o.id)
+      existingIds,
+      undefined,
+      { autoCode: true }
     )
     if (!validation.valid) return { success: false as const, errors: validation.errors }
 
@@ -55,7 +71,7 @@ export const purchaseService = {
 
     const total = input.lines.reduce((s, l) => s + l.qty * l.unitCost, 0)
     const order: PurchaseOrder = {
-      id: trim(input.orderNumber) || nextId('OC'),
+      id: orderNumber,
       supplier: trim(input.supplier),
       date: input.date,
       currency: input.currency,
@@ -92,7 +108,7 @@ export const purchaseService = {
     if (!canTransitionPurchase(order.status, 'pending')) {
       return { success: false as const, errors: ['No se puede enviar la orden en su estado actual.'] }
     }
-    const validation = validatePurchaseOrder(order.lines ?? [], order.supplier)
+    const validation = validatePurchaseOrder(resolvePurchaseOrderLines(order), order.supplier)
     if (!validation.valid) return { success: false as const, errors: validation.errors }
 
     return {
@@ -104,16 +120,27 @@ export const purchaseService = {
   },
 
   approveOrder(state: ERPState, orderId: string) {
-    const order = state.purchaseOrders.find((o) => o.id === orderId)
+    let order = state.purchaseOrders.find((o) => o.id === orderId)
     if (!order) return { success: false as const, errors: ['Orden no encontrada.'] }
-    if (!canTransitionPurchase(order.status, 'approved')) {
-      return { success: false as const, errors: ['Solo se pueden aprobar órdenes pendientes.'] }
+
+    if (order.status === 'draft') {
+      if (!canTransitionPurchase(order.status, 'pending')) {
+        return { success: false as const, errors: ['No se puede enviar la orden en su estado actual.'] }
+      }
+      const submitValidation = validatePurchaseOrder(resolvePurchaseOrderLines(order), order.supplier)
+      if (!submitValidation.valid) return { success: false as const, errors: submitValidation.errors }
+      order = { ...order, status: 'pending' }
     }
-    const validation = validatePurchaseOrder(order.lines ?? [{ product: 'Ítems', qty: order.items, unitCost: 1 }], order.supplier)
-    if (order.items <= 0 && !order.lines?.length) {
+
+    if (!canTransitionPurchase(order.status, 'approved')) {
+      return { success: false as const, errors: ['Solo se pueden aprobar órdenes en borrador o pendientes.'] }
+    }
+    const lines = resolvePurchaseOrderLines(order)
+    const validation = validatePurchaseOrder(lines, order.supplier)
+    if (order.items <= 0 && !lines.length) {
       return { success: false as const, errors: ['No se puede aprobar una orden sin productos.'] }
     }
-    void validation
+    if (!validation.valid) return { success: false as const, errors: validation.errors }
 
     if (order.purchaseType === 'international') {
       const invoice: InternationalInvoice = {

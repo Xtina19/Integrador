@@ -32,6 +32,31 @@ function asNumber(v: unknown): number | null {
   return Number.isInteger(n) && n > 0 ? n : null
 }
 
+function resolveAlcanceProveedor(row: Record<string, unknown>): 'nacional' | 'internacional' | 'mixto' {
+  const scope = String(row.scope ?? '').toLowerCase()
+  if (scope === 'national' || scope === 'nacional') return 'nacional'
+  if (scope === 'international' || scope === 'internacional') return 'internacional'
+
+  if (row.international === true || row.es_internacional === true || row.es_internacional === 1) {
+    return 'internacional'
+  }
+  if (row.international === false || row.es_internacional === false || row.es_internacional === 0) {
+    return 'nacional'
+  }
+
+  const country = String(row.country ?? row.pais ?? '').toLowerCase()
+  if (country.includes('internacional')) return 'internacional'
+  if (country.includes('dominicana') || country === 'rd') return 'nacional'
+  if (country.trim()) return 'internacional'
+
+  return 'nacional'
+}
+
+function isActiveSupplier(row: Record<string, unknown>): boolean {
+  const status = String(row.status ?? row.estado ?? 'active').toLowerCase()
+  return status === 'active' || status === 'activo'
+}
+
 export function useComprasCatalogos() {
   const [proveedores, setProveedores] = useState<CatalogProveedor[]>([])
   const [productos, setProductos] = useState<CatalogProducto[]>([])
@@ -54,13 +79,14 @@ export function useComprasCatalogos() {
 
         setProveedores(
           provRows
+            .filter(isActiveSupplier)
             .map((r) => {
               const id = asNumber(r.id)
               if (!id) return null
               return {
                 id,
                 nombre: String(r.nombre ?? r.name ?? `Proveedor #${id}`),
-                tipo: String(r.tipo ?? r.supplierType ?? 'nacional').toLowerCase(),
+                tipo: resolveAlcanceProveedor(r),
               }
             })
             .filter(Boolean) as CatalogProveedor[]
@@ -74,7 +100,10 @@ export function useComprasCatalogos() {
               return {
                 id,
                 titulo: String(r.titulo ?? r.title ?? r.nombre ?? `Producto #${id}`),
-                costo: Number(r.costo ?? r.cost ?? r.precio ?? 0) || 0,
+                costo:
+                  Number(r.cost ?? r.costo ?? 0) ||
+                  Number(r.price ?? r.precio ?? 0) ||
+                  0,
               }
             })
             .filter(Boolean) as CatalogProducto[]

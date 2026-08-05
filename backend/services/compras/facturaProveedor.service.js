@@ -134,12 +134,13 @@ async function registrar(input, actorUserId = null) {
   try {
     return await withTransaction(async (conn) => {
       const { codigo } = await numeracionService.generarCodigo('FP', conn)
+      const numeroFactura = input.numeroFactura?.trim() || codigo
       const id = await facturaRepo.insert(
         {
           codigo,
           ordenCompraId: orden.id,
           proveedorId,
-          numeroFactura: String(input.numeroFactura).trim(),
+          numeroFactura,
           ncf: input.ncf ?? null,
           monedaId,
           tasaCambio,
@@ -194,8 +195,6 @@ async function registrar(input, actorUserId = null) {
 async function actualizar(id, input, actorUserId = null) {
   const actual = await getById(id)
   // Regla oficial LibroSys: solo BORRADOR es editable.
-  // El DER aprobado de factura_proveedor no incluye 'borrador'
-  // (registrada | contabilizada | anulada); por compatibilidad no se altera el ENUM.
   if (String(actual.estado).toLowerCase() !== 'borrador') {
     throw new PurchaseError('PURCHASE_INVOICE_NOT_EDITABLE', {
       message: 'Solo las facturas en borrador pueden editarse.',
@@ -282,6 +281,48 @@ async function actualizar(id, input, actorUserId = null) {
   }
 }
 
+async function registrarPago(id, actorUserId = null) {
+  const actual = await getById(id)
+  if (actual.estado === ESTADO.ANULADA) {
+    throw new PurchaseError('PURCHASE_INVOICE_NOT_EDITABLE', {
+      message: 'No se puede registrar pago en una factura anulada.',
+      developerMessage: 'registrarPago rechazado: documento anulado.',
+      httpStatus: 409,
+    })
+  }
+  if (actual.estadoPago === ESTADO_PAGO.PAGADA) {
+    throw new PurchaseError('PURCHASE_INVOICE_ALREADY_PAID', {
+      message: 'La factura ya está pagada.',
+      developerMessage: 'registrarPago rechazado: ya pagada.',
+      httpStatus: 409,
+    })
+  }
+
+  try {
+    return await withTransaction(async (conn) => {
+      await facturaRepo.update(
+        id,
+        { estadoPago: ESTADO_PAGO.PAGADA, updatedBy: actorUserId },
+        conn
+      )
+      await audit(
+        actorUserId,
+        {
+          entidad: 'factura_proveedor',
+          entidadId: id,
+          accion: 'actualizar',
+          descripcion: `FP ${actual.codigo} marcada como pagada`,
+        },
+        conn
+      )
+      return getById(id, conn)
+    })
+  } catch (err) {
+    if (err instanceof PurchaseError || err instanceof ValidationError) throw err
+    translateDbError(err)
+  }
+}
+
 async function anular(id, actorUserId = null) {
   const actual = await getById(id)
   if (actual.estado === ESTADO.ANULADA) {
@@ -325,5 +366,6 @@ module.exports = {
   getByOrdenCompraId,
   registrar,
   actualizar,
+  registrarPago,
   anular,
 }

@@ -16,8 +16,10 @@ import type {
   Consolidation,
   BookCostingEntry,
 } from '@/types/domain'
+import type { SupplierInvoice } from '@/modules/compras/components/SupplierInvoiceRecordDialog'
 import { products as seedProducts, events as seedEvents, stockByCategory, inventoryChartData, lowStockProducts } from '@/mocks/mockCore'
 import { purchaseOrders as seedOrders, receptions as seedReceptions } from '@/mocks/mockCompras'
+import { loadLocalSupplierInvoices } from '@/modules/compras/services/comprasLocalStore'
 import {
   shipments as seedShipments,
   internationalInvoices as seedInvoices,
@@ -29,13 +31,13 @@ import { kardexMovements as seedKardex, inventoryAdjustments as seedAdjustments 
 import { createNotification, createActivity } from '@/services/activityService'
 import { salesStats } from '@/mocks/mockVentas'
 import { transfers as seedTransfers, transferHistory as seedTransferHistory } from '@/mocks/mockCore'
-import type { PurchaseStatus, TransferStatus, ImportStatus, EventStatus } from '@/types/domain'
-import { isApiEnabled } from '@/config/api'
+import type { TransferStatus, ImportStatus, EventStatus, PurchaseStatus } from '@/types/domain'
 
 export interface ERPState {
   products: Product[]
   purchaseOrders: PurchaseOrder[]
   receptions: Reception[]
+  supplierInvoices: SupplierInvoice[]
   transfers: Transfer[]
   transferHistory: { id: string; origin: string; destination: string; product: string; qty: number; status: 'finalized'; date: string }[]
   shipments: Shipment[]
@@ -51,49 +53,6 @@ export interface ERPState {
   inventoryChartData: InventoryChartPoint[]
   stockByCategory: StockCategory[]
 }
-
-const seedInternationalOrders: PurchaseOrder[] = [
-  {
-    id: 'OC-INT-2026-091',
-    supplier: 'Planeta Internacional',
-    date: '2026-05-20',
-    currency: 'EUR',
-    items: 840,
-    total: 45200,
-    status: 'approved',
-    purchaseType: 'international',
-    internationalInvoiceId: 'FI-2026-045',
-    lines: [
-      { product: 'Cien años de soledad', qty: 200, unitCost: 8.5 },
-      { product: 'La sombra del viento', qty: 300, unitCost: 6.8 },
-      { product: '1984', qty: 340, unitCost: 4.5 },
-    ],
-  },
-  {
-    id: 'OC-INT-2026-090',
-    supplier: 'Alfaguara Export',
-    date: '2026-06-05',
-    currency: 'EUR',
-    items: 240,
-    total: 12800,
-    status: 'approved',
-    purchaseType: 'international',
-    internationalInvoiceId: 'FI-2026-044',
-    lines: [{ product: 'Harry Potter y la piedra filosofal', qty: 240, unitCost: 53.33 }],
-  },
-  {
-    id: 'OC-INT-2026-089',
-    supplier: 'Penguin Random House',
-    date: '2026-05-25',
-    currency: 'USD',
-    items: 1200,
-    total: 68500,
-    status: 'approved',
-    purchaseType: 'international',
-    internationalInvoiceId: 'FI-2026-043',
-    lines: [{ product: 'Libros varios PRH', qty: 1200, unitCost: 57.08 }],
-  },
-]
 
 function mapLegacyTransferStatus(s: string): TransferStatus {
   const map: Record<string, TransferStatus> = {
@@ -129,6 +88,7 @@ function mapLegacyPurchaseStatus(s: string): PurchaseStatus {
   const map: Record<string, PurchaseStatus> = {
     draft: 'draft',
     sent: 'pending',
+    pending: 'pending',
     approved: 'approved',
     received: 'received',
     cancelled: 'cancelled',
@@ -136,9 +96,39 @@ function mapLegacyPurchaseStatus(s: string): PurchaseStatus {
   return map[s] ?? 'draft'
 }
 
-export function createInitialERPState(): ERPState {
-  const comprasFromApi = isApiEnabled('compras')
+/** Órdenes internacionales de referencia (Importaciones). */
+const seedInternationalOrders: PurchaseOrder[] = [
+  {
+    id: 'OC-INT-2026-091',
+    supplier: 'Planeta Internacional',
+    date: '2026-05-20',
+    currency: 'EUR',
+    items: 840,
+    total: 45200,
+    status: 'approved',
+    purchaseType: 'international',
+    internationalInvoiceId: 'FI-2026-045',
+    lines: [
+      { product: 'Cien años de soledad', qty: 200, unitCost: 8.5 },
+      { product: 'La sombra del viento', qty: 300, unitCost: 6.8 },
+      { product: '1984', qty: 340, unitCost: 4.5 },
+    ],
+  },
+  {
+    id: 'OC-INT-2026-090',
+    supplier: 'Alfaguara Export',
+    date: '2026-06-05',
+    currency: 'EUR',
+    items: 240,
+    total: 12800,
+    status: 'approved',
+    purchaseType: 'international',
+    internationalInvoiceId: 'FI-2026-044',
+    lines: [{ product: 'Harry Potter y la piedra filosofal', qty: 240, unitCost: 53.33 }],
+  },
+]
 
+export function createInitialERPState(): ERPState {
   return {
     products: seedProducts.map((p) => {
       const low = lowStockProducts.find((l) => l.id === p.id)
@@ -148,21 +138,18 @@ export function createInitialERPState(): ERPState {
         status: p.status as Product['status'],
       }
     }),
-    // FASE 6: con API Compras activa no se sembrán mocks; ERPProvider hidrata desde /api/compras
-    purchaseOrders: comprasFromApi
-      ? []
-      : [
-          ...seedOrders.map((o) => ({
-            ...o,
-            status: mapLegacyPurchaseStatus(o.status),
-            currency: 'DOP',
-            purchaseType: 'national' as const,
-          })),
-          ...seedInternationalOrders,
-        ],
-    receptions: comprasFromApi
-      ? []
-      : seedReceptions.map((r) => ({ ...r, purchaseType: 'national' as const })),
+    // Semilla local: se conserva si la API devuelve vacío. Las facturas siempre vienen de BD.
+    purchaseOrders: [
+      ...seedOrders.map((o) => ({
+        ...o,
+        status: mapLegacyPurchaseStatus(o.status),
+        currency: 'DOP',
+        purchaseType: 'national' as const,
+      })),
+      ...seedInternationalOrders,
+    ],
+    receptions: seedReceptions.map((r) => ({ ...r, purchaseType: 'national' as const })),
+    supplierInvoices: loadLocalSupplierInvoices(),
     transfers: seedTransfers.map((t) => ({
       id: t.id,
       origin: t.origin,

@@ -1,10 +1,15 @@
 /**
- * Constantes de UI del módulo Compras (no son datos de negocio).
- * Estados alineados con el DER / modelos backend (sin inventar estados nuevos).
+ * Constantes de UI del módulo Compras.
+ * Estados de factura: public/scriptdb → FacturaProveedores.estado
  */
 import type { PurchaseStatus } from '@/types/domain'
 import { purchaseStatusLabels } from '@/constants/stateMachines'
 import type { SupplierInvoice } from '@/modules/compras/components/SupplierInvoiceRecordDialog'
+import {
+  facturaProveedoresEstado,
+  isFacturaAnulada,
+  isFacturaPagada,
+} from '@/modules/compras/services/comprasScriptdb'
 
 export const purchaseStatusVariants: Record<
   PurchaseStatus | string,
@@ -18,7 +23,6 @@ export const purchaseStatusVariants: Record<
   cancelled: 'danger',
 }
 
-/** Mapa label + variant para badges de OC. */
 export const purchaseStatusMap: Record<
   string,
   { label: string; variant: 'neutral' | 'info' | 'warning' | 'success' | 'danger' }
@@ -29,24 +33,22 @@ export const purchaseStatusMap: Record<
   ])
 )
 
-/**
- * Estado de pago de factura proveedor (DER: pendiente | parcial | pagada).
- * El documento usa registrada | contabilizada | anulada (sin borrador).
- */
+/** FacturaProveedores.estado — public/scriptdb */
 export const invoiceStatusMap: Record<
   string,
   { label: string; variant: 'neutral' | 'info' | 'warning' | 'success' | 'danger' }
 > = {
+  Pendiente: { label: 'Pendiente', variant: 'warning' },
+  Pagada: { label: 'Pagada', variant: 'success' },
+  Vencida: { label: 'Vencida', variant: 'danger' },
+  Anulada: { label: 'Anulada', variant: 'danger' },
+  'Pagado Parcial': { label: 'Parcial', variant: 'info' },
   pending: { label: 'Pendiente', variant: 'warning' },
   partial: { label: 'Parcial', variant: 'info' },
   paid: { label: 'Pagada', variant: 'success' },
   anulada: { label: 'Anulada', variant: 'danger' },
 }
 
-/**
- * Recepción (DER: borrador | confirmada).
- * Misma nomenclatura oficial que el resto de Compras.
- */
 export const receptionStatusMap: Record<
   string,
   { label: string; variant: 'neutral' | 'info' | 'warning' | 'success' | 'danger' }
@@ -55,26 +57,26 @@ export const receptionStatusMap: Record<
   complete: { label: 'Confirmada', variant: 'success' },
 }
 
-/**
- * Edición UI solo si el documento está en BORRADOR (regla oficial LibroSys).
- * Compatibilidad DER: factura_proveedor.estado = registrada|contabilizada|anulada
- * (sin valor 'borrador'). Mientras el DER no evolucione, canEdit permanece en false
- * para datos reales; backend rechaza PUT/actualizar si estado ≠ borrador.
- */
+export function invoiceStatusBadge(invoice: Pick<SupplierInvoice, 'documentEstado' | 'estadoPago' | 'status'>) {
+  const estado = facturaProveedoresEstado(invoice)
+  return invoiceStatusMap[estado] ?? { label: estado, variant: 'warning' as const }
+}
+
 export function canEditFacturaProveedor(invoice: Pick<SupplierInvoice, 'documentEstado'>): boolean {
   return String(invoice.documentEstado ?? '').toLowerCase() === 'borrador'
 }
 
-/**
- * Pendiente/parcial: visualizar y anular (con permisos).
- * Pagada / anulada: solo lectura.
- */
 export function canAnularFacturaProveedor(
   invoice: Pick<SupplierInvoice, 'status' | 'documentEstado' | 'estadoPago'>
 ): boolean {
-  const doc = String(invoice.documentEstado ?? '').toLowerCase()
-  const pago = String(invoice.estadoPago ?? invoice.status ?? '').toLowerCase()
-  if (doc === 'anulada') return false
-  if (pago === 'pagada' || invoice.status === 'paid') return false
+  if (isFacturaAnulada(invoice) || isFacturaPagada(invoice)) return false
+  return true
+}
+
+/** Pendiente o parcial — registrar pago (actualiza FacturaProveedores + CuentasPorPagar). */
+export function canRegistrarPagoFacturaProveedor(
+  invoice: Pick<SupplierInvoice, 'status' | 'documentEstado' | 'estadoPago'>
+): boolean {
+  if (isFacturaAnulada(invoice) || isFacturaPagada(invoice)) return false
   return true
 }

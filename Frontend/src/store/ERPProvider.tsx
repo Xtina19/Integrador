@@ -15,6 +15,20 @@ import { eventService, type CreateEventInput, type UpdateEventInput } from '@/se
 import { dashboardService } from '@/services/dashboardService'
 import { prependActivity, prependNotification } from '@/services/activityService'
 import type { Activity, Notification, InternationalInvoice } from '@/types/domain'
+import { shouldUseLocalCompras } from '@/modules/compras/services/comprasDualMode'
+import {
+  isFacturaAnulada,
+  isFacturaPagada,
+} from '@/modules/compras/services/comprasScriptdb'
+import {
+  buildRegistrarFacturaBody,
+  registerLocalSupplierInvoice,
+} from '@/modules/compras/services/facturaProveedorUi'
+import {
+  mergeSupplierInvoices,
+  saveLocalSupplierInvoices,
+} from '@/modules/compras/services/comprasLocalStore'
+import type { SupplierInvoice } from '@/modules/compras/components/SupplierInvoiceRecordDialog'
 
 interface ERPContextValue {
   state: ERPState
@@ -25,6 +39,15 @@ interface ERPContextValue {
   unreadNotifications: number
   comprasReady: boolean
   refreshCompras: () => Promise<void>
+  registerSupplierInvoice: (input: {
+    orderId: string
+    ncf?: string
+    fechaEmision: string
+    fechaVencimiento?: string
+    fechaRecepcionDocumento?: string
+  }) => Promise<{ success: boolean; errors?: string[] }>
+  anularSupplierInvoice: (invoiceId: string) => Promise<{ success: boolean; errors?: string[] }>
+  registerSupplierInvoicePayment: (invoiceId: string) => Promise<{ success: boolean; errors?: string[] }>
 
   createPurchaseOrder: (input: CreatePurchaseInput) => { success: boolean; errors?: string[] } | Promise<{ success: boolean; errors?: string[] }>
   updatePurchaseOrder: (input: UpdatePurchaseInput) => { success: boolean; errors?: string[] } | Promise<{ success: boolean; errors?: string[] }>
@@ -89,14 +112,36 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
     }
     try {
       const loaded = await loadComprasFromApi()
-      setState((s) => ({
-        ...s,
-        purchaseOrders: loaded.purchaseOrders,
-        receptions: loaded.receptions,
-      }))
+      setState((s) => {
+        const apiOrderIds = new Set(loaded.purchaseOrders.map((o) => o.id))
+        const isSeedOrder = (o: { id: string; dbId?: number }) =>
+          !o.dbId && /^(OC-INT-)?OC-2026-/.test(o.id)
+        const localOrders = s.purchaseOrders.filter(
+          (o) => !o.dbId && !apiOrderIds.has(o.id) && !isSeedOrder(o)
+        )
+        const apiReceptionIds = new Set(loaded.receptions.map((r) => r.id))
+        const isSeedReception = (r: { id: string; dbId?: number }) =>
+          !r.dbId && /^REC-2026-/.test(r.id)
+        const localReceptions = s.receptions.filter(
+          (r) => !r.dbId && !apiReceptionIds.has(r.id) && !isSeedReception(r)
+        )
+        const fromApi = loaded.purchaseOrders.length > 0
+
+        return {
+          ...s,
+          purchaseOrders: fromApi
+            ? [...loaded.purchaseOrders, ...localOrders]
+            : s.purchaseOrders,
+          receptions: loaded.receptions.length > 0
+            ? [...loaded.receptions, ...localReceptions]
+            : s.receptions,
+          supplierInvoices: mergeSupplierInvoices(loaded.supplierInvoices, s.supplierInvoices),
+        }
+      })
       setComprasReady(true)
     } catch (e) {
       console.error('[Compras] No se pudo hidratar desde API:', getFriendlyErrorMessage(e))
+      // Ante error de API, mantener semilla local (no vaciar pantallas).
       setComprasReady(true)
     }
   }, [])
@@ -104,6 +149,148 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     void refreshCompras()
   }, [refreshCompras])
+
+  useEffect(() => {
+    saveLocalSupplierInvoices(state.supplierInvoices)
+  }, [state.supplierInvoices])
+
+  const registerSupplierInvoice = useCallback(
+    async (input: {
+      orderId: string
+      ncf?: string
+      fechaEmision: string
+      fechaVencimiento?: string
+      fechaRecepcionDocumento?: string
+    }) => {
+      const order = state.purchaseOrders.find((o) => o.id === input.orderId)
+      if (!order) return { success: false, errors: ['Orden de compra no encontrada.'] }
+
+      if (shouldUseLocalCompras(order)) {
+        try {
+          const invoice = registerLocalSupplierInvoice(
+            order,
+            {
+              ncf: input.ncf,
+              fechaEmision: input.fechaEmision,
+              fechaVencimiento: input.fechaVencimiento,
+            },
+            state.supplierInvoices
+          )
+          setState((s) => ({
+            ...s,
+            supplierInvoices: [...s.supplierInvoices, invoice],
+          }))
+          return { success: true }
+        } catch (e) {
+          return { success: false, errors: [getFriendlyErrorMessage(e)] }
+        }
+      }
+
+      try {
+        const orden = await comprasApi.getOrden(order.dbId!)
+        const body = buildRegistrarFacturaBody(orden, input)
+        const created = await comprasApi.registrarFactura(body)
+        setState((s) => ({
+          ...s,
+          supplierInvoices: [
+            ...s.supplierInvoices.filter((i) => i.orderId !== order.id),
+            {
+              id: created.codigo,
+              dbId: created.id,
+              supplier: order.supplier,
+              orderId: order.id,
+              date: String(created.fechaEmision).slice(0, 10),
+              amount: Number(created.total),
+              status: 'pending' as const,
+              currency: order.currency,
+              numeroFactura: created.numeroFactura,
+              ncf: created.ncf ?? undefined,
+              documentEstado: created.estado,
+              estadoPago: created.estadoPago,
+            } satisfies SupplierInvoice,
+          ],
+        }))
+        return { success: true }
+      } catch (e) {
+        return { success: false, errors: [getFriendlyErrorMessage(e)] }
+      }
+    },
+    [state]
+  )
+
+  const anularSupplierInvoice = useCallback(
+    async (invoiceId: string) => {
+      const inv = state.supplierInvoices.find((i) => i.id === invoiceId)
+      if (!inv) return { success: false, errors: ['Factura no encontrada.'] }
+
+      if (shouldUseLocalCompras(inv)) {
+        setState((s) => ({
+          ...s,
+          supplierInvoices: s.supplierInvoices.map((i) =>
+            i.id === invoiceId ? { ...i, documentEstado: 'Anulada', status: 'pending' as const } : i
+          ),
+        }))
+        return { success: true }
+      }
+
+      try {
+        await comprasApi.anularFactura(inv.dbId!)
+        setState((s) => ({
+          ...s,
+          supplierInvoices: s.supplierInvoices.map((i) =>
+            i.id === invoiceId ? { ...i, documentEstado: 'Anulada', status: 'pending' as const } : i
+          ),
+        }))
+        await refreshCompras()
+        return { success: true }
+      } catch (e) {
+        return { success: false, errors: [getFriendlyErrorMessage(e)] }
+      }
+    },
+    [state, refreshCompras]
+  )
+
+  const registerSupplierInvoicePayment = useCallback(
+    async (invoiceId: string) => {
+      const inv = state.supplierInvoices.find((i) => i.id === invoiceId)
+      if (!inv) return { success: false, errors: ['Factura no encontrada.'] }
+      if (isFacturaAnulada(inv)) {
+        return { success: false, errors: ['La factura está anulada.'] }
+      }
+      if (isFacturaPagada(inv)) {
+        return { success: false, errors: ['La factura ya está pagada.'] }
+      }
+
+      if (shouldUseLocalCompras(inv)) {
+        setState((s) => ({
+          ...s,
+          supplierInvoices: s.supplierInvoices.map((i) =>
+            i.id === invoiceId
+              ? { ...i, status: 'paid' as const, documentEstado: 'Pagada', estadoPago: 'Pagado' }
+              : i
+          ),
+        }))
+        return { success: true }
+      }
+
+      try {
+        await comprasApi.registrarPagoFactura(inv.dbId!)
+        setState((s) => ({
+          ...s,
+          supplierInvoices: s.supplierInvoices.map((i) =>
+            i.id === invoiceId
+              ? { ...i, status: 'paid' as const, documentEstado: 'Pagada', estadoPago: 'Pagado' }
+              : i
+          ),
+        }))
+        await refreshCompras()
+        return { success: true }
+      } catch (e) {
+        return { success: false, errors: [getFriendlyErrorMessage(e)] }
+      }
+    },
+    [state, refreshCompras]
+  )
 
   const metrics = useMemo(() => dashboardService.getMetrics(state), [state])
   const lowStockProducts = useMemo(() => dashboardService.getLowStockProducts(state), [state])
@@ -205,6 +392,16 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const existing = state.purchaseOrders.find((o) => o.id === input.orderId)
+      if (shouldUseLocalCompras(existing)) {
+        const result = purchaseService.updateOrder(state, input)
+        if (!result.success) return { success: false, errors: result.errors }
+        setState((s) => ({
+          ...s,
+          purchaseOrders: s.purchaseOrders.map((o) => (o.id === input.orderId ? result.order : o)),
+        }))
+        applySideEffects(setState, result.activity, null)
+        return { success: true }
+      }
       if (!existing?.dbId) return { success: false, errors: ['Orden no sincronizada. Recargue e intente de nuevo.'] }
 
       const productByTitle = new Map(state.products.map((p) => [p.title.trim().toLowerCase(), p]))
@@ -241,7 +438,9 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
   }, [state, refreshCompras])
 
   const deletePurchaseOrder = useCallback(async (orderId: string) => {
-    if (!comprasApi.isEnabled()) {
+    const existing = state.purchaseOrders.find((o) => o.id === orderId)
+
+    if (!comprasApi.isEnabled() || shouldUseLocalCompras(existing)) {
       const result = purchaseService.deleteOrder(state, orderId)
       if (!result.success) return { success: false, errors: result.errors }
       setState((s) => ({
@@ -253,7 +452,6 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const existing = state.purchaseOrders.find((o) => o.id === orderId)
       if (!existing?.dbId) return { success: false, errors: ['Orden no sincronizada. Recargue e intente de nuevo.'] }
       await comprasApi.cancelarOrden(existing.dbId)
       await refreshCompras()
@@ -264,7 +462,9 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
   }, [state, refreshCompras])
 
   const approvePurchaseOrder = useCallback(async (orderId: string) => {
-    if (!comprasApi.isEnabled()) {
+    const existing = state.purchaseOrders.find((o) => o.id === orderId)
+
+    if (!comprasApi.isEnabled() || shouldUseLocalCompras(existing)) {
       const result = purchaseService.approveOrder(state, orderId)
       if (!result.success) return { success: false, errors: result.errors }
       setState((s) => ({
@@ -288,7 +488,6 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const existing = state.purchaseOrders.find((o) => o.id === orderId)
       if (!existing?.dbId) return { success: false, errors: ['Orden no sincronizada. Recargue e intente de nuevo.'] }
       if (existing.status === 'draft') {
         await comprasApi.enviarAprobacion(existing.dbId)
@@ -302,8 +501,9 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
   }, [state, refreshCompras])
 
   const completeReception = useCallback(async (receptionId: string, items?: number) => {
-    if (!comprasApi.isEnabled()) {
-      const reception = state.receptions.find((r) => r.id === receptionId)
+    const reception = state.receptions.find((r) => r.id === receptionId)
+
+    if (!comprasApi.isEnabled() || shouldUseLocalCompras(reception)) {
       const isInternational = reception?.purchaseType === 'international'
 
       const result = isInternational
@@ -338,9 +538,8 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const existing = state.receptions.find((r) => r.id === receptionId)
-      if (!existing?.dbId) return { success: false, errors: ['Recepción no sincronizada. Recargue e intente de nuevo.'] }
-      await comprasApi.confirmarRecepcion(existing.dbId, { resultadoInspeccion: 'aceptada' })
+      if (!reception?.dbId) return { success: false, errors: ['Recepción no sincronizada. Recargue e intente de nuevo.'] }
+      await comprasApi.confirmarRecepcion(reception.dbId, { resultadoInspeccion: 'aceptada' })
       await refreshCompras()
       return { success: true }
     } catch (e) {
@@ -360,7 +559,9 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
   }, [state])
 
   const deleteReception = useCallback(async (receptionId: string) => {
-    if (!comprasApi.isEnabled()) {
+    const existing = state.receptions.find((r) => r.id === receptionId)
+
+    if (!comprasApi.isEnabled() || shouldUseLocalCompras(existing)) {
       const result = purchaseService.deleteReception(state, receptionId)
       if (!result.success) return { success: false, errors: result.errors }
       setState((s) => ({
@@ -372,7 +573,6 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const existing = state.receptions.find((r) => r.id === receptionId)
       if (!existing?.dbId) return { success: false, errors: ['Recepción no sincronizada. Recargue e intente de nuevo.'] }
       await comprasApi.anularRecepcion(existing.dbId)
       await refreshCompras()
@@ -669,6 +869,9 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
       unreadNotifications,
       comprasReady,
       refreshCompras,
+      registerSupplierInvoice,
+      anularSupplierInvoice,
+      registerSupplierInvoicePayment,
       createPurchaseOrder,
       updatePurchaseOrder,
       deletePurchaseOrder,
@@ -706,6 +909,9 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
       unreadNotifications,
       comprasReady,
       refreshCompras,
+      registerSupplierInvoice,
+      anularSupplierInvoice,
+      registerSupplierInvoicePayment,
       createPurchaseOrder,
       updatePurchaseOrder,
       deletePurchaseOrder,

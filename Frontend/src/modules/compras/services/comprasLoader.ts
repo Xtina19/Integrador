@@ -1,7 +1,6 @@
 /**
  * Carga agregada Compras desde API para hidratar ERPState.
- * FASE 9: usa listados paginados (sin N+1 getById por fila).
- * El detalle de líneas se obtiene al abrir un documento (getOrden / getRecepcion).
+ * Si algún listado falla (404/500), se devuelve vacío para ese recurso sin abortar el resto.
  */
 import { comprasApi } from '@/services/api/comprasApi'
 import { proveedoresApi } from '@/services/api/proveedoresApi'
@@ -12,6 +11,8 @@ import {
 } from '@/services/api/comprasMappers'
 import type { PurchaseOrder, Reception } from '@/types/domain'
 import type { SupplierInvoice } from '@/modules/compras/components/SupplierInvoiceRecordDialog'
+import type { FacturaProveedorDto, OrdenCompraDto, RecepcionDto } from '@/services/api/comprasApi'
+import type { PageResult } from '@/services/api/comprasApi'
 
 function supplierNameMap(rows: Record<string, unknown>[]): Record<number, string> {
   const map: Record<number, string> = {}
@@ -22,6 +23,18 @@ function supplierNameMap(rows: Record<string, unknown>[]): Record<number, string
   return map
 }
 
+async function safeList<T>(
+  label: string,
+  fn: () => Promise<PageResult<T>>
+): Promise<PageResult<T>> {
+  try {
+    return await fn()
+  } catch (e) {
+    console.warn(`[Compras] ${label} no disponible en API:`, e)
+    return { data: [], page: 1, pageSize: 0, total: 0 }
+  }
+}
+
 export async function loadComprasFromApi(): Promise<{
   purchaseOrders: PurchaseOrder[]
   receptions: Reception[]
@@ -29,35 +42,38 @@ export async function loadComprasFromApi(): Promise<{
   supplierNames: Record<number, string>
 }> {
   const [ordenesPage, recepcionesPage, facturasPage, proveedores] = await Promise.all([
-    comprasApi.listOrdenes({ activo: 1 }),
-    comprasApi.listRecepciones({ activo: 1 }),
-    comprasApi.listFacturas({ activo: 1 }),
-    proveedoresApi.list(),
+    safeList('órdenes', () => comprasApi.listOrdenes({ activo: 1 })),
+    safeList('recepciones', () => comprasApi.listRecepciones({ activo: 1 })),
+    safeList('facturas', () => comprasApi.listFacturas({ activo: 1 })),
+    proveedoresApi.list().catch(() => [] as Record<string, unknown>[]),
   ])
 
   const names = supplierNameMap(proveedores)
   const ordenById = new Map(ordenesPage.data.map((o) => [o.id, o]))
 
-  const purchaseOrders = ordenesPage.data.map((o) =>
-    ordenToPurchaseOrder(o, names[o.proveedorId] ?? '')
+  const purchaseOrders = ordenesPage.data.map((o: OrdenCompraDto) =>
+    ordenToPurchaseOrder(o, o.proveedorNombre ?? names[o.proveedorId] ?? '')
   )
 
-  const receptions = recepcionesPage.data.map((r) => {
+  const receptions = recepcionesPage.data.map((r: RecepcionDto) => {
     const orden = ordenById.get(r.ordenCompraId)
-    const orderCodigo = orden?.codigo ?? String(r.ordenCompraId)
+    const orderCodigo = r.ordenCodigo ?? orden?.codigo ?? String(r.ordenCompraId)
     const supplier =
+      r.proveedorNombre ??
+      orden?.proveedorNombre ??
       names[orden?.proveedorId ?? 0] ??
-      (orden ? `Proveedor #${orden.proveedorId}` : 'Proveedor')
-    const purchaseType = orden?.tipoCompra === 'internacional' ? 'international' : 'national'
+      'Proveedor'
+    const tipo = r.tipoCompra ?? orden?.tipoCompra
+    const purchaseType = tipo === 'internacional' ? 'international' : 'national'
     return recepcionToUi(r, orderCodigo, supplier, purchaseType)
   })
 
-  const supplierInvoices = facturasPage.data.map((f) => {
+  const supplierInvoices = facturasPage.data.map((f: FacturaProveedorDto) => {
     const orden = ordenById.get(f.ordenCompraId)
     return facturaToSupplierInvoice(
       f,
-      orden?.codigo ?? String(f.ordenCompraId),
-      names[f.proveedorId] ?? ''
+      f.ordenCodigo ?? orden?.codigo ?? String(f.ordenCompraId),
+      f.proveedorNombre ?? names[f.proveedorId] ?? ''
     )
   })
 

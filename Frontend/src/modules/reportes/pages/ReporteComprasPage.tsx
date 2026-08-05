@@ -1,25 +1,32 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Table } from '@/components/ui/Table'
 import { Toolbar } from '@/components/ui/Toolbar'
-import { purchaseOrders, purchaseStatusMap } from '@/mocks/mockCompras'
+import { purchaseStatusMap } from '@/modules/compras/constants/comprasUi'
 import { useTableExport } from '@/hooks/useTableExport'
+import { useERP } from '@/store/ERPProvider'
 import { formatDop } from '@/lib/money'
 
 export function ReporteComprasPage() {
+  const { state, comprasReady } = useERP()
   const { onExportPdf, onExportExcel } = useTableExport('Reporte Compras')
   const [search, setSearch] = useState('')
 
-  const filtered = purchaseOrders.filter(
-    (o) =>
-      search === '' ||
-      o.id.toLowerCase().includes(search.toLowerCase()) ||
-      o.supplier.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = useMemo(() => {
+    return state.purchaseOrders.filter(
+      (o) =>
+        search === '' ||
+        o.id.toLowerCase().includes(search.toLowerCase()) ||
+        o.supplier.toLowerCase().includes(search.toLowerCase())
+    )
+  }, [search, state.purchaseOrders])
 
   return (
     <div className="space-y-6">
+      {!comprasReady && (
+        <p className="text-sm text-gray-500">Cargando datos de Compras desde la base de datos…</p>
+      )}
       <Card>
         <CardBody>
           <Toolbar
@@ -36,7 +43,7 @@ export function ReporteComprasPage() {
                   o.date,
                   String(o.items),
                   formatDop(o.total),
-                  purchaseStatusMap[o.status].label,
+                  purchaseStatusMap[o.status]?.label ?? o.status,
                 ])
               )
             }
@@ -45,28 +52,28 @@ export function ReporteComprasPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Reporte de Compras" />
+        <CardHeader title="Órdenes de Compra" subtitle={`${filtered.length} registros desde la base de datos`} />
         <CardBody className="!p-0">
           <Table
             keyField="id"
             data={filtered}
             columns={[
-              { key: 'id', header: 'Orden', render: (o) => <span className="font-mono text-xs text-corporate">{o.id}</span> },
+              { key: 'id', header: 'Orden', className: 'font-mono text-xs text-corporate' },
               { key: 'supplier', header: 'Proveedor', render: (o) => <span className="font-medium">{o.supplier}</span> },
               { key: 'date', header: 'Fecha', className: 'text-sm' },
-              { key: 'items', header: 'Ítems', className: 'text-right' },
+              { key: 'items', header: 'Ítems', className: 'text-right tabular-nums' },
               {
                 key: 'total',
                 header: 'Total',
-                className: 'text-right font-mono tabular-nums',
-                render: (o) => formatDop(o.total),
+                className: 'text-right',
+                render: (o) => <span className="font-semibold tabular-nums">{formatDop(o.total)}</span>,
               },
               {
                 key: 'status',
                 header: 'Estado',
                 render: (o) => {
-                  const cfg = purchaseStatusMap[o.status]
-                  return <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                  const meta = purchaseStatusMap[o.status] ?? { label: o.status, variant: 'neutral' as const }
+                  return <Badge variant={meta.variant}>{meta.label}</Badge>
                 },
               },
             ]}

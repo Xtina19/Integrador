@@ -17,6 +17,10 @@ const tasasCambioRoutes = require('./routes/tasasCambio');
 const eventosRoutes = require('./routes/eventos');
 const autoresRoutes = require('./routes/autores');
 const inventoryRoutes = require('./routes/inventario');
+const comprasRoutes = require('./routes/comprasScriptdb');
+const { authPlaceholder } = require('./middlewares/authPlaceholder');
+const { traceId } = require('./middlewares/traceId');
+const { errorHandler } = require('./middlewares/errorHandler');
 const { mountVentasDdd } = require('./bootstrap/mountVentas');
 
 const app = express();
@@ -53,12 +57,15 @@ app.use('/api/tasas-cambio', tasasCambioRoutes);
 app.use('/api/eventos', eventosRoutes);
 app.use('/api/autores', autoresRoutes);
 app.use('/api/inventario', inventoryRoutes);
+app.use('/api/compras', traceId, authPlaceholder, comprasRoutes);
+app.use('/api/v1/compras', traceId, authPlaceholder, comprasRoutes);
 
 const PORT = process.env.PORT || 3001;
 
 async function start() {
   try {
     await mountVentasDdd(app);
+    app.use(errorHandler);
     app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));
   } catch (err) {
     console.error('[Backend] Error al iniciar:', err);

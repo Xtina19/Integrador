@@ -32,9 +32,12 @@ function validateLines(linesInput) {
 
 function validateRegistrar(input = {}) {
   const ordenCompraId = requireId(input.ordenCompraId, 'ordenCompraId')
-  const numeroFactura = requireString(input.numeroFactura, 'numeroFactura', { max: 50 })
   const monedaId = requireId(input.monedaId, 'monedaId')
   const fechaEmision = requireDate(input.fechaEmision, 'fechaEmision')
+  const numeroFactura =
+    input.numeroFactura != null && String(input.numeroFactura).trim() !== ''
+      ? requireString(input.numeroFactura, 'numeroFactura', { max: 50 })
+      : undefined
   return {
     ordenCompraId,
     proveedorId: optionalId(input.proveedorId, 'proveedorId'),

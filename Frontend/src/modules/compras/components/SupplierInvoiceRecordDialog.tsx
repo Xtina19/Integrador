@@ -3,7 +3,7 @@ import { FormDialog, DetailRow } from '@/components/ui/FormDialog'
 import { Input, Select } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { formatMoney } from '@/lib/money'
-import { invoiceStatusMap } from '@/modules/compras/constants/comprasUi'
+import { invoiceStatusBadge } from '@/modules/compras/constants/comprasUi'
 
 export interface SupplierInvoice {
   id: string
@@ -12,6 +12,9 @@ export interface SupplierInvoice {
   orderId: string
   date: string
   amount: number
+  /** Número fiscal del proveedor (distinto del código interno FP-). */
+  numeroFactura?: string
+  ncf?: string | null
   /** Estado de pago UI: pending | partial | paid */
   status: 'paid' | 'pending' | 'partial'
   currency?: string
@@ -19,6 +22,7 @@ export interface SupplierInvoice {
   documentEstado?: string
   /** DER pago: pendiente | parcial | pagada */
   estadoPago?: string
+  fechaVencimiento?: string
 }
 
 interface SupplierInvoiceRecordDialogProps {
@@ -61,12 +65,7 @@ export function SupplierInvoiceRecordDialog({
   if (!invoice) return null
 
   const currency = invoice.currency || 'DOP'
-  const statusKey =
-    invoice.documentEstado === 'anulada' ? 'anulada' : invoice.status
-  const statusMeta = invoiceStatusMap[statusKey] ?? {
-    label: invoice.status,
-    variant: 'warning' as const,
-  }
+  const statusMeta = invoiceStatusBadge(invoice)
 
   function handleSave() {
     if (!invoice) return
@@ -94,6 +93,10 @@ export function SupplierInvoiceRecordDialog({
       {mode === 'view' ? (
         <div className="space-y-1">
           <DetailRow label="Factura" value={<span className="font-mono">{invoice.id}</span>} />
+          {invoice.numeroFactura ? (
+            <DetailRow label="Número proveedor" value={<span className="font-mono">{invoice.numeroFactura}</span>} />
+          ) : null}
+          {invoice.ncf ? <DetailRow label="NCF" value={invoice.ncf} /> : null}
           <DetailRow label="Proveedor" value={invoice.supplier} />
           <DetailRow label="Orden de compra" value={<span className="font-mono">{invoice.orderId}</span>} />
           <DetailRow label="Fecha" value={invoice.date} />
