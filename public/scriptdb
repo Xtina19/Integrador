@@ -74,6 +74,18 @@ CREATE TABLE Direccion (
 -- =============================================
 -- MODULO PERSONAS Y ENTIDADES COMERCIALES
 -- =============================================
+-- Mantenimientos admin → almacenamiento en BD:
+--   Clientes     → Persona (+ Telefono); NO existe tabla Clientes
+--   Usuarios     → Usuario + Persona
+--   Roles        → Rol (catálogo) + Usuario.rol (slug)
+--   Proveedores  → Proveedor + Persona + TipoProveedor
+--   Editoriales  → Editorial
+--   Productos    → Producto + Autor + CategoriaProducto + Editorial
+--   Categorías   → CategoriaProducto
+--   Almacenes    → Almacen + Sucursal
+--   Monedas      → Moneda
+--   Tasas cambio → TasaCambio + Moneda
+--   Formas pago  → FormaPago (NC no incluida; ver Ventas)
 CREATE TABLE Persona (
     id_persona INT PRIMARY KEY IDENTITY,
     tipo_persona VARCHAR(20) NOT NULL,
@@ -85,6 +97,10 @@ CREATE TABLE Persona (
     correo VARCHAR(150),
     fecha_nacimiento DATE,
     genero VARCHAR(20),
+    tipo_cliente VARCHAR(30) NULL,
+    -- persona|colegio|universidad|empresa|institucion (mantenimiento Clientes)
+    sucursal_preferida VARCHAR(100) NULL,
+    observaciones VARCHAR(255) NULL,
     estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
     fecha_registro DATETIME NOT NULL DEFAULT GETDATE()
 );
@@ -116,11 +132,24 @@ CREATE TABLE Usuario (
     correo VARCHAR(150) NOT NULL UNIQUE,
     contrasena_hash VARCHAR(255) NOT NULL,
     rol VARCHAR(50) NOT NULL DEFAULT 'usuario',
+    -- slug de Rol.slug (catálogo Rol)
     estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
     ultimo_acceso DATETIME,
     fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
     fecha_actualizacion DATETIME NOT NULL DEFAULT GETDATE(),
     CONSTRAINT fk_usuario_persona FOREIGN KEY (id_persona) REFERENCES Persona(id_persona),
+);
+
+CREATE TABLE Rol (
+    id_rol INT PRIMARY KEY IDENTITY,
+    codigo VARCHAR(30) NOT NULL,
+    slug VARCHAR(30) NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion VARCHAR(255) NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT UQ_Rol_codigo UNIQUE (codigo),
+    CONSTRAINT UQ_Rol_slug UNIQUE (slug)
 );
 
 CREATE TABLE TipoProveedor (
@@ -164,12 +193,18 @@ CREATE TABLE Autor (
 
 CREATE TABLE Editorial (
     id_editorial INT PRIMARY KEY IDENTITY,
+    codigo_editorial VARCHAR(30) NULL,
     nombre VARCHAR(150) NOT NULL,
     pais_origen VARCHAR(50),
     sitio_web VARCHAR(200),
     correo_contacto VARCHAR(100),
     telefono VARCHAR(20),
-    fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP
+    nombre_contacto VARCHAR(150) NULL,
+    tipo_contrato VARCHAR(100) NULL,
+    vencimiento_contrato DATE NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT UQ_Editorial_codigo UNIQUE (codigo_editorial)
 );
 
 CREATE TABLE CategoriaProducto (
@@ -200,6 +235,46 @@ CREATE TABLE Producto (
     CONSTRAINT fk_producto_autor FOREIGN KEY (id_autor) REFERENCES Autor(id_autor),
     CONSTRAINT fk_producto_editorial FOREIGN KEY (id_editorial) REFERENCES Editorial(id_editorial),
     CONSTRAINT fk_producto_categoria FOREIGN KEY (id_categoria) REFERENCES CategoriaProducto(id_categoria)
+);
+
+-- =============================================
+-- MODULO CONFIGURACION (MONEDAS, TASAS, FORMAS DE PAGO)
+-- =============================================
+CREATE TABLE Moneda (
+    id_moneda INT PRIMARY KEY IDENTITY,
+    codigo_iso CHAR(3) NOT NULL,
+    simbolo VARCHAR(10) NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activa',
+    es_predeterminada BIT NOT NULL DEFAULT 0,
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT UQ_Moneda_codigo UNIQUE (codigo_iso)
+);
+
+CREATE TABLE TasaCambio (
+    id_tasa_cambio INT PRIMARY KEY IDENTITY,
+    id_moneda_origen INT NOT NULL,
+    id_moneda_destino INT NOT NULL,
+    valor DECIMAL(18, 6) NOT NULL,
+    fecha_tasa DATE NOT NULL,
+    notas VARCHAR(255) NULL,
+    actualizado_por VARCHAR(100) NOT NULL DEFAULT 'Sistema',
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activa',
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_tasa_origen FOREIGN KEY (id_moneda_origen) REFERENCES Moneda(id_moneda),
+    CONSTRAINT fk_tasa_destino FOREIGN KEY (id_moneda_destino) REFERENCES Moneda(id_moneda),
+    CONSTRAINT uq_tasa_par_fecha UNIQUE (id_moneda_origen, id_moneda_destino, fecha_tasa)
+);
+
+CREATE TABLE FormaPago (
+    id_forma_pago INT PRIMARY KEY IDENTITY,
+    codigo VARCHAR(30) NOT NULL,
+    slug VARCHAR(30) NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT UQ_FormaPago_codigo UNIQUE (codigo),
+    CONSTRAINT UQ_FormaPago_slug UNIQUE (slug)
 );
 
 -- =============================================
@@ -1030,6 +1105,96 @@ VALUES
     ('Perú', 'PER', '+51', 'PEN', 'Activo'),
     ('Brasil', 'BRA', '+55', 'BRL', 'Activo');
 
+-- Tabla: Moneda
+-- Depende de: ninguna
+INSERT INTO
+    Moneda (codigo_iso, simbolo, nombre, estado, es_predeterminada)
+VALUES
+    ('DOP', 'RD$', 'Peso Dominicano', 'Activa', 1),
+    ('USD', 'US$', 'Dólar Estadounidense', 'Activa', 0),
+    ('EUR', '€', 'Euro', 'Activa', 0),
+    ('GBP', '£', 'Libra Esterlina', 'Activa', 0),
+    ('MXN', 'MX$', 'Peso Mexicano', 'Activa', 0),
+    ('COP', 'COL$', 'Peso Colombiano', 'Activa', 0),
+    ('ARS', 'AR$', 'Peso Argentino', 'Activa', 0),
+    ('CLP', 'CL$', 'Peso Chileno', 'Activa', 0),
+    ('BRL', 'R$', 'Real Brasileño', 'Activa', 0),
+    ('CAD', 'CA$', 'Dólar Canadiense', 'Activa', 0),
+    ('JPY', '¥', 'Yen Japonés', 'Activa', 0),
+    ('PEN', 'S/', 'Sol Peruano', 'Activa', 0);
+
+-- Tabla: TasaCambio
+-- Depende de: Moneda (tasas hacia DOP, referencia agosto 2026)
+INSERT INTO
+    TasaCambio (
+        id_moneda_origen,
+        id_moneda_destino,
+        valor,
+        fecha_tasa,
+        notas,
+        actualizado_por,
+        estado
+    )
+SELECT
+    mo.id_moneda,
+    md.id_moneda,
+    v.valor,
+    v.fecha_tasa,
+    v.notas,
+    'Sistema',
+    'Activa'
+FROM (
+    VALUES
+        ('USD', 58.29, '2026-08-05', 'Tasa de referencia mercado interbancario (Xe)'),
+        ('EUR', 63.5, '2026-08-05', 'Estimado vía cruce EUR/USD'),
+        ('GBP', 74.05, '2026-08-05', 'Estimado vía cruce GBP/USD'),
+        ('MXN', 3.15, '2026-08-05', 'Estimado vía cruce MXN/USD'),
+        ('COP', 0.0146, '2026-08-05', 'Estimado vía cruce COP/USD'),
+        (
+            'ARS',
+            0.058,
+            '2026-08-05',
+            'Estimado vía cruce ARS/USD, alta volatilidad'
+        ),
+        ('CLP', 0.0614, '2026-08-05', 'Estimado vía cruce CLP/USD'),
+        ('BRL', 10.41, '2026-08-05', 'Estimado vía cruce BRL/USD'),
+        ('CAD', 42.55, '2026-08-05', 'Estimado vía cruce CAD/USD'),
+        ('JPY', 0.3886, '2026-08-05', 'Estimado vía cruce JPY/USD'),
+        ('PEN', 15.54, '2026-08-05', 'Estimado vía cruce PEN/USD')
+) AS v (origen, valor, fecha_tasa, notas)
+INNER JOIN Moneda mo ON mo.codigo_iso = v.origen
+INNER JOIN Moneda md ON md.codigo_iso = 'DOP';
+
+-- Tabla: FormaPago
+-- Depende de: ninguna (NOTA_CREDITO no es forma de pago; ver Ventas)
+INSERT INTO
+    FormaPago (codigo, slug, nombre, estado)
+VALUES
+    ('EFECTIVO', 'efectivo', 'Efectivo', 'Activo'),
+    ('TARJETA', 'tarjeta', 'Tarjeta', 'Activo'),
+    (
+        'TRANSFERENCIA',
+        'transferencia',
+        'Transferencia',
+        'Activo'
+    ),
+    ('CHEQUE', 'cheque', 'Cheque', 'Activo'),
+    ('PAYPAL', 'paypal', 'PayPal', 'Activo'),
+    ('PAGO_MOVIL', 'pago_movil', 'Pago Móvil', 'Activo'),
+    (
+        'PUNTOS',
+        'puntos',
+        'Puntos / Programa de Lealtad',
+        'Activo'
+    ),
+    ('CRIPTO', 'cripto', 'Criptomoneda', 'Activo'),
+    (
+        'FINANCIAMIENTO',
+        'financiamiento',
+        'Financiamiento / Crédito Institucional',
+        'Activo'
+    );
+
 -- Tabla: TipoDireccion
 -- Depende de: ninguna
 INSERT INTO
@@ -1084,6 +1249,7 @@ VALUES
 
 -- Tabla: Persona
 -- Depende de: ninguna
+-- Clientes: Persona con tipo_cliente (excluir Usuario/Proveedor en consultas API)
 INSERT INTO
     Persona (
         tipo_persona,
@@ -1558,6 +1724,195 @@ VALUES
         'https://harpercollins.com',
         'contact@harpercollins.test',
         '+1-212-555-1000'
+    );
+
+-- Semilla Joselito: Editorial (EDT-001..EDT-015)
+-- Actualiza registros demo existentes por nombre y agrega editoriales nuevas
+UPDATE Editorial
+SET
+    codigo_editorial = 'EDT-001',
+    nombre_contacto = 'Carlos Ramírez',
+    correo_contacto = 'contacto@alfaguara.com',
+    telefono = '+34 91 423 3400',
+    tipo_contrato = 'Distribución exclusiva',
+    vencimiento_contrato = '2027-03-06',
+    estado = 'Inactivo'
+WHERE
+    nombre = 'Alfaguara';
+
+UPDATE Editorial
+SET
+    codigo_editorial = 'EDT-003',
+    nombre = 'Planeta',
+    nombre_contacto = 'Miguel Ángel Torres',
+    correo_contacto = 'comercial@planeta.es',
+    telefono = '+34 93 228 5800',
+    tipo_contrato = 'Distribución no exclusiva',
+    vencimiento_contrato = '2028-12-20',
+    estado = 'Activo'
+WHERE
+    nombre = 'Editorial Planeta';
+
+UPDATE Editorial
+SET
+    codigo_editorial = 'EDT-004',
+    nombre = 'Sudamericana',
+    nombre_contacto = 'Valeria Gómez',
+    correo_contacto = 'contacto@sudamericana.com.ar',
+    telefono = '+54 11 4124 9100',
+    tipo_contrato = 'Distribución exclusiva',
+    vencimiento_contrato = '2027-10-15',
+    estado = 'Activo'
+WHERE
+    nombre = 'Editorial Sudamericana';
+
+UPDATE Editorial
+SET
+    codigo_editorial = 'EDT-007',
+    nombre_contacto = 'Jorge Martínez',
+    correo_contacto = 'ventas@salamandra.info',
+    telefono = '+34 93 218 4408',
+    tipo_contrato = 'Distribución exclusiva',
+    vencimiento_contrato = '2028-07-04',
+    estado = 'Activo'
+WHERE
+    nombre = 'Salamandra';
+
+UPDATE Editorial
+SET
+    codigo_editorial = 'EDT-008',
+    nombre_contacto = 'Patricia Soler',
+    correo_contacto = 'contacto@minotaurolibros.com',
+    telefono = '+34 93 492 8000',
+    tipo_contrato = 'Distribución exclusiva',
+    vencimiento_contrato = '2028-12-29',
+    estado = 'Inactivo'
+WHERE
+    nombre = 'Minotauro';
+
+UPDATE Editorial
+SET
+    codigo_editorial = 'EDT-010',
+    nombre_contacto = 'Cristina Molina',
+    correo_contacto = 'info@debate.es',
+    telefono = '+34 91 744 9000',
+    tipo_contrato = 'Consignación',
+    vencimiento_contrato = '2028-09-02',
+    estado = 'Activo'
+WHERE
+    nombre = 'Debate';
+
+INSERT INTO
+    Editorial (
+        codigo_editorial,
+        nombre,
+        pais_origen,
+        correo_contacto,
+        telefono,
+        nombre_contacto,
+        tipo_contrato,
+        vencimiento_contrato,
+        estado
+    )
+VALUES
+    (
+        'EDT-002',
+        'Debolsillo',
+        'España',
+        'ventas@debolsillo.com',
+        '+34 93 366 5000',
+        'Laura Fernández',
+        'Distribución exclusiva',
+        '2028-05-14',
+        'Activo'
+    ),
+    (
+        'EDT-005',
+        'Alianza Editorial',
+        'España',
+        'pedidos@alianzaeditorial.es',
+        '+34 91 393 8800',
+        'Roberto Díaz',
+        'Distribución no exclusiva',
+        '2028-12-29',
+        'Inactivo'
+    ),
+    (
+        'EDT-006',
+        'Cátedra',
+        'España',
+        'info@catedra.com',
+        '+34 91 446 3350',
+        'Ana Belén Ruiz',
+        'Consignación',
+        '2027-07-17',
+        'Activo'
+    ),
+    (
+        'EDT-009',
+        'Plaza y Janés',
+        'España',
+        'comercial@plazayjanes.es',
+        '+34 91 744 9060',
+        'Fernando López',
+        'Distribución no exclusiva',
+        '2027-02-20',
+        'Activo'
+    ),
+    (
+        'EDT-011',
+        'Paidós',
+        'España',
+        'ventas@paidos.com',
+        '+34 93 494 9720',
+        'Andrés Herrera',
+        'Distribución no exclusiva',
+        '2028-04-11',
+        'Activo'
+    ),
+    (
+        'EDT-012',
+        'Diana',
+        'México',
+        'contacto@editorialdiana.com.mx',
+        '+52 55 5089 0510',
+        'Sofía Hernández',
+        'Distribución exclusiva',
+        '2027-04-12',
+        'Activo'
+    ),
+    (
+        'EDT-013',
+        'Gredos',
+        'España',
+        'pedidos@editorialgredos.com',
+        '+34 91 393 8800',
+        'Manuel Castro',
+        'Consignación',
+        '2028-12-08',
+        'Activo'
+    ),
+    (
+        'EDT-014',
+        'Seix Barral',
+        'España',
+        'comercial@seixbarral.es',
+        '+34 93 228 5800',
+        'Elena Navarro',
+        'Distribución no exclusiva',
+        '2028-09-30',
+        'Activo'
+    ),
+    (
+        'EDT-015',
+        'Ediciones B',
+        'España',
+        'ventas@edicionesb.com',
+        '+34 93 217 3900',
+        'Ricardo Suárez',
+        'Distribución exclusiva',
+        '2028-05-18',
+        'Activo'
     );
 
 -- Tabla: CategoriaProducto
@@ -2086,6 +2441,89 @@ VALUES
     (4, 'Madrid', '28001', 'Activo'),
     (5, 'Londres', 'SW1A1AA', 'Activo'),
     (6, 'Ciudad de México', '06000', 'Activo');
+
+-- Tabla: Rol
+-- Depende de: ninguna (Usuario.rol = Rol.slug)
+INSERT INTO
+    Rol (codigo, slug, nombre, descripcion, estado)
+VALUES
+    (
+        'ADMINISTRADOR',
+        'administrador',
+        'Administrador',
+        'Acceso total al sistema: configuración, usuarios, roles y todos los módulos',
+        'Activo'
+    ),
+    (
+        'ALMACEN',
+        'almacen',
+        'Almacén',
+        'Gestión de inventario físico, recepciones y traslados entre sucursales',
+        'Activo'
+    ),
+    (
+        'AUDITOR',
+        'auditor',
+        'Auditor',
+        'Acceso de solo lectura a reportes, auditoría y trazabilidad de operaciones',
+        'Activo'
+    ),
+    (
+        'CAJERO',
+        'cajero',
+        'Cajero',
+        'Registro de ventas en POS, facturación y cobros en caja',
+        'Activo'
+    ),
+    (
+        'COMPRAS',
+        'compras',
+        'Compras',
+        'Gestión de proveedores, órdenes de compra y recepciones',
+        'Activo'
+    ),
+    (
+        'CONSULTA',
+        'consulta',
+        'Consulta',
+        'Acceso de consulta limitada a catálogos y reportes básicos',
+        'Activo'
+    ),
+    (
+        'EVENTOS',
+        'eventos',
+        'Eventos',
+        'Organización de eventos, firmas de libros y ferias',
+        'Activo'
+    ),
+    (
+        'INVENTARIO',
+        'inventario',
+        'Inventario',
+        'Conteos físicos, ajustes, transferencias y descartes',
+        'Activo'
+    ),
+    (
+        'LOGISTICA',
+        'logistica',
+        'Logística',
+        'Despacho, embarques y coordinación de entregas',
+        'Activo'
+    ),
+    (
+        'SUPERVISOR',
+        'supervisor',
+        'Supervisor',
+        'Supervisión operativa de sucursales y personal de piso',
+        'Activo'
+    ),
+    (
+        'USUARIO',
+        'usuario',
+        'Usuario',
+        'Acceso básico al sistema',
+        'Activo'
+    );
 
 -- Tabla: Usuario
 -- Depende de: Persona

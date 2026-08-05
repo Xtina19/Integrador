@@ -1,21 +1,21 @@
-﻿import {
-  httpGet,
-  httpPost,
-  httpPut,
-  httpPatch,
-} from '@/services/http'
+﻿import { httpGet, httpPost, httpPut, httpPatch } from '@/services/http'
 import { listAll } from '@/services/api/httpList'
 
 const base = '/api/almacenes'
 
-export type AlmacenEstado = 'Activo' | 'Inactivo'
+export interface SucursalOptionDto {
+  id: string
+  idSucursal?: number
+  nombre: string
+  codigo: string
+}
 
 export interface AlmacenDto {
   id: string
-  idAlmacen: number
+  idAlmacen?: number
   sucursalId: string | null
-  sucursalNombre: string | null
-  sucursalCodigo: string | null
+  sucursalNombre?: string | null
+  sucursalCodigo?: string | null
   nombre: string
   codigo: string
   direccion: string
@@ -24,122 +24,60 @@ export interface AlmacenDto {
   telefono: string
   tipoAlmacen: string
   bloqueado: boolean
-  motivoBloqueo: string
-  fechaBloqueo: string | null
-  estado: AlmacenEstado
-  fechaRegistro: string
+  motivoBloqueo?: string
+  fechaBloqueo?: string | null
+  estado: string
+  fechaRegistro?: string
 }
 
 export interface GuardarAlmacenRequest {
   sucursalId: number | null
-  nombre: string
   codigo: string
-  direccion?: string
-  ciudad?: string
-  responsable?: string
-  telefono?: string
-  tipoAlmacen?: string
+  nombre: string
+  tipoAlmacen: string
+  direccion: string
+  ciudad: string
+  responsable: string
+  telefono: string
 }
 
-export interface SucursalOptionDto {
-  id: string
-  idSucursal: number
-  nombre: string
-  codigo: string
-}
+type ApiEnvelope<T> = { success?: boolean; data?: T }
 
-interface ApiEnvelope<T> {
-  success: boolean
-  data?: T
-  total?: number
-  message?: string
-  error?: {
-    code: string
-    message: string
-    details?: unknown
+function unwrapData<T>(res: T | ApiEnvelope<T>): T {
+  if (
+    res &&
+    typeof res === 'object' &&
+    'data' in res &&
+    (res as ApiEnvelope<T>).data !== undefined
+  ) {
+    return (res as ApiEnvelope<T>).data as T
   }
+  return res as T
 }
 
 export const almacenesApi = {
-  list: (
-    params?: Record<string, string | number | undefined>,
-  ) => listAll<AlmacenDto>(base, params),
+  list: (params?: Record<string, string | number | undefined>) =>
+    listAll<AlmacenDto>(base, params),
 
-  async listSucursales(): Promise<SucursalOptionDto[]> {
-  const response = await httpGet<
-    ApiEnvelope<SucursalOptionDto[]>
-  >(`${base}/opciones/sucursales`)
-
-  if (!response.success) {
-    throw new Error(
-      response.error?.message ??
-        'No se pudieron cargar las sucursales.',
+  listSucursales: async (): Promise<SucursalOptionDto[]> => {
+    const res = await httpGet<ApiEnvelope<SucursalOptionDto[]> | SucursalOptionDto[]>(
+      `${base}/opciones/sucursales`,
     )
-  }
-
-  return response.data ?? []
-},
-
-  async getById(id: string): Promise<AlmacenDto | null> {
-    const response = await httpGet<ApiEnvelope<AlmacenDto>>(
-      `${base}/${id}`,
-    )
-
-    return response.data ?? null
+    const data = unwrapData(res)
+    return Array.isArray(data) ? data : []
   },
 
-  async create(
-    body: GuardarAlmacenRequest,
-  ): Promise<{ id: string; idAlmacen: number }> {
-    const response = await httpPost<
-      ApiEnvelope<{ id: string; idAlmacen: number }>
-    >(base, body)
-
-    if (!response.success || !response.data) {
-      throw new Error(
-        response.error?.message ??
-          'No se pudo crear el almacén.',
-      )
-    }
-
-    return response.data
+  getById: async (id: string): Promise<AlmacenDto> => {
+    const res = await httpGet<ApiEnvelope<AlmacenDto> | AlmacenDto>(`${base}/${id}`)
+    return unwrapData(res)
   },
 
-  async update(
-    id: string,
-    body: GuardarAlmacenRequest,
-  ): Promise<{ id: string; idAlmacen: number }> {
-    const response = await httpPut<
-      ApiEnvelope<{ id: string; idAlmacen: number }>
-    >(`${base}/${id}`, body)
+  create: (body: Partial<GuardarAlmacenRequest>) =>
+    httpPost<Record<string, unknown>>(base, body),
 
-    if (!response.success || !response.data) {
-      throw new Error(
-        response.error?.message ??
-          'No se pudo actualizar el almacén.',
-      )
-    }
+  update: (id: string, body: Partial<GuardarAlmacenRequest>) =>
+    httpPut<Record<string, unknown>>(`${base}/${id}`, body),
 
-    return response.data
-  },
-
-  async setEstado(
-    id: string,
-    estado: AlmacenEstado,
-  ): Promise<{ id: string; estado: AlmacenEstado }> {
-    const response = await httpPatch<
-      ApiEnvelope<{ id: string; estado: AlmacenEstado }>
-    >(`${base}/${id}/estado`, {
-      status: estado,
-    })
-
-    if (!response.success || !response.data) {
-      throw new Error(
-        response.error?.message ??
-          'No se pudo cambiar el estado del almacén.',
-      )
-    }
-
-    return response.data
-  },
+  setEstado: (id: string, status: string) =>
+    httpPatch<Record<string, unknown>>(`${base}/${id}/estado`, { status, estado: status }),
 }

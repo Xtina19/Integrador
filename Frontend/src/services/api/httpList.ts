@@ -7,89 +7,24 @@ export interface PageResult<T> {
   total: number
 }
 
-export interface ApiListEnvelope<T> {
-  success: boolean
-  data?: T[]
-  total?: number
-  page?: number
-  pageSize?: number
-  message?: string
-  error?: {
-    code?: string
-    message?: string
-    details?: unknown
-  }
-}
-
-type ListResponse<T> =
-  | T[]
-  | PageResult<T>
-  | ApiListEnvelope<T>
-
-export async function listAll<T>(
-  url: string,
-  params?: Record<
-    string,
-    string | number | boolean | undefined
-  >,
-): Promise<T[]> {
-  const query = new URLSearchParams()
-
+export async function listAll<T>(url: string, params?: Record<string, string | number | undefined>): Promise<T[]> {
+  const qs = new URLSearchParams()
   if (params) {
-    Object.entries(params).forEach(([key, value]) => {
-      if (
-        value !== undefined &&
-        value !== ''
-      ) {
-        query.set(key, String(value))
-      }
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') qs.set(k, String(v))
     })
   }
-
-  if (!query.has('pageSize')) {
-    query.set('pageSize', '100')
-  }
-
-  const queryString = query.toString()
-  const fullUrl = queryString
-    ? `${url}?${queryString}`
-    : url
-
-  const response = await httpGet<ListResponse<T>>(fullUrl)
-
-  if (Array.isArray(response)) {
-    return response
-  }
-
-  if (
-    'success' in response &&
-    response.success === false
-  ) {
-    throw new Error(
-      response.error?.message ??
-      'No se pudo obtener el listado.',
-    )
-  }
-
-  return Array.isArray(response.data)
-    ? response.data
-    : []
+  qs.set('pageSize', '100')
+  const full = qs.toString() ? `${url}?${qs}` : `${url}?pageSize=100`
+  const res = await httpGet<T[] | PageResult<T> | { success?: boolean; data: T[]; total?: number }>(full)
+  if (Array.isArray(res)) return res
+  if (res && Array.isArray(res.data)) return res.data
+  return []
 }
 
-/**
- * Genera un código de catálogo si el formulario
- * no lo proporciona.
- */
-export function ensureCode(
-  prefix: string,
-  name: string,
-  explicit?: string,
-  existing: string[] = [],
-): string {
-  let code = String(explicit ?? '')
-    .trim()
-    .toUpperCase()
-
+/** Genera código de catálogo si el formulario no lo trae (alta). */
+export function ensureCode(prefix: string, name: string, explicit?: string, existing: string[] = []): string {
+  let code = String(explicit ?? '').trim().toUpperCase()
   if (!code) {
     const slug = name
       .trim()
@@ -97,22 +32,13 @@ export function ensureCode(
       .replace(/^-|-$/g, '')
       .toUpperCase()
       .slice(0, 12)
-
-    code =
-      `${prefix}-${slug ||
-      Date.now().toString(36).toUpperCase()}`
+    code = `${prefix}-${slug || Date.now().toString(36).toUpperCase()}`
   }
-
-  const taken = new Set(
-    existing.map((current) => current.toUpperCase()),
-  )
-
+  const taken = new Set(existing.map((c) => c.toUpperCase()))
   let candidate = code
-  let number = 1
-
+  let n = 1
   while (taken.has(candidate)) {
-    candidate = `${code.slice(0, 16)}-${number++}`
+    candidate = `${code.slice(0, 16)}-${n++}`
   }
-
   return candidate
 }

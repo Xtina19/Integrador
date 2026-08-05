@@ -25,11 +25,15 @@ type Product = {
   title: string
   author: string
   category: string
+  categoryId: string
   publisher: string
+  publisherId: string
   price: number
   currency: string
   status: string
 }
+
+type CatalogOption = { id: string; name: string }
 
 const statusMap: Record<string, { label: string; variant: 'success' | 'neutral' }> = {
   active: { label: 'Activo', variant: 'success' },
@@ -45,8 +49,8 @@ export function AdminProducts() {
   const navigate = useNavigate()
   const { showSuccess, showError } = useToast()
   const [products, setProducts] = useState<Product[]>([])
-  const [categoryNames, setCategoryNames] = useState<string[]>([])
-  const [publisherNames, setPublisherNames] = useState<string[]>([])
+  const [categories, setCategories] = useState<CatalogOption[]>([])
+  const [publishers, setPublishers] = useState<CatalogOption[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('all')
@@ -58,8 +62,8 @@ export function AdminProducts() {
     isbn: '',
     title: '',
     author: '',
-    category: '',
-    publisher: '',
+    categoryId: '',
+    publisherId: '',
     price: '',
     currency: 'DOP',
     status: 'active',
@@ -74,8 +78,8 @@ export function AdminProducts() {
         editorialesApi.list(),
       ])
       setProducts(list as Product[])
-      setCategoryNames((cats as { name: string }[]).map((c) => c.name).filter(Boolean))
-      setPublisherNames((pubs as { name: string }[]).map((p) => p.name).filter(Boolean))
+      setCategories((cats as CatalogOption[]).map((c) => ({ id: c.id, name: c.name })))
+      setPublishers((pubs as CatalogOption[]).map((p) => ({ id: p.id, name: p.name })))
     } catch (err) {
       showError(getFriendlyErrorMessage(err))
     } finally {
@@ -96,8 +100,8 @@ export function AdminProducts() {
         isbn: selected.isbn,
         title: selected.title,
         author: selected.author,
-        category: selected.category,
-        publisher: selected.publisher,
+        categoryId: selected.categoryId || '',
+        publisherId: selected.publisherId || '',
         price: String(selected.price),
         currency: selected.currency,
         status: selected.status,
@@ -121,28 +125,19 @@ export function AdminProducts() {
 
   const validation = useMemo(
     () =>
-      validateAdminProduct(
-        form,
-        products.map((p) => p.code),
-        products.map((p) => p.isbn),
-        selected?.code,
-        selected?.isbn
-      ),
+      validateAdminProduct(form, [], products.map((p) => p.isbn), selected?.code, selected?.isbn),
     [form, products, selected]
   )
 
   async function handleSave() {
     if (!selected || !validation.valid) return false
     try {
-      const cats = (await categoriasApi.list()) as { id: string; name: string }[]
-      const pubs = (await editorialesApi.list()) as { id: string; name: string }[]
       await productosApi.update(selected.id, {
-        code: trim(form.code),
         isbn: trim(form.isbn),
         title: trim(form.title),
         author: trim(form.author),
-        categoryId: cats.find((c) => c.name === form.category)?.id,
-        publisherId: pubs.find((p) => p.name === form.publisher)?.id,
+        categoryId: form.categoryId,
+        publisherId: form.publisherId,
         price: Number(form.price) || 0,
         status: form.status,
       })
@@ -196,7 +191,7 @@ export function AdminProducts() {
               onChange={(e) => setCategory(e.target.value)}
               options={[
                 { value: 'all', label: 'Todas las categorías' },
-                ...categoryNames.map((c) => ({ value: c, label: c })),
+                ...categories.map((c) => ({ value: c.name, label: c.name })),
               ]}
             />
             <Select
@@ -205,7 +200,7 @@ export function AdminProducts() {
               onChange={(e) => setPublisher(e.target.value)}
               options={[
                 { value: 'all', label: 'Todas las editoriales' },
-                ...publisherNames.map((p) => ({ value: p, label: p })),
+                ...publishers.map((p) => ({ value: p.name, label: p.name })),
               ]}
             />
             <Select
@@ -306,12 +301,12 @@ export function AdminProducts() {
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input label="Código Interno" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+            <Input label="Código Interno" value={form.code} readOnly disabled />
             <Input label="ISBN" value={form.isbn} onChange={(e) => setForm({ ...form, isbn: e.target.value })} />
             <Input label="Título" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="md:col-span-2" />
-            <Input label="Autor" value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} className="md:col-span-2" />
-            <Select label="Categoría" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} options={categoryNames.map((c) => ({ value: c, label: c }))} />
-            <Select label="Editorial" value={form.publisher} onChange={(e) => setForm({ ...form, publisher: e.target.value })} options={publisherNames.map((p) => ({ value: p, label: p }))} />
+            <Input label="Autor *" value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} className="md:col-span-2" />
+            <Select label="Categoría *" value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} options={categories.map((c) => ({ value: c.id, label: c.name }))} />
+            <Select label="Editorial *" value={form.publisherId} onChange={(e) => setForm({ ...form, publisherId: e.target.value })} options={publishers.map((c) => ({ value: c.id, label: c.name }))} />
             <Input label="Precio" type="number" min={0} step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
             <Select label="Estado" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={statusOptions} />
           </div>

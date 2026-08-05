@@ -23,7 +23,7 @@ export function formaPagoLabel(forma: string): string {
     efectivo: 'Efectivo',
     tarjeta: 'Tarjeta',
     transferencia: 'Transferencia',
-    nota_credito: 'Nota de crédito',
+    nota_credito: 'Crédito NC aplicado',
   }
   return map[forma] ?? forma
 }

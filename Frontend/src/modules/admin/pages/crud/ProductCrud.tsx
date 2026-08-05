@@ -12,7 +12,6 @@ import { trim } from '@/utils/formValidation'
 import { productosApi } from '@/services/api/productosApi'
 import { categoriasApi } from '@/services/api/categoriasApi'
 import { editorialesApi } from '@/services/api/editorialesApi'
-import { ensureCode } from '@/services/api/httpList'
 import { getFriendlyErrorMessage } from '@/services/http'
 import { useToast } from '@/context/ToastContext'
 import { formatMoney } from '@/lib/money'
@@ -62,7 +61,6 @@ export function ProductFormPage() {
   const [existing, setExisting] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
-  const [allCodes, setAllCodes] = useState<string[]>([])
   const [allIsbns, setAllIsbns] = useState<string[]>([])
   const [categories, setCategories] = useState<CatalogOption[]>([])
   const [publishers, setPublishers] = useState<CatalogOption[]>([])
@@ -79,7 +77,6 @@ export function ProductFormPage() {
         ])
         if (cancelled) return
         const list = products as Product[]
-        setAllCodes(list.map((p) => p.code))
         setAllIsbns(list.map((p) => p.isbn).filter(Boolean))
         setCategories((cats as CatalogOption[]).map((c) => ({ id: c.id, name: c.name })))
         setPublishers((pubs as CatalogOption[]).map((p) => ({ id: p.id, name: p.name })))
@@ -112,18 +109,8 @@ export function ProductFormPage() {
 
   const validation = useMemo(
     () =>
-      validateAdminProduct(
-        {
-          ...form,
-          category: form.categoryId,
-          publisher: form.publisherId,
-        },
-        allCodes,
-        allIsbns,
-        existing?.code,
-        existing?.isbn
-      ),
-    [form, allCodes, allIsbns, existing]
+      validateAdminProduct(form, [], allIsbns, existing?.code, existing?.isbn),
+    [form, allIsbns, existing]
   )
 
   if (isEdit && !loading && (notFound || !existing)) {
@@ -135,7 +122,6 @@ export function ProductFormPage() {
   }
 
   const buildPayload = () => ({
-    code: ensureCode('PRD', trim(form.title), trim(form.code) || existing?.code, allCodes),
     isbn: trim(form.isbn),
     title: trim(form.title),
     author: trim(form.author),
@@ -173,7 +159,6 @@ export function ProductFormPage() {
         showSuccess('Producto creado')
         setForm(emptyForm)
         const list = (await productosApi.list()) as Product[]
-        setAllCodes(list.map((p) => p.code))
         setAllIsbns(list.map((p) => p.isbn).filter(Boolean))
       } catch (err) {
         showError(getFriendlyErrorMessage(err))
@@ -203,10 +188,16 @@ export function ProductFormPage() {
         </div>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Input label="Código Interno" value={form.code} onChange={(e) => update('code', e.target.value.toUpperCase())} placeholder="Se genera si se deja vacío" />
+        <Input
+          label="Código Interno"
+          value={isEdit ? form.code : ''}
+          readOnly
+          disabled
+          placeholder="Se generará automáticamente"
+        />
         <Input label="ISBN *" value={form.isbn} onChange={(e) => update('isbn', e.target.value)} placeholder="978-XXXXXXXXXX" />
         <Input label="Título *" value={form.title} onChange={(e) => update('title', e.target.value)} className="md:col-span-2" />
-        <Input label="Autor" value={form.author} onChange={(e) => update('author', e.target.value)} className="md:col-span-2" />
+        <Input label="Autor *" value={form.author} onChange={(e) => update('author', e.target.value)} className="md:col-span-2" />
         <Select label="Categoría *" value={form.categoryId} onChange={(e) => update('categoryId', e.target.value)} options={categories.map((c) => ({ value: c.id, label: c.name }))} />
         <Select label="Editorial *" value={form.publisherId} onChange={(e) => update('publisherId', e.target.value)} options={publishers.map((p) => ({ value: p.id, label: p.name }))} />
         <Input label="Precio de venta *" type="number" min={0} step="0.01" value={form.price} onChange={(e) => update('price', e.target.value)} />

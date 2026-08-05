@@ -15,14 +15,14 @@ import {
 } from '@/utils/formValidation'
 
 export interface AdminProductForm {
-  code: string
+  code?: string
   isbn: string
   title: string
-  author?: string
-  category: string
-  publisher: string
+  author: string
+  categoryId: string
+  publisherId: string
   price: string | number
-  currency: string
+  currency?: string
   status?: string
 }
 
@@ -87,14 +87,18 @@ export function validateAdminProduct(
   excludeIsbn?: string
 ): ValidationResult {
   const errors = collectErrors(
-    validateCode(form.code, 'Código'),
+    ...(trim(form.code || '')
+      ? [
+          validateCode(form.code!, 'Código'),
+          validateUnique(form.code!, existingCodes, 'código', excludeCode),
+        ]
+      : []),
     requireText(form.isbn, 'ISBN', 10, 20),
     requireText(form.title, 'Título'),
-    requireSelect(form.category, 'una categoría'),
-    requireSelect(form.publisher, 'una editorial'),
+    requireText(form.author, 'Autor'),
+    requireSelect(form.categoryId, 'una categoría'),
+    requireSelect(form.publisherId, 'una editorial'),
     validatePositiveDecimal(form.price, 'Precio'),
-    requireSelect(form.currency, 'una moneda'),
-    validateUnique(form.code, existingCodes, 'código', excludeCode),
     validateUnique(form.isbn, existingIsbns, 'ISBN', excludeIsbn)
   )
   return toValidationResult(errors)

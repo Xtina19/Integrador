@@ -1,0 +1,40 @@
+---
+description: LibroSys — estilo unificado del proyecto (public/scriptdb)
+alwaysApply: true
+---
+
+# Estilo unificado — LibroSys
+
+Referencia oficial: `public/scriptdb`. El código debe leerse como escrito por un solo equipo.
+
+## Base de datos
+
+- Único script: `public/scriptdb`.
+- Cabeceras de rutas: `adaptada exclusivamente a public/scriptdb` + tablas usadas.
+- Comentarios en español, mismo formato que scriptdb (`-- MODULO`, secciones con `===`).
+
+## Backend
+
+- **Rutas CRUD:** un archivo en `routes/`, SQL inline, mapeo FE en el mismo archivo.
+- **Ventas / Inventario:** capas internas por transacciones multi-tabla (mismo criterio de complejidad).
+- **Lib compartida:** `codigoAuto.js`, `personaTipo.js`, `formasPago.js`, `rolesSemilla.js`.
+- **Repositories ventas:** cabecera `Repositorio X — public/scriptdb`.
+
+## Catálogos
+
+| Catálogo | Fuente |
+|----------|--------|
+| Maestros | Tablas scriptdb |
+| Formas de pago | `PagoFactura.forma_pago` → `lib/formasPago.js` |
+| Roles | `Usuario.rol` → SQL + `lib/rolesSemilla.js` |
+| Tipo persona | `Natural` / `Jurídica` → `lib/personaTipo.js` |
+
+## Frontend
+
+- Implementación: `modules/*/pages|services`.
+- Facades: `pages/`, `services/api/`, `context/`.
+- Rutas: `routes/index.tsx`.
+
+## Evitar en código productivo
+
+Etiquetas de proceso interno, nombres que sugieran código añadido después (`*Catalog.js`, `*Scriptdb.js`, `*Venta*` redundantes), o comentarios que contrasten “viejo” vs “nuevo”.
