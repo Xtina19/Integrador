@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Table } from '@/components/ui/Table'
@@ -15,11 +16,17 @@ import { useToast } from '@/context/ToastContext'
 
 export function ProductosAsociadosPage() {
   const { showError } = useToast()
+  const [searchParams] = useSearchParams()
   const [products, setProducts] = useState<EditorialProduct[]>([])
   const [publishers, setPublishers] = useState<EditorialRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [publisherId, setPublisherId] = useState('all')
+  const [publisherId, setPublisherId] = useState(() => searchParams.get('publisherId') ?? 'all')
+
+  useEffect(() => {
+    const fromUrl = searchParams.get('publisherId')
+    if (fromUrl) setPublisherId(fromUrl)
+  }, [searchParams])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -28,7 +35,7 @@ export function ProductosAsociadosPage() {
         editorialesApi.list(),
         editorialesApi.productos({
           q: search || undefined,
-          editorialId: publisherId === 'all' ? undefined : publisherId,
+          publisherId: publisherId === 'all' ? undefined : publisherId,
         }),
       ])
       setPublishers(pubs)

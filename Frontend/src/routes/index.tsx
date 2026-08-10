@@ -133,11 +133,8 @@ export function AppRoutes() {
         <Route path="inventario/categorias/ver/:id" element={<CategoryDetailPage />} />
         <Route path="inventario/categorias/eliminar/:id" element={<CategoryDeletePage />} />
 
-        <Route path="inventario/editoriales" element={<EditorialesLista />} />
-        <Route path="inventario/editoriales/nuevo" element={<PublisherFormPage />} />
-        <Route path="inventario/editoriales/editar/:id" element={<PublisherFormPage />} />
-        <Route path="inventario/editoriales/ver/:id" element={<PublisherDetailPage />} />
-        <Route path="inventario/editoriales/eliminar/:id" element={<PublisherDeletePage />} />
+        <Route path="inventario/editoriales" element={<Navigate to="/editoriales/lista" replace />} />
+        <Route path="inventario/editoriales/*" element={<RedirectLegacyPath fromPrefix="/inventario/editoriales" toPrefix="/editoriales" />} />
 
         <Route path="inventario/productos" element={<AdminProducts />} />
         <Route path="inventario/productos/nuevo" element={<ProductFormPage />} />
@@ -230,7 +227,7 @@ export function AppRoutes() {
         />
         <Route
           path="administracion/editoriales/*"
-          element={<RedirectLegacyPath fromPrefix="/administracion/editoriales" toPrefix="/inventario/editoriales" />}
+          element={<RedirectLegacyPath fromPrefix="/administracion/editoriales" toPrefix="/editoriales" />}
         />
         <Route
           path="administracion/proveedores/*"

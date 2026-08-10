@@ -56,11 +56,82 @@ function mapEditorial(row) {
     contact: row.nombre_contacto || '',
     phone: row.telefono || '',
     email: row.correo_contacto || '',
+    website: row.sitio_web || '',
     contractType: row.tipo_contrato || '',
     contractExpiry: formatDateFe(row.vencimiento_contrato),
     status: mapEstadoToFe(row.estado),
     productCount: Number(row.product_count) || 0,
   };
+}
+
+async function nextCodigoEditorial(pool) {
+  const result = await pool.request().query(`
+    SELECT MAX(TRY_CAST(SUBSTRING(codigo_editorial, 5, 20) AS INT)) AS max_num
+    FROM Editorial
+    WHERE codigo_editorial LIKE 'EDT-[0-9]%'
+  `);
+  const n = Number(result.recordset[0]?.max_num || 0) + 1;
+  return `EDT-${String(n).padStart(3, '0')}`;
+}
+
+function parseBodyFields(body, existing = null) {
+  const name =
+    body.name != null || body.nombre != null
+      ? String(body.name || body.nombre || '').trim()
+      : existing?.nombre || '';
+  const country =
+    body.country != null || body.pais_origen != null
+      ? String(body.country || body.pais_origen || body.pais || '').trim()
+      : existing?.pais_origen || '';
+  const contact =
+    body.contact != null || body.nombre_contacto != null
+      ? String(body.contact || body.nombre_contacto || '').trim()
+      : existing?.nombre_contacto || '';
+  const phone =
+    body.phone != null || body.telefono != null
+      ? String(body.phone || body.telefono || '').trim()
+      : existing?.telefono || '';
+  const email =
+    body.email != null || body.correo != null || body.correo_contacto != null
+      ? String(body.email || body.correo || body.correo_contacto || '').trim()
+      : existing?.correo_contacto || '';
+  const website =
+    body.website != null || body.sitio_web != null
+      ? String(body.website || body.sitio_web || '').trim()
+      : existing?.sitio_web || '';
+  const contractType =
+    body.contractType != null || body.tipo_contrato != null
+      ? String(body.contractType || body.tipo_contrato || '').trim()
+      : existing?.tipo_contrato || '';
+  const contractExpiry =
+    body.contractExpiry != null || body.vencimiento_contrato != null
+      ? String(body.contractExpiry || body.vencimiento_contrato || '').trim()
+      : formatDateFe(existing?.vencimiento_contrato);
+  const statusRaw =
+    body.status != null || body.estado != null
+      ? String(body.status || body.estado || '').trim()
+      : existing?.estado || 'Activo';
+  const status =
+    statusRaw.toLowerCase() === 'inactive' || statusRaw.toLowerCase() === 'inactivo'
+      ? 'Inactivo'
+      : 'Activo';
+  const codeRaw =
+    body.code != null || body.codigo_editorial != null
+      ? String(body.code || body.codigo_editorial || '').trim()
+      : existing?.codigo_editorial || '';
+
+  return { name, country, contact, phone, email, website, contractType, contractExpiry, status, codeRaw };
+}
+
+function searchWhereClause(alias = 'e') {
+  return `
+    AND (
+      ${alias}.nombre LIKE @q
+      OR ISNULL(${alias}.codigo_editorial, '') LIKE @q
+      OR ISNULL(${alias}.pais_origen, '') LIKE @q
+      OR ISNULL(${alias}.correo_contacto, '') LIKE @q
+      OR ISNULL(${alias}.nombre_contacto, '') LIKE @q
+    )`;
 }
 
 function fail(res, status, message) {
@@ -82,19 +153,13 @@ router.get('/dashboard', async (req, res) => {
   try {
     const pool = await getConnection();
     const result = await pool.request().query(`
-      SELECT
-        e.id_editorial,
-        e.codigo_editorial,
-        e.nombre,
-        e.estado,
-        e.vencimiento_contrato,
-        (SELECT COUNT(*) FROM Producto p WHERE p.id_editorial = e.id_editorial) AS product_count
-      FROM Editorial e
+      ${SELECT_EDITORIAL}
       ORDER BY product_count DESC, e.nombre
     `);
     const rows = result.recordset.map(mapEditorial);
     const withoutProducts = rows.filter((r) => r.productCount === 0).length;
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const in30 = new Date(today);
     in30.setDate(in30.getDate() + 30);
     const active = rows.filter((r) => r.status === 'active').length;
@@ -119,13 +184,22 @@ router.get('/dashboard', async (req, res) => {
         return d >= today && d <= in30;
       })
       .slice(0, 10)
-      .map((r) => ({
-        id: r.id,
-        code: r.code,
-        name: r.name,
-        contractExpiry: r.contractExpiry,
-        status: r.status,
-      }));
+      .map((r) => {
+        const d = new Date(r.contractExpiry);
+        const daysRemaining = Math.max(
+          0,
+          Math.ceil((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+        );
+        return {
+          id: r.id,
+          code: r.code,
+          name: r.name,
+          contractType: r.contractType,
+          contractExpiry: r.contractExpiry,
+          status: r.status,
+          daysRemaining,
+        };
+      });
     return res.json({
       total: rows.length,
       active,
@@ -160,12 +234,23 @@ router.get('/dashboard', async (req, res) => {
 router.get('/productos', async (req, res) => {
   try {
     const pool = await getConnection();
-    const publisherId = req.query.publisherId || req.query.id_editorial;
+    const publisherId =
+      req.query.publisherId || req.query.editorialId || req.query.id_editorial;
+    const q = String(req.query.q || req.query.search || '').trim();
     const request = pool.request();
     let where = ' WHERE 1=1 ';
     if (publisherId) {
       request.input('idEditorial', sql.Int, Number(publisherId));
       where += ' AND p.id_editorial = @idEditorial ';
+    }
+    if (q) {
+      request.input('q', sql.NVarChar(200), `%${q}%`);
+      where += `
+        AND (
+          p.titulo LIKE @q
+          OR ISNULL(p.isbn, '') LIKE @q
+          OR ISNULL(p.codigo_producto, '') LIKE @q
+        )`;
     }
     const result = await request.query(`
       SELECT
@@ -179,7 +264,12 @@ router.get('/productos', async (req, res) => {
         a.apellido AS autor_apellido,
         c.nombre_categoria,
         e.id_editorial,
-        e.nombre AS editorial
+        e.nombre AS editorial,
+        (
+          SELECT ISNULL(SUM(i.stock_actual), 0)
+          FROM Inventario i
+          WHERE i.id_producto = p.id_producto
+        ) AS stock_total
       FROM Producto p
       INNER JOIN Autor a ON p.id_autor = a.id_autor
       INNER JOIN Editorial e ON p.id_editorial = e.id_editorial
@@ -196,7 +286,7 @@ router.get('/productos', async (req, res) => {
       category: row.nombre_categoria || '',
       publisherId: String(row.id_editorial),
       publisher: row.editorial || '',
-      stock: 0,
+      stock: Number(row.stock_total) || 0,
       status: String(row.estado || '').toLowerCase() === 'activo' ? 'active' : 'inactive',
       price: Number(row.precio) || 0,
     }));
@@ -215,12 +305,7 @@ router.get('/search', async (req, res) => {
     let where = ' WHERE 1=1 ';
     if (q) {
       request.input('q', sql.NVarChar(200), `%${q}%`);
-      where += `
-        AND (
-          e.nombre LIKE @q
-          OR ISNULL(e.pais_origen, '') LIKE @q
-          OR ISNULL(e.correo_contacto, '') LIKE @q
-        )`;
+      where += searchWhereClause('e');
     }
     const result = await request.query(`${SELECT_EDITORIAL} ${where} ORDER BY e.nombre`);
     return res.json(result.recordset.map(mapEditorial));
@@ -242,12 +327,7 @@ router.get('/', async (req, res) => {
     let where = ' WHERE 1=1 ';
     if (q) {
       request.input('q', sql.NVarChar(200), `%${q}%`);
-      where += `
-        AND (
-          e.nombre LIKE @q
-          OR ISNULL(e.pais_origen, '') LIKE @q
-          OR ISNULL(e.correo_contacto, '') LIKE @q
-        )`;
+      where += searchWhereClause('e');
     }
     request.input('offset', sql.Int, offset);
     request.input('limit', sql.Int, pageSize);
@@ -261,8 +341,10 @@ router.get('/', async (req, res) => {
         WHERE 1=1
           AND (@q IS NULL OR (
             e.nombre LIKE @q
+            OR ISNULL(e.codigo_editorial, '') LIKE @q
             OR ISNULL(e.pais_origen, '') LIKE @q
             OR ISNULL(e.correo_contacto, '') LIKE @q
+            OR ISNULL(e.nombre_contacto, '') LIKE @q
           ))
       `);
 
@@ -298,44 +380,42 @@ router.post('/', async (req, res) => {
   try {
     const pool = await getConnection();
     const body = req.body || {};
-    const name = String(body.name || body.nombre || '').trim();
-    const country = String(body.country || body.pais_origen || body.pais || '').trim();
-    const contact = String(body.contact || body.nombre_contacto || '').trim();
-    const phone = String(body.phone || body.telefono || '').trim();
-    const email = String(body.email || body.correo || body.correo_contacto || '').trim();
-    const contractType = String(body.contractType || body.tipo_contrato || '').trim();
-    const contractExpiry = String(body.contractExpiry || body.vencimiento_contrato || '').trim();
-    const statusRaw = String(body.status || body.estado || 'Activo').trim();
-    const status = statusRaw.toLowerCase() === 'inactive' || statusRaw.toLowerCase() === 'inactivo'
-      ? 'Inactivo'
-      : 'Activo';
+    const fields = parseBodyFields(body);
 
-    if (!name) return fail(res, 400, 'El nombre es obligatorio.');
-    if (!country) return fail(res, 400, 'El país es obligatorio.');
+    if (!fields.name) return fail(res, 400, 'El nombre es obligatorio.');
+    if (!fields.country) return fail(res, 400, 'El país es obligatorio.');
+
+    let codigo = fields.codeRaw;
+    if (!codigo) codigo = await nextCodigoEditorial(pool);
 
     const inserted = await pool
       .request()
-      .input('nombre', sql.VarChar(150), name)
-      .input('pais', sql.VarChar(50), country)
-      .input('contacto', sql.VarChar(150), contact || null)
-      .input('telefono', sql.VarChar(20), phone || null)
-      .input('correo', sql.VarChar(100), email || null)
-      .input('tipo', sql.VarChar(100), contractType || null)
-      .input('venc', sql.Date, contractExpiry || null)
-      .input('estado', sql.VarChar(20), status)
+      .input('codigo', sql.VarChar(30), codigo)
+      .input('nombre', sql.VarChar(150), fields.name)
+      .input('pais', sql.VarChar(50), fields.country)
+      .input('contacto', sql.VarChar(150), fields.contact || null)
+      .input('telefono', sql.VarChar(20), fields.phone || null)
+      .input('correo', sql.VarChar(100), fields.email || null)
+      .input('sitio', sql.VarChar(200), fields.website || null)
+      .input('tipo', sql.VarChar(100), fields.contractType || null)
+      .input('venc', sql.Date, fields.contractExpiry || null)
+      .input('estado', sql.VarChar(20), fields.status)
       .query(`
         INSERT INTO Editorial (
-          nombre, pais_origen, nombre_contacto, telefono, correo_contacto,
-          tipo_contrato, vencimiento_contrato, estado
+          codigo_editorial, nombre, pais_origen, nombre_contacto, telefono,
+          correo_contacto, sitio_web, tipo_contrato, vencimiento_contrato, estado
         )
         OUTPUT INSERTED.id_editorial
-        VALUES (@nombre, @pais, @contacto, @telefono, @correo, @tipo, @venc, @estado)
+        VALUES (@codigo, @nombre, @pais, @contacto, @telefono, @correo, @sitio, @tipo, @venc, @estado)
       `);
 
     const row = await fetchById(pool, inserted.recordset[0].id_editorial);
     return res.status(201).json(mapEditorial(row));
   } catch (err) {
     console.error('[editoriales] create', err);
+    if (err.number === 2627 || err.number === 2601) {
+      return fail(res, 409, 'Ya existe una editorial con ese código.');
+    }
     return res.status(500).json({ success: false, error: { message: err.message } });
   }
 });
@@ -347,64 +427,35 @@ router.put('/:id', async (req, res) => {
     if (!existing) return fail(res, 404, 'Editorial no encontrada');
 
     const body = req.body || {};
-    const name =
-      body.name != null || body.nombre != null
-        ? String(body.name || body.nombre || '').trim()
-        : existing.nombre;
-    const country =
-      body.country != null || body.pais_origen != null
-        ? String(body.country || body.pais_origen || '').trim()
-        : existing.pais_origen || '';
-    const phone =
-      body.phone != null || body.telefono != null
-        ? String(body.phone || body.telefono || '').trim()
-        : existing.telefono || '';
-    const email =
-      body.email != null || body.correo != null || body.correo_contacto != null
-        ? String(body.email || body.correo || body.correo_contacto || '').trim()
-        : existing.correo_contacto || '';
-    const contact =
-      body.contact != null || body.nombre_contacto != null
-        ? String(body.contact || body.nombre_contacto || '').trim()
-        : existing.nombre_contacto || '';
-    const contractType =
-      body.contractType != null || body.tipo_contrato != null
-        ? String(body.contractType || body.tipo_contrato || '').trim()
-        : existing.tipo_contrato || '';
-    const contractExpiry =
-      body.contractExpiry != null || body.vencimiento_contrato != null
-        ? String(body.contractExpiry || body.vencimiento_contrato || '').trim()
-        : formatDateFe(existing.vencimiento_contrato);
-    const statusRaw =
-      body.status != null || body.estado != null
-        ? String(body.status || body.estado || '').trim()
-        : existing.estado || 'Activo';
-    const status =
-      statusRaw.toLowerCase() === 'inactive' || statusRaw.toLowerCase() === 'inactivo'
-        ? 'Inactivo'
-        : 'Activo';
+    const fields = parseBodyFields(body, existing);
 
-    if (!name) return fail(res, 400, 'El nombre es obligatorio.');
-    if (!country) return fail(res, 400, 'El país es obligatorio.');
+    if (!fields.name) return fail(res, 400, 'El nombre es obligatorio.');
+    if (!fields.country) return fail(res, 400, 'El país es obligatorio.');
+
+    const codigo = fields.codeRaw || existing.codigo_editorial || codeEditorial(existing);
 
     await pool
       .request()
       .input('id', sql.Int, Number(req.params.id))
-      .input('nombre', sql.VarChar(150), name)
-      .input('pais', sql.VarChar(50), country)
-      .input('contacto', sql.VarChar(150), contact || null)
-      .input('telefono', sql.VarChar(20), phone || null)
-      .input('correo', sql.VarChar(100), email || null)
-      .input('tipo', sql.VarChar(100), contractType || null)
-      .input('venc', sql.Date, contractExpiry || null)
-      .input('estado', sql.VarChar(20), status)
+      .input('codigo', sql.VarChar(30), codigo || null)
+      .input('nombre', sql.VarChar(150), fields.name)
+      .input('pais', sql.VarChar(50), fields.country)
+      .input('contacto', sql.VarChar(150), fields.contact || null)
+      .input('telefono', sql.VarChar(20), fields.phone || null)
+      .input('correo', sql.VarChar(100), fields.email || null)
+      .input('sitio', sql.VarChar(200), fields.website || null)
+      .input('tipo', sql.VarChar(100), fields.contractType || null)
+      .input('venc', sql.Date, fields.contractExpiry || null)
+      .input('estado', sql.VarChar(20), fields.status)
       .query(`
         UPDATE Editorial
-        SET nombre = @nombre,
+        SET codigo_editorial = @codigo,
+            nombre = @nombre,
             pais_origen = @pais,
             nombre_contacto = @contacto,
             telefono = @telefono,
             correo_contacto = @correo,
+            sitio_web = @sitio,
             tipo_contrato = @tipo,
             vencimiento_contrato = @venc,
             estado = @estado
@@ -415,6 +466,9 @@ router.put('/:id', async (req, res) => {
     return res.json(mapEditorial(row));
   } catch (err) {
     console.error('[editoriales] update', err);
+    if (err.number === 2627 || err.number === 2601) {
+      return fail(res, 409, 'Ya existe una editorial con ese código.');
+    }
     return res.status(500).json({ success: false, error: { message: err.message } });
   }
 });

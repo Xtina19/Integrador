@@ -13,6 +13,8 @@ export type AdminModuleKey =
 export interface AdminModuleConfig {
   key: AdminModuleKey
   basePath: string
+  /** Ruta del listado cuando difiere del basePath (ej. módulo Editoriales). */
+  listPath?: string
   label: string
   singular: string
   createLabel: string
@@ -59,7 +61,8 @@ export const ADMIN_MODULES: Record<AdminModuleKey, AdminModuleConfig> = {
   },
   editoriales: {
     key: 'editoriales',
-    basePath: '/inventario/editoriales',
+    basePath: '/editoriales',
+    listPath: '/editoriales/lista',
     label: 'Editoriales',
     singular: 'Editorial',
     createLabel: 'Registrar Editorial',
@@ -156,8 +159,12 @@ export const ADMIN_MODULES: Record<AdminModuleKey, AdminModuleConfig> = {
 }
 
 export function adminPath(module: AdminModuleKey, action: 'list' | 'nuevo' | 'editar' | 'ver' | 'eliminar', id?: string) {
-  const base = ADMIN_MODULES[module].basePath
-  if (action === 'list') return base
-  if (action === 'nuevo') return `${base}/nuevo`
-  return `${base}/${action}/${id}`
+  const cfg = ADMIN_MODULES[module]
+  if (action === 'list') return cfg.listPath ?? cfg.basePath
+  if (action === 'nuevo') return `${cfg.basePath}/nuevo`
+  return `${cfg.basePath}/${action}/${id}`
+}
+
+export function adminListPath(module: AdminModuleKey) {
+  return ADMIN_MODULES[module].listPath ?? ADMIN_MODULES[module].basePath
 }

@@ -2158,6 +2158,78 @@ VALUES
         'Activo'
     );
 
+-- === MODULO EDITORIALES: semilla Renovaciones (referencia demo: agosto 2026) ===
+-- Vencidos, por vencer (30 días) y vigentes para el submódulo Renovaciones
+UPDATE Editorial
+SET
+    codigo_editorial = 'EDT-PRH',
+    nombre_contacto = 'Rebecca Torres',
+    tipo_contrato = 'Distribución exclusiva',
+    vencimiento_contrato = '2026-08-22',
+    estado = 'Activo'
+WHERE
+    nombre = 'Penguin Random House';
+
+UPDATE Editorial
+SET
+    codigo_editorial = 'EDT-BLO',
+    nombre_contacto = 'James Whitfield',
+    tipo_contrato = 'Importación',
+    vencimiento_contrato = '2026-06-10',
+    estado = 'Activo'
+WHERE
+    nombre = 'Bloomsbury Publishing';
+
+UPDATE Editorial
+SET
+    codigo_editorial = 'EDT-TUS',
+    nombre_contacto = 'María López',
+    tipo_contrato = 'Consignación',
+    vencimiento_contrato = '2026-04-15',
+    estado = 'Activo'
+WHERE
+    nombre = 'Tusquets Editores';
+
+UPDATE Editorial
+SET
+    codigo_editorial = 'EDT-HC',
+    nombre_contacto = 'David Lee',
+    tipo_contrato = 'Distribución no exclusiva',
+    vencimiento_contrato = '2026-09-02',
+    estado = 'Activo'
+WHERE
+    nombre = 'HarperCollins';
+
+UPDATE Editorial
+SET
+    vencimiento_contrato = '2026-03-01'
+WHERE
+    codigo_editorial = 'EDT-001';
+
+UPDATE Editorial
+SET
+    vencimiento_contrato = '2026-07-20'
+WHERE
+    codigo_editorial = 'EDT-009';
+
+UPDATE Editorial
+SET
+    vencimiento_contrato = '2026-08-18'
+WHERE
+    codigo_editorial = 'EDT-012';
+
+UPDATE Editorial
+SET
+    vencimiento_contrato = '2026-08-25'
+WHERE
+    codigo_editorial = 'EDT-006';
+
+UPDATE Editorial
+SET
+    vencimiento_contrato = '2026-05-05'
+WHERE
+    codigo_editorial = 'EDT-005';
+
 -- Tabla: CategoriaProducto
 -- Depende de: ninguna
 INSERT INTO

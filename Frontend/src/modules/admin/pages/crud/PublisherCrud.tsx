@@ -7,13 +7,12 @@ import { DetailSection, DetailRow } from '@/modules/admin/components/AdminDetail
 import { Input, Select } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { RecordNotFound } from '@/modules/admin/components/RecordNotFound'
-import { ADMIN_MODULES } from '@/lib/adminConfig'
+import { ADMIN_MODULES, adminListPath } from '@/lib/adminConfig'
 import { formatEditorialDate, toDateInputValue } from '@/lib/editorialesDisplay'
 import { contractStatusConfig, getContractVisualStatus } from '@/lib/publisherContractStatus'
 import { validateAdminPublisher } from '@/business-rules/adminValidators'
 import { trim } from '@/utils/formValidation'
 import { editorialesApi, type EditorialRecord } from '@/services/api/editorialesApi'
-import { ensureCode } from '@/services/api/httpList'
 import { getFriendlyErrorMessage } from '@/services/http'
 import { useToast } from '@/context/ToastContext'
 
@@ -24,8 +23,8 @@ const statusOptions = [
 ]
 const contractTypes = [
   'Distribución exclusiva',
-  'Distribución regional',
-  'Distribución nacional',
+  'Distribución no exclusiva',
+  'Consignación',
   'Convenio institucional',
   'Distribución',
   'Importación',
@@ -115,7 +114,7 @@ export function PublisherFormPage() {
   }
 
   if (isEdit && !loading && (notFound || !existing)) {
-    return <RecordNotFound moduleLabel="editorial" listPath={config.basePath} />
+    return <RecordNotFound moduleLabel="editorial" listPath={adminListPath('editoriales')} />
   }
 
   if (isEdit && loading) {
@@ -123,7 +122,7 @@ export function PublisherFormPage() {
   }
 
   const buildPayload = () => ({
-    code: ensureCode('ED', trim(form.name), trim(form.code) || existing?.code, allCodes),
+    code: trim(form.code) || undefined,
     name: trim(form.name),
     country: trim(form.country),
     contact: trim(form.contact),
@@ -146,7 +145,7 @@ export function PublisherFormPage() {
           await editorialesApi.create(payload)
           showSuccess('Editorial creada')
         }
-        navigate(config.basePath)
+        navigate(adminListPath('editoriales'))
       } catch (err) {
         showError(getFriendlyErrorMessage(err))
       }
@@ -174,12 +173,12 @@ export function PublisherFormPage() {
   return (
     <AdminFormLayout
       breadcrumbs={[
-        { label: config.label, to: config.basePath },
+        { label: config.label, to: adminListPath('editoriales') },
         { label: isEdit ? config.editTitle : config.createTitle },
       ]}
       title={isEdit ? config.editTitle : config.createTitle}
       subtitle={isEdit ? `Modificando ${existing!.name}` : 'Nueva editorial en catálogo maestro'}
-      listPath={config.basePath}
+      listPath={adminListPath('editoriales')}
       saveDisabled={!validation.valid}
       onSave={saveForm}
       onSaveContinue={!isEdit ? saveContinue : undefined}
@@ -194,7 +193,7 @@ export function PublisherFormPage() {
           label="Código *"
           value={form.code}
           onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
-          placeholder="Se genera si se deja vacío"
+          placeholder="Se genera automáticamente (EDT-001)"
         />
         <Input
           label="Nombre *"
@@ -249,6 +248,7 @@ export function PublisherFormPage() {
 
 export function PublisherDetailPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const { showSuccess, showError } = useToast()
   const [publisher, setPublisher] = useState<Publisher | null>(null)
   const [loading, setLoading] = useState(true)
@@ -277,7 +277,7 @@ export function PublisherDetailPage() {
   }, [id])
 
   if (loading) return <p className="text-sm text-gray-500">Cargando editorial…</p>
-  if (notFound || !publisher) return <RecordNotFound moduleLabel="editorial" listPath={config.basePath} />
+  if (notFound || !publisher) return <RecordNotFound moduleLabel="editorial" listPath={adminListPath('editoriales')} />
 
   const contractStatus = getContractVisualStatus(publisher.contractExpiry)
   const contractBadge = contractStatusConfig[contractStatus]
@@ -299,7 +299,7 @@ export function PublisherDetailPage() {
       config={config}
       id={publisher.id}
       breadcrumbs={[
-        { label: config.label, to: config.basePath },
+        { label: config.label, to: adminListPath('editoriales') },
         { label: config.detailTitle },
       ]}
       title={publisher.name}
@@ -347,7 +347,20 @@ export function PublisherDetailPage() {
             <DetailRow label="Estado del contrato" value={<Badge variant={contractBadge.variant}>{contractBadge.label}</Badge>} />
             <DetailRow
               label="Productos asociados"
-              value={<span className="font-bold text-corporate">{publisher.productCount}</span>}
+              value={
+                <div className="flex items-center gap-3">
+                  <span className="font-bold text-corporate">{publisher.productCount}</span>
+                  {publisher.productCount > 0 && (
+                    <button
+                      type="button"
+                      className="text-sm font-medium text-corporate hover:underline"
+                      onClick={() => navigate(`/editoriales/productos?publisherId=${publisher.id}`)}
+                    >
+                      Ver catálogo
+                    </button>
+                  )}
+                </div>
+              }
             />
           </dl>
         </DetailSection>
@@ -386,13 +399,13 @@ export function PublisherDeletePage() {
   }, [id])
 
   if (loading) return <p className="text-sm text-gray-500">Cargando editorial…</p>
-  if (notFound || !publisher) return <RecordNotFound moduleLabel="editorial" listPath={config.basePath} />
+  if (notFound || !publisher) return <RecordNotFound moduleLabel="editorial" listPath={adminListPath('editoriales')} />
 
   return (
     <AdminDeleteLayout
       config={config}
       breadcrumbs={[
-        { label: config.label, to: config.basePath },
+        { label: config.label, to: adminListPath('editoriales') },
         { label: config.deleteTitle },
       ]}
       recordTitle={publisher.name}
