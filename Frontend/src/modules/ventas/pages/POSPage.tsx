@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/Badge'
 import { Input, Select } from '@/components/ui/Input'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/context/ToastContext'
-import { useClientesCatalog } from '@/context/ClientesCatalogContext'
+import { useClientesCatalog, parseClienteIdFromQuery } from '@/context/ClientesCatalogContext'
+import { clientesApi } from '@/services/api/clientesApi'
 import { VentasApiRequiredBanner } from '../components/VentasApiRequiredBanner'
 import { POS_DEFAULTS, buildPosCatalogDesdeMaestro, type PosCatalogProduct } from '../data/posCatalog'
 import { useProductosMaestro } from '@/hooks/useProductosMaestro'
@@ -62,7 +63,7 @@ export function POSPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { showSuccess, showError } = useToast()
-  const { buscarActivos, getById } = useClientesCatalog()
+  const { buscarTodos, getById } = useClientesCatalog()
   const { productos: productosMaestro } = useProductosMaestro()
   const catalog = useMemo(
     () => buildPosCatalogDesdeMaestro(productosMaestro),
@@ -214,13 +215,67 @@ export function POSPage() {
     })
   }
 
-  function buscarClientes() {
+  async function buscarClientes() {
     const texto = clienteQuery.trim()
     if (!texto) return
-    const rows = buscarActivos(texto)
-    setClientes(rows.map((c) => ({ id: c.id, nombre: `${c.codigo} — ${c.nombre}` })))
+
+    type ClienteRow = { id?: string; codigo?: string; nombre?: string; estado?: string }
+    let rows: ClienteRow[] = []
+
+    const idFromCode = parseClienteIdFromQuery(texto)
+    if (idFromCode != null) {
+      const direct = getById(String(idFromCode))
+      if (direct) {
+        rows = [{
+          id: direct.id,
+          codigo: direct.codigo,
+          nombre: direct.nombre,
+          estado: direct.estado,
+        }]
+      }
+    }
+
     if (rows.length === 0) {
-      showError('No se encontraron clientes activos. Use Registrar cliente.')
+      try {
+        rows = (await clientesApi.list({ q: texto, pageSize: 50 })) as ClienteRow[]
+      } catch {
+        /* fallback local abajo */
+      }
+    }
+
+    if (rows.length === 0) {
+      rows = buscarTodos(texto).map((c) => ({
+        id: c.id,
+        codigo: c.codigo,
+        nombre: c.nombre,
+        estado: c.estado,
+      }))
+    }
+
+    const activos = rows.filter((c) => String(c.estado).toLowerCase() === 'activo')
+
+    if (activos.length === 0) {
+      if (rows.length > 0) {
+        const c = rows[0]
+        showError(
+          `El cliente ${c.codigo ?? ''} — ${c.nombre ?? ''} está inactivo. Actívelo en Administración → Clientes.`,
+        )
+      } else {
+        showError('No se encontraron clientes. Verifique el código o use Registrar cliente.')
+      }
+      setClientes([])
+      setClienteId('')
+      return
+    }
+
+    setClientes(
+      activos.map((c) => ({
+        id: String(c.id),
+        nombre: `${c.codigo ?? ''} — ${c.nombre ?? ''}`,
+      })),
+    )
+    if (activos.length === 1) {
+      onSeleccionarCliente(String(activos[0].id))
     }
   }
 
@@ -450,7 +505,7 @@ export function POSPage() {
                       value={clienteQuery}
                       onChange={(e) => setClienteQuery(e.target.value)}
                     />
-                    <Button type="button" variant="outline" onClick={buscarClientes}>
+                    <Button type="button" variant="outline" onClick={() => void buscarClientes()}>
                       Buscar
                     </Button>
                   </div>

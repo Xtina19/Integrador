@@ -4,6 +4,11 @@
 -- =============================
 -- Fuente oficial del equipo. El backend (routes/*.js) y el FE deben alinearse aquí.
 --
+-- REGLA OBLIGATORIA: public/scriptdb ES LA BASE DE DATOS.
+--   • Toda tabla, columna, FK, índice y relación cruzada se define AQUÍ primero.
+--   • El backend solo implementa lo que este script declara; nunca al revés.
+--   • No usar observacion/texto libre para simular relaciones entre módulos.
+--
 -- GUÍA RÁPIDA (orden de lectura):
 --   1. MODULO CONTACTO          → Teléfonos, países, direcciones
 --   2. MODULO PERSONAS          → Persona, Usuario, Rol, Proveedor, catálogo libros
@@ -328,14 +333,21 @@ CREATE TABLE FormaPago (
 --              ├── DescarteInventario ── DetalleDescarteInventario
 --              │       └── EvidenciaDescarteInventario
 --              └── MovimientoInventario (kardex FE) ── AuditoriaInventario
---                    └── puente Ventas: id_factura_venta / id_detalle_factura → FacturaVenta
+--                    ├── puente Ventas: id_factura_venta / id_detalle_factura → FacturaVenta
+--                    └── puente Compras: documento_tipo = 'recepcion', documento_id = RecepcionOrdenCompra.id_recepcion
 --   OperacionIdempotenteInventario: idempotencia despacho/recepción transferencias
 -- NOTA: No existe tabla Kardex; la pantalla kardex lee MovimientoInventario.
 -- NOTA: Material (MODULO EVENTOS) no es inventario de productos.
+-- NOTA: CosteoInventario no existe. El costo vive en Producto.costo_referencia (costeo por libro / costeo manual).
 -- Puente Ventas (MODULO VENTAS):
 --   Emisión factura → MovimientoInventario (documento_tipo venta, salida stock)
 --   Devolución/cambio/anulación → MovimientoInventario (devolucion|compensacion, entrada stock)
 --   DetalleFacturaVenta.id_inventario → existencia (Producto+Almacen) descontada
+-- Puente Compras / Importaciones:
+--   RecepcionOrdenCompra (Recibido | Recibido Parcial)
+--     → DetalleRecepcionOrdenCompra (cantidades)
+--     → Inventario.stock_actual (alta) + MovimientoInventario (entrada, documento_tipo recepcion)
+--   Costeo por libro (Importaciones) → Producto.costo_referencia / Producto.precio (no mueve stock)
 --
 -- --- Ubicación: sucursal + almacén ---
 CREATE TABLE Sucursal (
@@ -634,7 +646,8 @@ CREATE TABLE MovimientoInventario (
     saldo_anterior INT NOT NULL,
     saldo_posterior INT NOT NULL,
     documento_tipo VARCHAR(50) NOT NULL,
-    -- inventario: transferencia|ajuste|descarte|conteo|recepcion
+    -- inventario: transferencia|ajuste|descarte|conteo|recepcion|existencia_inicial
+    -- compras: recepcion → RecepcionOrdenCompra.id_recepcion
     -- ventas: venta|devolucion|compensacion|anulacion_venta
     documento_id INT NOT NULL,
     id_factura_venta INT NULL,
@@ -690,6 +703,22 @@ CREATE TABLE OperacionIdempotenteInventario (
 -- MODULO IMPORTACIONES / EMBARQUES
 -- =============================================
 -- FE: módulo importaciones (embarques internacionales → Consolidacion → Almacen).
+--
+-- RELACIONES (scriptdb — no duplicar en código):
+--   OrdenCompra.tipo_orden = 'Internacional'
+--     → FacturaProveedores.id_orden_compra (Compras — factura proveedor unificada)
+--     → FacturaInternacional.id_factura_prov (FK — detalle logístico embarque)
+--     → FacturaInternacional.id_embarque      (FK)
+--     → Embarque → DocumentoCostoFlete (documentos de flete: facturas BL, guías, etc.)
+--     → Embarque → CostoEmbarque (legacy — totales históricos semilla)
+--     → Embarque → Consolidacion.id_embarque  (FK)
+--     → Consolidacion.id_almacen_destino      (FK → Almacen)
+--     → al finalizar embarque: RecepcionOrdenCompra.id_orden_compra (FK) + OrdenCompra.estado = 'Recibida'
+--     → Inventario + MovimientoInventario (documento_tipo = 'recepcion')
+-- Costeo por libro: costo unitario = producto + flete repartido.
+-- Precio de venta = costo × (1 + margen/100). Margen por libro (default 50%), editable en Importaciones → Costeo por Libro.
+-- Al aplicar: Producto.costo_referencia (costo) y Producto.precio (venta).
+--
 CREATE TABLE Embarque (
     id_embarque INT PRIMARY KEY IDENTITY,
     codigo_embarque VARCHAR(50) NOT NULL UNIQUE,
@@ -703,7 +732,7 @@ CREATE TABLE Embarque (
     -- 'Aéreo', 'Marítimo', 'Terrestre'
     numero_tracking VARCHAR(100),
     estado VARCHAR(50) NOT NULL DEFAULT 'En Tránsito',
-    -- 'En Tránsito', 'En Aduana', 'Recibido'
+    -- 'Registrado', 'En Tránsito', 'En Aduana', 'Recibido', 'Costeado', 'Finalizado'
     observacion VARCHAR(255),
     fecha_registro DATETIME NOT NULL DEFAULT GETDATE()
 );
@@ -723,9 +752,43 @@ CREATE TABLE CostoEmbarque (
     CONSTRAINT fk_ce_embarque FOREIGN KEY (id_embarque) REFERENCES Embarque(id_embarque)
 );
 
+-- Documentos de costo de flete (facturas forwarder, BL, guías, recibos aduanales).
+-- TODO el registro vive en SQL Server (public/scriptdb): metadatos + archivo adjunto en contenido_archivo.
+CREATE TABLE DocumentoCostoFlete (
+    id_documento_flete INT PRIMARY KEY IDENTITY,
+    id_embarque INT NOT NULL,
+    codigo_documento VARCHAR(50) NOT NULL UNIQUE,
+    numero_documento VARCHAR(100),
+    -- Número del proveedor (factura agente de carga, BL, guía aérea)
+    tipo_documento VARCHAR(50) NOT NULL,
+    -- 'Factura flete', 'Conocimiento de embarque', 'Guía aérea', 'Factura aduana', 'Recibo portuario', 'Otros'
+    concepto VARCHAR(150) NOT NULL,
+    -- 'Flete internacional', 'Seguro', 'Aduana', 'Transporte local', 'Gastos portuarios', 'Manipulación', 'Otros gastos'
+    proveedor_servicio VARCHAR(150) NOT NULL,
+    -- Agente de carga, naviera, broker aduanal, courier
+    fecha_documento DATE NOT NULL,
+    moneda VARCHAR(10) NOT NULL DEFAULT 'USD',
+    tasa_cambio DECIMAL(10, 4),
+    monto DECIMAL(12, 2) NOT NULL,
+    monto_local DECIMAL(12, 2),
+    estado VARCHAR(50) NOT NULL DEFAULT 'Registrado',
+    -- 'Registrado', 'Validado', 'Pagado', 'Anulado'
+    nombre_archivo VARCHAR(255),
+    mime_type VARCHAR(100),
+    -- application/pdf, image/jpeg, etc.
+    contenido_archivo VARBINARY(MAX),
+    -- Archivo PDF/imagen almacenado en BD (no filesystem externo)
+    observacion VARCHAR(255),
+    fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT fk_dcf_embarque FOREIGN KEY (id_embarque) REFERENCES Embarque(id_embarque)
+);
+
 CREATE TABLE FacturaInternacional (
     id_factura_int INT PRIMARY KEY IDENTITY,
     id_embarque INT NOT NULL,
+    id_orden_compra INT NULL,
+    id_factura_prov INT NULL,
+    -- Vínculo con FacturaProveedores (factura unificada en Compras)
     numero_factura VARCHAR(100) NOT NULL UNIQUE,
     proveedor VARCHAR(150) NOT NULL,
     pais_emisor VARCHAR(100),
@@ -781,7 +844,10 @@ CREATE TABLE Consolidacion (
 -- =============================================
 -- MODULO COMPRAS Y FINANCIERO
 -- =============================================
--- FE: /compras (órdenes, recepciones, facturas proveedor, CxP).
+-- FE: /compras (órdenes, recepciones, facturas proveedor nacionales e internacionales, CxP).
+-- Montos de OC: la orden registra producto+cantidad; total factura se captura al registrar pago (FacturaProveedores).
+-- Nacional: RecepcionOrdenCompra (Pendiente → Recibido) → Inventario + MovimientoInventario + FacturaProveedores + CuentasPorPagar.
+-- OC internacional: FacturaProveedores al aprobar; FacturaInternacional al registrar embarque; al finalizar → RecepcionOrdenCompra (Recibido) → Inventario.
 CREATE TABLE OrdenCompra (
     id_orden_compra INT PRIMARY KEY IDENTITY,
     codigo_orden VARCHAR(50) NOT NULL UNIQUE,
@@ -795,6 +861,8 @@ CREATE TABLE OrdenCompra (
     total DECIMAL(12, 2) NOT NULL DEFAULT 0,
     estado VARCHAR(50) NOT NULL DEFAULT 'Pendiente',
     -- 'Pendiente', 'Aprobada', 'Recibida', 'Cancelada'
+    tipo_orden VARCHAR(50) NOT NULL DEFAULT 'Nacional',
+    -- 'Nacional' | 'Internacional' — las internacionales alimentan Importaciones
     observacion VARCHAR(255),
     id_usuario INT NOT NULL,
     fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
@@ -806,8 +874,9 @@ CREATE TABLE DetalleOrdenCompra (
     id_orden_compra INT NOT NULL,
     id_producto INT NOT NULL,
     cantidad INT NOT NULL,
-    precio_unitario DECIMAL(12, 2) NOT NULL,
-    subtotal DECIMAL(12, 2) NOT NULL,
+    -- Costo se define al pagar la factura proveedor, no en la OC (default 0).
+    precio_unitario DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    subtotal DECIMAL(12, 2) NOT NULL DEFAULT 0,
     observacion VARCHAR(255),
     CONSTRAINT fk_doc_orden FOREIGN KEY (id_orden_compra) REFERENCES OrdenCompra(id_orden_compra),
     CONSTRAINT fk_doc_producto FOREIGN KEY (id_producto) REFERENCES Producto(id_producto)
@@ -818,8 +887,8 @@ CREATE TABLE RecepcionOrdenCompra (
     id_orden_compra INT NOT NULL,
     id_almacen INT NOT NULL,
     id_usuario_recibe INT NOT NULL,
-    estado VARCHAR(50) NOT NULL DEFAULT 'Recibido',
-    -- 'Recibido', 'Recibido Parcial', 'Rechazado'
+    estado VARCHAR(50) NOT NULL DEFAULT 'Pendiente',
+    -- 'Pendiente', 'Recibido', 'Recibido Parcial', 'Rechazado'
     observacion VARCHAR(255),
     fecha_recepcion DATETIME NOT NULL DEFAULT GETDATE(),
     CONSTRAINT fk_roc_orden FOREIGN KEY (id_orden_compra) REFERENCES OrdenCompra(id_orden_compra),
@@ -1121,6 +1190,16 @@ ALTER TABLE CuentasPorCobrar ADD CONSTRAINT fk_cpc_factura_venta
 -- Pago con nota de crédito aplicada
 ALTER TABLE PagoFactura ADD CONSTRAINT fk_pf_nota_credito
     FOREIGN KEY (id_nota_credito) REFERENCES NotaCredito(id_nota_credito);
+
+-- Importaciones → Compras (OrdenCompra internacional)
+ALTER TABLE FacturaInternacional ADD CONSTRAINT fk_fi_orden_compra
+    FOREIGN KEY (id_orden_compra) REFERENCES OrdenCompra(id_orden_compra);
+
+ALTER TABLE FacturaInternacional ADD CONSTRAINT uq_fi_orden_compra
+    UNIQUE (id_orden_compra);
+
+ALTER TABLE FacturaInternacional ADD CONSTRAINT fk_fi_factura_prov
+    FOREIGN KEY (id_factura_prov) REFERENCES FacturaProveedores(id_factura_prov);
 
 -- Fin Modulos Financieros
 -- Bloque Siguiente
@@ -3232,11 +3311,204 @@ VALUES
     (9, 'Seguro de carga', 250, 'USD', 60.55, 15137.50),
     (10, 'Flete aéreo', 1350, 'USD', 60.60, 81810);
 
+-- Tabla: DocumentoCostoFlete
+-- Depende de: Embarque
+INSERT INTO
+    DocumentoCostoFlete (
+        id_embarque,
+        codigo_documento,
+        numero_documento,
+        tipo_documento,
+        concepto,
+        proveedor_servicio,
+        fecha_documento,
+        moneda,
+        tasa_cambio,
+        monto,
+        monto_local,
+        estado,
+        nombre_archivo,
+        mime_type,
+        observacion
+    )
+VALUES
+    (
+        1,
+        'DCF-001',
+        'FF-2026-001',
+        'Factura flete',
+        'Flete internacional',
+        'DHL Global Forwarding',
+        '2026-01-04',
+        'USD',
+        60.25,
+        1200,
+        72300,
+        'Pagado',
+        'flete-embarque-001.pdf',
+        'application/pdf',
+        'Flete aéreo Bogotá — SDQ'
+    ),
+    (
+        2,
+        'DCF-002',
+        'FF-2026-002',
+        'Factura flete',
+        'Flete internacional',
+        'Kuehne + Nagel',
+        '2026-01-09',
+        'USD',
+        60.30,
+        1500,
+        90450,
+        'Pagado',
+        'flete-embarque-002.pdf',
+        'application/pdf',
+        'Reposición urgente'
+    ),
+    (
+        3,
+        'DCF-003',
+        'BL-2026-003',
+        'Conocimiento de embarque',
+        'Flete internacional',
+        'Maersk Line',
+        '2026-01-14',
+        'USD',
+        60.35,
+        3800,
+        229330,
+        'Validado',
+        'bl-embarque-003.pdf',
+        'application/pdf',
+        'Contenedor marítimo UK'
+    ),
+    (
+        4,
+        'DCF-004',
+        'SEG-2026-004',
+        'Factura flete',
+        'Seguro',
+        'Mapfre Seguros',
+        '2026-01-19',
+        'USD',
+        60.40,
+        300,
+        18120,
+        'Pagado',
+        'seguro-embarque-004.pdf',
+        'application/pdf',
+        'Póliza carga aérea'
+    ),
+    (
+        5,
+        'DCF-005',
+        'BL-2026-005',
+        'Conocimiento de embarque',
+        'Flete internacional',
+        'MSC Mediterranean',
+        '2026-01-30',
+        'EUR',
+        65.00,
+        4200,
+        273000,
+        'Registrado',
+        'bl-embarque-005.pdf',
+        'application/pdf',
+        'Contenedor compartido'
+    ),
+    (
+        6,
+        'DCF-006',
+        'ADU-2026-006',
+        'Factura aduana',
+        'Aduana',
+        'Despacho Aduanal RD',
+        '2026-02-04',
+        'USD',
+        60.45,
+        450,
+        27202.50,
+        'Pagado',
+        'aduana-embarque-006.pdf',
+        'application/pdf',
+        'Gestión aduanal completa'
+    ),
+    (
+        7,
+        'DCF-007',
+        'CRR-2026-007',
+        'Guía aérea',
+        'Flete internacional',
+        'FedEx International',
+        '2026-02-09',
+        'USD',
+        60.50,
+        800,
+        48400,
+        'Pagado',
+        'guia-embarque-007.pdf',
+        'application/pdf',
+        'Courier express'
+    ),
+    (
+        8,
+        'DCF-008',
+        'ALM-2026-008',
+        'Recibo portuario',
+        'Otros gastos',
+        'DP World Caucedo',
+        '2026-02-11',
+        'GBP',
+        76.00,
+        600,
+        45600,
+        'Registrado',
+        'almacenaje-008.pdf',
+        'application/pdf',
+        'Almacenaje en aduana'
+    ),
+    (
+        9,
+        'DCF-009',
+        'SEG-2026-009',
+        'Factura flete',
+        'Seguro',
+        'Seguros Reservas',
+        '2026-02-17',
+        'USD',
+        60.55,
+        250,
+        15137.50,
+        'Validado',
+        'seguro-embarque-009.pdf',
+        'application/pdf',
+        'Cobertura marítima'
+    ),
+    (
+        10,
+        'DCF-010',
+        'FF-2026-010',
+        'Factura flete',
+        'Flete internacional',
+        'Avianca Cargo',
+        '2026-02-21',
+        'USD',
+        60.60,
+        1350,
+        81810,
+        'Registrado',
+        'flete-embarque-010.pdf',
+        'application/pdf',
+        'Consolidado regional'
+    );
+
 -- Tabla: FacturaInternacional
 -- Depende de: Embarque
 INSERT INTO
     FacturaInternacional (
         id_embarque,
+        id_orden_compra,
         numero_factura,
         proveedor,
         pais_emisor,
@@ -3253,6 +3525,7 @@ INSERT INTO
 VALUES
     (
         1,
+        NULL,
         'FINV-001',
         'Penguin Random House Latinoamérica',
         'Colombia',
@@ -3268,6 +3541,7 @@ VALUES
     ),
     (
         2,
+        NULL,
         'FINV-002',
         'Grupo Santillana Colombia',
         'Colombia',
@@ -3283,6 +3557,7 @@ VALUES
     ),
     (
         3,
+        NULL,
         'FINV-003',
         'Bloomsbury Publishing UK',
         'Reino Unido',
@@ -3298,6 +3573,7 @@ VALUES
     ),
     (
         4,
+        NULL,
         'FINV-004',
         'Fondo de Cultura Económica México',
         'México',
@@ -3313,6 +3589,7 @@ VALUES
     ),
     (
         5,
+        NULL,
         'FINV-005',
         'Alfaguara España',
         'España',
@@ -3328,6 +3605,7 @@ VALUES
     ),
     (
         6,
+        NULL,
         'FINV-006',
         'Penguin Random House Latinoamérica',
         'Argentina',
@@ -3343,6 +3621,7 @@ VALUES
     ),
     (
         7,
+        NULL,
         'FINV-007',
         'HarperCollins',
         'Estados Unidos',
@@ -3358,6 +3637,7 @@ VALUES
     ),
     (
         8,
+        NULL,
         'FINV-008',
         'Bloomsbury Publishing UK',
         'Reino Unido',
@@ -3373,6 +3653,7 @@ VALUES
     ),
     (
         9,
+        NULL,
         'FINV-009',
         'Grupo Santillana Colombia',
         'Colombia',
@@ -3388,6 +3669,7 @@ VALUES
     ),
     (
         10,
+        NULL,
         'FINV-010',
         'Fondo de Cultura Económica México',
         'México',
@@ -5163,6 +5445,7 @@ INSERT INTO
         impuestos,
         total,
         estado,
+        tipo_orden,
         observacion,
         id_usuario
     )
@@ -5178,6 +5461,7 @@ VALUES
         9000,
         59000,
         'Recibida',
+        'Nacional',
         'Compra local',
         1
     ),
@@ -5192,6 +5476,7 @@ VALUES
         7560,
         49560,
         'Recibida',
+        'Nacional',
         'Reposición',
         2
     ),
@@ -5206,6 +5491,7 @@ VALUES
         15300,
         100300,
         'Aprobada',
+        'Internacional',
         'Importación',
         3
     ),
@@ -5220,6 +5506,7 @@ VALUES
         10800,
         70800,
         'Aprobada',
+        'Internacional',
         'Importación',
         4
     ),
@@ -5234,6 +5521,7 @@ VALUES
         12960,
         84960,
         'Pendiente',
+        'Nacional',
         'Nueva edición',
         5
     ),
@@ -5248,6 +5536,7 @@ VALUES
         16200,
         106200,
         'Pendiente',
+        'Nacional',
         'Fantasía',
         6
     ),
@@ -5262,6 +5551,7 @@ VALUES
         5040,
         33040,
         'Recibida',
+        'Nacional',
         'Sucursal',
         7
     ),
@@ -5276,6 +5566,7 @@ VALUES
         6300,
         41300,
         'Aprobada',
+        'Nacional',
         'La Romana',
         8
     ),
@@ -5290,6 +5581,7 @@ VALUES
         4320,
         28320,
         'Pendiente',
+        'Nacional',
         'San Pedro',
         9
     ),
@@ -5304,6 +5596,7 @@ VALUES
         9900,
         64900,
         'Cancelada',
+        'Internacional',
         'Cancelada por demora',
         10
     );
@@ -6721,3 +7014,105 @@ VALUES
     (8, 8, 20, 1, 1000, 'Daño de evento', 8, 'Aplicado'),
     (9, 9, 35, 3, 500, 'Transporte', 9, 'Pendiente'),
     (10, 10, 10, 1, 975, 'Otro', 10, 'Borrador');
+
+-- =============================================
+-- MIGRACIONES (BD ya desplegada — ejecutar una vez)
+-- =============================================
+
+-- OrdenCompra.tipo_orden
+IF COL_LENGTH('OrdenCompra', 'tipo_orden') IS NULL
+BEGIN
+    ALTER TABLE OrdenCompra ADD tipo_orden VARCHAR(50) NOT NULL DEFAULT 'Nacional';
+END;
+GO
+
+UPDATE OrdenCompra
+SET tipo_orden = 'Internacional'
+WHERE tipo_orden = 'Nacional'
+  AND (observacion LIKE '%Import%' OR UPPER(codigo_orden) LIKE '%INT%');
+GO
+
+-- FacturaInternacional.id_orden_compra + FK + UNIQUE
+IF COL_LENGTH('FacturaInternacional', 'id_orden_compra') IS NULL
+BEGIN
+    ALTER TABLE FacturaInternacional ADD id_orden_compra INT NULL;
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'fk_fi_orden_compra')
+BEGIN
+    ALTER TABLE FacturaInternacional ADD CONSTRAINT fk_fi_orden_compra
+        FOREIGN KEY (id_orden_compra) REFERENCES OrdenCompra(id_orden_compra);
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'uq_fi_orden_compra')
+BEGIN
+    CREATE UNIQUE INDEX uq_fi_orden_compra ON FacturaInternacional(id_orden_compra)
+    WHERE id_orden_compra IS NOT NULL;
+END;
+GO
+
+UPDATE fi
+SET fi.id_orden_compra = oc.id_orden_compra
+FROM FacturaInternacional fi
+INNER JOIN OrdenCompra oc
+    ON fi.observacion LIKE '%id_orden_compra=' + CAST(oc.id_orden_compra AS VARCHAR(20)) + '%'
+WHERE fi.id_orden_compra IS NULL;
+GO
+
+-- DocumentoCostoFlete (BD ya desplegada)
+IF OBJECT_ID('DocumentoCostoFlete', 'U') IS NULL
+BEGIN
+    CREATE TABLE DocumentoCostoFlete (
+        id_documento_flete INT PRIMARY KEY IDENTITY,
+        id_embarque INT NOT NULL,
+        codigo_documento VARCHAR(50) NOT NULL UNIQUE,
+        numero_documento VARCHAR(100),
+        tipo_documento VARCHAR(50) NOT NULL,
+        concepto VARCHAR(150) NOT NULL,
+        proveedor_servicio VARCHAR(150) NOT NULL,
+        fecha_documento DATE NOT NULL,
+        moneda VARCHAR(10) NOT NULL DEFAULT 'USD',
+        tasa_cambio DECIMAL(10, 4),
+        monto DECIMAL(12, 2) NOT NULL,
+        monto_local DECIMAL(12, 2),
+        estado VARCHAR(50) NOT NULL DEFAULT 'Registrado',
+        nombre_archivo VARCHAR(255),
+        mime_type VARCHAR(100),
+        contenido_archivo VARBINARY(MAX),
+        observacion VARCHAR(255),
+        fecha_registro DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT fk_dcf_embarque FOREIGN KEY (id_embarque) REFERENCES Embarque(id_embarque)
+    );
+END;
+GO
+
+IF COL_LENGTH('DocumentoCostoFlete', 'mime_type') IS NULL
+    ALTER TABLE DocumentoCostoFlete ADD mime_type VARCHAR(100) NULL;
+GO
+
+-- FacturaInternacional.id_factura_prov → FacturaProveedores (factura unificada Compras)
+IF COL_LENGTH('FacturaInternacional', 'id_factura_prov') IS NULL
+BEGIN
+    ALTER TABLE FacturaInternacional ADD id_factura_prov INT NULL;
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'fk_fi_factura_prov')
+BEGIN
+    ALTER TABLE FacturaInternacional ADD CONSTRAINT fk_fi_factura_prov
+        FOREIGN KEY (id_factura_prov) REFERENCES FacturaProveedores(id_factura_prov);
+END;
+GO
+
+UPDATE fi
+SET fi.id_factura_prov = fp.id_factura_prov
+FROM FacturaInternacional fi
+INNER JOIN FacturaProveedores fp ON fp.id_orden_compra = fi.id_orden_compra AND fp.estado <> 'Anulada'
+WHERE fi.id_factura_prov IS NULL AND fi.id_orden_compra IS NOT NULL;
+GO
+
+IF COL_LENGTH('DocumentoCostoFlete', 'contenido_archivo') IS NULL
+    ALTER TABLE DocumentoCostoFlete ADD contenido_archivo VARBINARY(MAX) NULL;
+GO

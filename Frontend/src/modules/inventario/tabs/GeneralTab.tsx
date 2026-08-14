@@ -9,6 +9,7 @@ import { Toolbar } from '@/components/ui/Toolbar'
 import { Select } from '@/components/ui/Input'
 import type { ProductoInventarioVista } from '../types/inventoryUi'
 import { stockEstadoBadge } from '../utils/statusBadges'
+import { formatMoney } from '@/lib/money'
 
 const estadoLabel = { normal: 'Normal', bajo: 'Bajo stock', agotado: 'Agotado' } as const
 
@@ -85,6 +86,18 @@ export function GeneralTab({ productos, onOpenKardex }: Props) {
                   <span className="text-lg font-semibold tabular-nums text-corporate">{p.stockConsolidado}</span>
                   <p className="text-[11px] text-slate-400">mín. {p.stockMinimo}</p>
                 </div>
+              ),
+            },
+            {
+              key: 'costoReferencia',
+              header: 'Costo',
+              className: 'text-right',
+              render: (p) => (
+                <span className="tabular-nums text-sm">
+                  {p.costoReferencia && p.costoReferencia > 0
+                    ? formatMoney(p.costoReferencia, 'DOP')
+                    : '—'}
+                </span>
               ),
             },
             {

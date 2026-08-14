@@ -2,7 +2,7 @@ export type PurchaseStatus = 'draft' | 'pending' | 'approved' | 'received' | 'fi
 export type PurchaseType = 'national' | 'international'
 export type TransferStatus = 'requested' | 'approved' | 'in_transit' | 'received' | 'finalized'
 export type ImportStatus = 'registered' | 'in_transit' | 'customs' | 'received' | 'costed' | 'finalized'
-export type EventStatus = 'scheduled' | 'staff_assigned' | 'in_progress' | 'finalized'
+export type EventStatus = 'scheduled' | 'staff_assigned' | 'in_progress' | 'finalized' | 'cancelled'
 export type InternationalInvoiceStatus = 'pending' | 'paid'
 export type ImportPipelineStage =
   | 'invoice'
@@ -31,7 +31,8 @@ export interface Product {
 export interface PurchaseOrderLine {
   product: string
   qty: number
-  unitCost: number
+  /** Costo unitario legacy / importaciones; no se captura en OC nacional. */
+  unitCost?: number
   /** Id numérico de producto cuando la fuente es API Compras. */
   productoId?: number
 }
@@ -57,26 +58,41 @@ export interface PurchaseOrder {
 
 export interface InternationalInvoice {
   id: string
+  /** Id numérico BD (FacturaInternacional). */
+  dbId?: number
   orderId: string
+  /** Id numérico OrdenCompra en BD. */
+  orderDbId?: number
   supplier: string
   date: string
   currency: string
   amount: number
   status: InternationalInvoiceStatus
   shipmentId?: string
+  shipmentDbId?: number
   shipmentCode?: string
   consolidationId?: string
   stage: ImportPipelineStage
+  /** OC aprobada sin embarque en BD (selector Registrar Embarque). */
+  pendingEmbarque?: boolean
 }
 
+export type ConsolidationStatus = 'pending' | 'processed' | 'closed'
+
+/** Consolidación en almacén destino — 1:1 con Embarque (public/scriptdb → Consolidacion.id_embarque). */
 export interface Consolidation {
   id: string
-  name: string
-  orderIds: string[]
-  shipmentIds: string[]
-  invoiceIds: string[]
-  totalBoxes: number
-  status: 'active' | 'closed'
+  dbId?: number
+  code: string
+  shipmentId: string
+  shipmentDbId?: number
+  warehouseId?: string
+  warehouseName?: string
+  date: string
+  totalBultos: number
+  weightKg?: number
+  volumeM3?: number
+  status: ConsolidationStatus
   notes?: string
 }
 
@@ -88,6 +104,33 @@ export interface ShipmentCosts {
   portFees: number
   handling: number
   other: number
+}
+
+export type FreightDocumentStatus = 'registered' | 'validated' | 'paid' | 'void'
+
+/** Documento de costo de flete — DocumentoCostoFlete (scriptdb). */
+export interface FreightCostDocument {
+  id: string
+  dbId?: number
+  code: string
+  shipmentId: string
+  shipmentDbId?: number
+  shipmentCode?: string
+  documentNumber?: string
+  documentType: string
+  concept: string
+  serviceProvider: string
+  documentDate: string
+  currency: string
+  exchangeRate?: number
+  amount: number
+  localAmount?: number
+  status: FreightDocumentStatus
+  fileName?: string
+  /** Indica si el binario está persistido en DocumentoCostoFlete.contenido_archivo */
+  hasFile?: boolean
+  mimeType?: string
+  notes?: string
 }
 
 /** @deprecated Usar ShipmentCosts embebido en Shipment */
@@ -107,11 +150,20 @@ export interface FreightCost {
 export interface BookCostingEntry {
   isbn: string
   title: string
+  productId?: string
   orderId?: string
   shipmentId?: string
   productCost: number
   freightAlloc: number
+  /** Costo unitario total (producto + flete). */
   finalCost: number
+  /** Precio de venta con margen (Producto.precio). */
+  salePrice: number
+  marginPercent: number
+  /** Costo en inventario antes de aplicar (Producto.costo_referencia). */
+  previousCost?: number
+  appliedToInventory?: boolean
+  appliedAt?: string
 }
 
 export interface Reception {
@@ -152,6 +204,7 @@ export interface TransferHistoryItem {
 
 export interface Shipment {
   id: string
+  dbId?: number
   code: string
   type: 'Marítimo' | 'Aéreo' | 'Courier'
   departure: string
@@ -162,9 +215,13 @@ export interface Shipment {
   destination: string
   supplier?: string
   orderId?: string
+  orderDbId?: number
   invoiceId?: string
+  invoiceDbId?: number
   consolidationId?: string
+  consolidationDbId?: number
   costs?: ShipmentCosts
+  freightDocuments?: FreightCostDocument[]
   notes?: string
 }
 

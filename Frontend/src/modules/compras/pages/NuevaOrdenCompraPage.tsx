@@ -10,13 +10,11 @@ import type { PurchaseStatus, PurchaseType } from '@/types/domain'
 import { useERP } from '@/store/ERPProvider'
 import { comprasApi } from '@/services/api/comprasApi'
 import { useComprasCatalogos } from '@/modules/compras/hooks/useComprasCatalogos'
-import { formatMoney } from '@/lib/money'
 
 interface OrderLine {
   id: string
   product: string
   qty: number
-  unitCost: number
   productoId?: number
 }
 
@@ -32,7 +30,7 @@ export function NuevaOrdenCompraPage() {
     currency: 'DOP',
     status: 'pending' as PurchaseStatus,
   })
-  const [lines, setLines] = useState<OrderLine[]>([{ id: '1', product: '', qty: 1, unitCost: 0 }])
+  const [lines, setLines] = useState<OrderLine[]>([{ id: '1', product: '', qty: 1 }])
 
   useEffect(() => {
     if (catalog.loading) return
@@ -45,7 +43,7 @@ export function NuevaOrdenCompraPage() {
     setLines((prev) => {
       if (prev[0]?.product || !catalog.productos[0]) return prev
       const p = catalog.productos[0]
-      return [{ id: '1', product: p.titulo, qty: 1, unitCost: Number(p.costo.toFixed(2)), productoId: p.id }]
+      return [{ id: '1', product: p.titulo, qty: 1, productoId: p.id }]
     })
   }, [catalog.loading, catalog.productos, catalog.suppliersForType])
 
@@ -63,10 +61,7 @@ export function NuevaOrdenCompraPage() {
     [catalog.productos]
   )
 
-  const total = useMemo(
-    () => lines.reduce((sum, line) => sum + line.qty * line.unitCost, 0),
-    [lines]
-  )
+  const totalItems = useMemo(() => lines.reduce((sum, line) => sum + line.qty, 0), [lines])
 
   const validation = useMemo(
     () =>
@@ -75,7 +70,7 @@ export function NuevaOrdenCompraPage() {
         form.supplier,
         form.date,
         form.currency,
-        lines.map((l) => ({ product: l.product, qty: l.qty, unitCost: l.unitCost, productoId: l.productoId })),
+        lines.map((l) => ({ product: l.product, qty: l.qty, productoId: l.productoId })),
         [],
         undefined,
         { autoCode: true }
@@ -101,7 +96,6 @@ export function NuevaOrdenCompraPage() {
         id: `line-${prev.length + 1}-${Math.random().toString(36).slice(2, 7)}`,
         product: p?.titulo ?? '',
         qty: 1,
-        unitCost: p ? Number(p.costo.toFixed(2)) : 0,
         productoId: p?.id,
       },
     ])
@@ -121,7 +115,6 @@ export function NuevaOrdenCompraPage() {
             ...line,
             product: String(value),
             productoId: prod?.id,
-            unitCost: prod ? Number(prod.costo.toFixed(2)) : line.unitCost,
           }
         }
         return { ...line, [field]: value }
@@ -150,7 +143,6 @@ export function NuevaOrdenCompraPage() {
           lines: lines.map((l) => ({
             product: trim(l.product),
             qty: Math.round(l.qty),
-            unitCost: Number(l.unitCost.toFixed(2)),
             productoId: l.productoId,
           })),
         })
@@ -232,70 +224,52 @@ export function NuevaOrdenCompraPage() {
               Agregar línea
             </Button>
           </div>
+          <p className="text-sm text-gray-500 mb-3">
+            Registre producto y cantidad. El monto de la factura se ingresa al registrar el pago al proveedor.
+          </p>
           <div className="space-y-3">
-            {lines.map((line) => {
-              const subtotal = line.qty * line.unitCost
-              return (
-                <div
-                  key={line.id}
-                  className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-4 rounded-lg bg-surface border border-gray-100"
-                >
-                  <div className="md:col-span-5">
-                    <Select
-                      label="Producto"
-                      value={line.product}
-                      onChange={(e) => updateLine(line.id, 'product', e.target.value)}
-                      options={productOptions}
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Input
-                      label="Cantidad"
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={line.qty}
-                      onChange={(e) => updateLine(line.id, 'qty', Math.round(Number(e.target.value) || 1))}
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Input
-                      label="Costo unitario"
-                      type="number"
-                      min={0}
-                      step={0.01}
-                      value={line.unitCost}
-                      onChange={(e) => updateLine(line.id, 'unitCost', Number(Number(e.target.value).toFixed(2)) || 0)}
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Subtotal</label>
-                    <p className="py-2 text-sm font-semibold text-corporate tabular-nums">
-                      {formatMoney(subtotal, form.currency)}
-                    </p>
-                  </div>
-                  <div className="md:col-span-1 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => removeLine(line.id)}
-                      className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                      aria-label="Eliminar línea"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
+            {lines.map((line) => (
+              <div
+                key={line.id}
+                className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-4 rounded-lg bg-surface border border-gray-100"
+              >
+                <div className="md:col-span-8">
+                  <Select
+                    label="Producto"
+                    value={line.product}
+                    onChange={(e) => updateLine(line.id, 'product', e.target.value)}
+                    options={productOptions}
+                  />
                 </div>
-              )
-            })}
+                <div className="md:col-span-3">
+                  <Input
+                    label="Cantidad"
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={line.qty}
+                    onChange={(e) => updateLine(line.id, 'qty', Math.round(Number(e.target.value) || 1))}
+                  />
+                </div>
+                <div className="md:col-span-1 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => removeLine(line.id)}
+                    className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    aria-label="Eliminar línea"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
         <div className="flex justify-end pt-4 border-t border-gray-200">
           <div className="text-right">
-            <p className="text-sm text-gray-500">Total de la orden</p>
-            <p className="text-2xl font-bold text-corporate tabular-nums">
-              {formatMoney(total, form.currency)}
-            </p>
+            <p className="text-sm text-gray-500">Total de unidades solicitadas</p>
+            <p className="text-2xl font-bold text-corporate tabular-nums">{totalItems}</p>
           </div>
         </div>
       </div>

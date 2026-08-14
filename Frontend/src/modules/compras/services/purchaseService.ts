@@ -8,6 +8,7 @@ import { internationalSupplierNames } from '@/mocks/mockAdmin'
 import { createActivity, createNotification } from '@/services/activityService'
 import { nextId, nextOrdenCompraCode } from '@/utils/idGenerator'
 import { nowFormatted } from '@/utils/timeUtils'
+import { registerLocalSupplierInvoice } from '@/modules/compras/services/facturaProveedorUi'
 
 /** Líneas efectivas: usa detalle guardado o reconstruye desde ítems/total (órdenes legacy). */
 export function resolvePurchaseOrderLines(order: PurchaseOrder): PurchaseOrderLine[] {
@@ -69,7 +70,7 @@ export const purchaseService = {
       return { success: false as const, errors: ['Los proveedores internacionales solo aplican a compras internacionales.'] }
     }
 
-    const total = input.lines.reduce((s, l) => s + l.qty * l.unitCost, 0)
+    const total = 0
     const order: PurchaseOrder = {
       id: orderNumber,
       supplier: trim(input.supplier),
@@ -143,13 +144,18 @@ export const purchaseService = {
     if (!validation.valid) return { success: false as const, errors: validation.errors }
 
     if (order.purchaseType === 'international') {
-      const invoice: InternationalInvoice = {
-        id: nextId('FI'),
+      const supplierInvoice = registerLocalSupplierInvoice(
+        order,
+        { fechaEmision: nowFormatted().slice(0, 10) },
+        state.supplierInvoices
+      )
+      const pipelineInvoice: InternationalInvoice = {
+        id: supplierInvoice.id,
         orderId: order.id,
         supplier: order.supplier,
-        date: nowFormatted().slice(0, 10),
+        date: supplierInvoice.date,
         currency: order.currency,
-        amount: order.total,
+        amount: 0,
         status: 'pending',
         stage: 'invoice',
       }
@@ -158,17 +164,18 @@ export const purchaseService = {
         success: true as const,
         orderId,
         newStatus: 'approved' as const,
-        internationalInvoice: invoice,
-        updatedOrder: { ...order, internationalInvoiceId: invoice.id },
+        supplierInvoice: { ...supplierInvoice, purchaseType: 'international' as const },
+        internationalInvoice: pipelineInvoice,
+        updatedOrder: { ...order, internationalInvoiceId: pipelineInvoice.id },
         activity: createActivity(
-          `Orden internacional ${orderId} aprobada — factura ${invoice.id} generada.`,
-          'Importaciones'
+          `Orden internacional ${orderId} aprobada — factura ${supplierInvoice.id} registrada.`,
+          'Compras'
         ),
         notification: createNotification(
           'info',
-          'Factura Internacional',
-          `${invoice.id} lista para embarque — ${orderId}`,
-          'Importaciones'
+          'Factura de proveedor',
+          `${supplierInvoice.id} lista para embarque — ${orderId}`,
+          'Compras'
         ),
       }
     }
@@ -246,7 +253,7 @@ export const purchaseService = {
     )
     if (!validation.valid) return { success: false as const, errors: validation.errors }
 
-    const total = input.lines.reduce((s, l) => s + l.qty * l.unitCost, 0)
+    const total = 0
     const updated: PurchaseOrder = {
       ...order,
       supplier: trim(input.supplier),

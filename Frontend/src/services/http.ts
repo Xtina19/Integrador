@@ -83,9 +83,12 @@ export function getFriendlyErrorMessage(error: unknown): string {
       const looksTechnical =
         !domainMsg ||
         /\b(ECONN|SQL|stack|Exception|TypeError|at\s+\S+\s+\()/i.test(String(domainMsg)) ||
-        /backend|servidor|localhost|:\d{2,5}/i.test(String(domainMsg))
+        /backend|servidor|localhost|:\d{2,5}/i.test(String(domainMsg)) ||
+        /entity too large|PAYLOAD_TOO_LARGE/i.test(String(domainMsg))
 
-      if (domainMsg && !looksTechnical) {
+      if (status === 413 || /entity too large|PAYLOAD_TOO_LARGE/i.test(String(domainMsg || ''))) {
+        userMessage = 'El PDF o imagen es demasiado grande. Use un archivo de hasta 25 MB.'
+      } else if (domainMsg && !looksTechnical) {
         userMessage = String(domainMsg)
       } else if (status === 401) {
         userMessage = USER_MSG.unauthorized
@@ -123,6 +126,22 @@ const http = axios.create({
   baseURL: apiConfig.baseUrl,
   timeout: apiConfig.timeout,
   headers: apiConfig.headers,
+  maxBodyLength: Infinity,
+  maxContentLength: Infinity,
+})
+
+http.interceptors.request.use((config) => {
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    const headers = config.headers as { delete?: (name: string) => void } & Record<string, unknown>
+    if (typeof headers.delete === 'function') {
+      headers.delete('Content-Type')
+      headers.delete('content-type')
+    } else {
+      delete headers['Content-Type']
+      delete headers['content-type']
+    }
+  }
+  return config
 })
 
 http.interceptors.response.use(

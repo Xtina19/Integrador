@@ -142,7 +142,7 @@ export const inventoryService = {
     }
   },
 
-  applyReceptionToInventory(state: ERPState, orderId: string, items: number) {
+  applyReceptionToInventory(state: ERPState, orderId: string, items: number, shipmentId?: string) {
     const order = state.purchaseOrders.find((o) => o.id === orderId)
     if (!order) return null
 
@@ -167,7 +167,7 @@ export const inventoryService = {
       type: 'Entrada',
       qty,
       balance: newStock,
-      reference: orderId,
+      reference: shipmentId ? `${orderId} / ${shipmentId}` : orderId,
       user: 'inventario@joselito.com',
     }
 

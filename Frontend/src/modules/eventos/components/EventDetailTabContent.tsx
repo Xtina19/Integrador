@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { Input, Select } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
-import { isEventDetailLocked } from '@/modules/eventos/utils/eventFieldLock'
+import { isEventDetailLocked, isEventFullyLocked } from '@/modules/eventos/utils/eventFieldLock'
 import type { EventStatus } from '@/types/domain'
+import { apiConfig } from '@/config/api'
 import { fetchArray } from '../utils/apiLists'
 
-const API_BASE = 'http://localhost:3001/api'
+const API_BASE = `${apiConfig.baseUrl}/api`
 
 export interface EventDetailForm {
   code: string
@@ -15,19 +16,26 @@ export interface EventDetailForm {
   publishers: string[]       // guardamos nombres para mostrar en los badges
   publisherIds: number[]     // y los IDs reales, que son los que se envían al backend
   location: string
+  sucursalId: number | ''
   startDate: string
   endDate: string
   responsible: string
+  responsibleId: number | ''
   budget: string
   capacity: string
   notes: string
 }
 
 const eventTypes = [
-  { value: 'feria', label: 'Feria' },
-  { value: 'evento', label: 'Evento' },
-  { value: 'presentacion', label: 'Presentación' },
-  { value: 'taller', label: 'Taller' },
+  { value: 'Feria del libro', label: 'Feria del libro' },
+  { value: 'Feria', label: 'Feria' },
+  { value: 'Presentación', label: 'Presentación' },
+  { value: 'Taller', label: 'Taller' },
+  { value: 'Firma', label: 'Firma' },
+  { value: 'Club de lectura', label: 'Club de lectura' },
+  { value: 'Conferencia', label: 'Conferencia' },
+  { value: 'Lanzamiento', label: 'Lanzamiento' },
+  { value: 'Encuentro', label: 'Encuentro' },
 ]
 
 interface EventDetailTabContentProps {
@@ -48,33 +56,40 @@ interface PersonaOption {
   nombre: string
 }
 
+interface SucursalOption {
+  id_sucursal: number
+  nombre: string
+  codigo_sucursal?: string
+}
+
 export function EventDetailTabContent({ form, onChange, status, locked }: EventDetailTabContentProps) {
-  const fieldsLocked = locked ?? (status ? isEventDetailLocked(status) || status === 'finalized' : false)
+  const fieldsLocked = locked ?? (status ? isEventDetailLocked(status) || isEventFullyLocked(status) : false)
   const [publisherPick, setPublisherPick] = useState('')
   const [editoriales, setEditoriales] = useState<EditorialOption[]>([])
   const [loadingEditoriales, setLoadingEditoriales] = useState(true)
   const [responsables, setResponsables] = useState<PersonaOption[]>([])
   const [loadingResponsables, setLoadingResponsables] = useState(true)
+  const [sucursales, setSucursales] = useState<SucursalOption[]>([])
+  const [loadingSucursales, setLoadingSucursales] = useState(true)
   const [catalogError, setCatalogError] = useState('')
 
   useEffect(() => {
     async function loadCatalogs() {
       setLoadingEditoriales(true)
       setLoadingResponsables(true)
+      setLoadingSucursales(true)
       setCatalogError('')
 
       try {
-        const [editorialesData, responsablesData] = await Promise.all([
-          fetchArray<EditorialOption>(
-            `${API_BASE}/eventos/editoriales`
-          ),
-          fetchArray<PersonaOption>(
-            `${API_BASE}/eventos/personas`
-          ),
+        const [editorialesData, responsablesData, sucursalesData] = await Promise.all([
+          fetchArray<EditorialOption>(`${API_BASE}/eventos/editoriales`),
+          fetchArray<PersonaOption>(`${API_BASE}/eventos/personas`),
+          fetchArray<SucursalOption>(`${API_BASE}/eventos/sucursales`),
         ])
 
         setEditoriales(editorialesData)
         setResponsables(responsablesData)
+        setSucursales(sucursalesData)
       } catch (error) {
         console.error(
           'Error cargando los catálogos del evento:',
@@ -83,19 +98,21 @@ export function EventDetailTabContent({ form, onChange, status, locked }: EventD
 
         setEditoriales([])
         setResponsables([])
+        setSucursales([])
         setCatalogError(
-          'No se pudieron cargar las editoriales y los responsables.'
+          'No se pudieron cargar las editoriales, sucursales y responsables.'
         )
       } finally {
         setLoadingEditoriales(false)
         setLoadingResponsables(false)
+        setLoadingSucursales(false)
       }
     }
 
     void loadCatalogs()
   }, [])
 
-  function update(field: keyof EventDetailForm, value: string | string[] | number[]) {
+  function update(field: keyof EventDetailForm, value: string | string[] | number[] | number | '') {
     onChange({ ...form, [field]: value })
   }
 
@@ -131,12 +148,17 @@ export function EventDetailTabContent({ form, onChange, status, locked }: EventD
       )}
       {fieldsLocked && (
         <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-4 py-2.5">
-          Este evento está en curso. Los datos principales están bloqueados. Puede editar utensilios, observaciones e inventario adicional.
+          Este evento está en curso. Los datos principales están bloqueados. Puede editar personal, utensilios y observaciones.
         </div>
       )}
       {status === 'finalized' && (
         <div className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
           Este evento está finalizado. Todos los campos están en solo lectura.
+        </div>
+      )}
+      {status === 'cancelled' && (
+        <div className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
+          Este evento está cancelado. Todos los campos están en solo lectura.
         </div>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -195,11 +217,29 @@ export function EventDetailTabContent({ form, onChange, status, locked }: EventD
             ))}
           </div>
         </div>
-        <Input
-          label="Lugar *"
-          value={form.location}
-          disabled={fieldsLocked}
-          onChange={(e) => update('location', e.target.value)}
+        <Select
+          label="Sucursal / lugar *"
+          value={form.sucursalId === '' ? '' : String(form.sucursalId)}
+          disabled={fieldsLocked || loadingSucursales}
+          onChange={(e) => {
+            const id = e.target.value ? Number(e.target.value) : ''
+            const suc = sucursales.find((s) => s.id_sucursal === id)
+            onChange({
+              ...form,
+              sucursalId: id,
+              location: suc?.nombre ?? '',
+            })
+          }}
+          options={[
+            {
+              value: '',
+              label: loadingSucursales ? 'Cargando sucursales...' : 'Seleccione sucursal...',
+            },
+            ...sucursales.map((s) => ({
+              value: String(s.id_sucursal),
+              label: s.nombre,
+            })),
+          ]}
         />
         <Input
           label="Capacidad estimada"
@@ -225,11 +265,17 @@ export function EventDetailTabContent({ form, onChange, status, locked }: EventD
         />
         <Select
           label="Responsable *"
-          value={form.responsible}
+          value={form.responsibleId === '' ? '' : String(form.responsibleId)}
           disabled={fieldsLocked || loadingResponsables}
-          onChange={(e) =>
-            update('responsible', e.target.value)
-          }
+          onChange={(e) => {
+            const id = e.target.value ? Number(e.target.value) : ''
+            const persona = responsables.find((p) => p.id_persona === id)
+            onChange({
+              ...form,
+              responsibleId: id,
+              responsible: persona?.nombre ?? '',
+            })
+          }}
           options={[
             {
               value: '',
@@ -238,7 +284,7 @@ export function EventDetailTabContent({ form, onChange, status, locked }: EventD
                 : 'Seleccione responsable...',
             },
             ...responsables.map((persona) => ({
-              value: persona.nombre,
+              value: String(persona.id_persona),
               label: persona.nombre,
             })),
           ]}
@@ -257,7 +303,7 @@ export function EventDetailTabContent({ form, onChange, status, locked }: EventD
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-corporate focus:outline-none focus:ring-2 focus:ring-corporate/20 disabled:bg-gray-50 disabled:text-gray-500"
             rows={3}
             value={form.notes}
-            disabled={status === 'finalized'}
+            disabled={status ? isEventFullyLocked(status) : false}
             onChange={(e) => update('notes', e.target.value)}
             placeholder="Notas internas del evento..."
           />

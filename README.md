@@ -37,6 +37,28 @@ Proyecto/
 
 ---
 
+## Inicio rápido (recomendado)
+
+**Un solo comando levanta backend + frontend juntos.** El frontend espera a que el backend responda antes de abrir.
+
+Desde la **raíz** del proyecto:
+
+```bash
+npm install
+npm start
+```
+
+O haga doble clic en **`INICIAR-LIBROSYS.cmd`** (Windows).
+
+- Backend: `http://localhost:3001`
+- App: `http://localhost:5173`
+
+> **Importante:** no use solo `vite` ni `npm run dev:web`. Eso levanta únicamente la pantalla sin la base de datos. Use siempre `npm start` desde la raíz, `npm run dev` en `Frontend/`, o el archivo `.cmd`.
+
+Al abrir el proyecto en **Cursor/VS Code**, la tarea **LibroSys: backend + frontend** puede iniciarse automáticamente (configurado en `.vscode/tasks.json`).
+
+---
+
 ## Backend
 
 ```bash
@@ -69,7 +91,7 @@ npm install
 npm run dev
 ```
 
-App: `http://localhost:5173`
+`npm run dev` inicia también el backend en `localhost:3001`. App: `http://localhost:5173`
 
 ```env
 VITE_API_URL=http://localhost:3001

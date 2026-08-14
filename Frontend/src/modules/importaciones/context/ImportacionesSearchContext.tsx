@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 
-export type ImportacionesSearchTab = 'embarques' | 'facturas' | 'consolidaciones' | null
+export type ImportacionesSearchTab = 'embarques' | 'facturas' | null
 
 interface ImportacionesSearchContextValue {
   activeTab: ImportacionesSearchTab
@@ -14,15 +14,14 @@ const ImportacionesSearchContext = createContext<ImportacionesSearchContextValue
 
 function resolveTab(pathname: string): ImportacionesSearchTab {
   if (pathname.startsWith('/importaciones/embarques') && !pathname.includes('/nuevo')) return 'embarques'
+  if (pathname.startsWith('/importaciones/consolidaciones')) return 'embarques'
   if (pathname.startsWith('/importaciones/facturas')) return 'facturas'
-  if (pathname.startsWith('/importaciones/consolidaciones')) return 'consolidaciones'
   return null
 }
 
 const placeholders: Record<Exclude<ImportacionesSearchTab, null>, string> = {
-  embarques: 'Buscar embarque, factura, OC, origen o destino...',
+  embarques: 'Buscar embarque, consolidación, factura, OC...',
   facturas: 'Buscar factura, proveedor, OC o embarque...',
-  consolidaciones: 'Buscar código, nombre, embarque u orden...',
 }
 
 export function ImportacionesSearchProvider({ children }: { children: React.ReactNode }) {

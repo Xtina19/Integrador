@@ -1,45 +1,95 @@
-import { useState, useMemo } from 'react'
-import { Calculator } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Calculator, CheckCircle2, ExternalLink } from 'lucide-react'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Table } from '@/components/ui/Table'
 import { Toolbar } from '@/components/ui/Toolbar'
-import { Select } from '@/components/ui/Input'
+import { Input, Select } from '@/components/ui/Input'
+import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
 import type { BookCostingEntry } from '@/types/domain'
-import { computeShipmentCostsTotal, hasShipmentCosts } from '@/business-rules/shipmentCosts'
+import { hasShipmentCosts } from '@/business-rules/shipmentCosts'
 import { useERP } from '@/store/ERPProvider'
+import {
+  BOOK_COSTING_MARGIN_PERCENT,
+  bookCostingRowKey,
+  clampBookCostingMargin,
+} from '@/modules/importaciones/business-rules/bookCosting'
 import { formatDop } from '@/lib/money'
+import { useToast } from '@/context/ToastContext'
 
 function formatUsd(value: number) {
   return `$${value.toFixed(2)}`
 }
 
 export function CosteoLibroPage() {
-  const { state } = useERP()
+  const { state, applyImportCosting, updateBookCostingMargin } = useERP()
+  const { showSuccess, showError } = useToast()
   const [search, setSearch] = useState('')
+  const [applying, setApplying] = useState(false)
+  const [bulkMargin, setBulkMargin] = useState(String(BOOK_COSTING_MARGIN_PERCENT))
 
   const shipmentsWithCosts = useMemo(
     () => state.shipments.filter((s) => hasShipmentCosts(s.costs)),
-    [state.shipments]
+    [state.shipments],
   )
 
   const [selectedShipmentId, setSelectedShipmentId] = useState(
-    () => shipmentsWithCosts[0]?.id ?? ''
+    () => shipmentsWithCosts[0]?.id ?? '',
   )
 
   const selectedShipment = state.shipments.find((s) => s.id === selectedShipmentId)
-  const freightTotal = selectedShipment?.costs ? computeShipmentCostsTotal(selectedShipment.costs) : 0
 
   const filtered = useMemo(() => {
     return state.bookCosting.filter((b) => {
       const matchShipment = !selectedShipmentId || b.shipmentId === selectedShipmentId
       const matchSearch =
         search === '' ||
-        b.isbn.includes(search) ||
-        b.title.toLowerCase().includes(search.toLowerCase()) ||
+        (b.isbn ?? '').includes(search) ||
+        (b.title ?? '').toLowerCase().includes(search.toLowerCase()) ||
         (b.orderId ?? '').toLowerCase().includes(search.toLowerCase())
       return matchShipment && matchSearch
     })
   }, [search, state.bookCosting, selectedShipmentId])
+
+  const pendingCount = filtered.filter((b) => !b.appliedToInventory).length
+  const allApplied = filtered.length > 0 && pendingCount === 0
+
+  async function handleApplyToInventory() {
+    if (!selectedShipmentId) return
+    setApplying(true)
+    try {
+      const result = await applyImportCosting(selectedShipmentId)
+      if (!result.success) {
+        showError(result.errors?.join(' ') ?? 'No se pudo aplicar el costeo.')
+        return
+      }
+      showSuccess('Costeo aplicado: costo de referencia y precio de venta actualizados en inventario.')
+    } finally {
+      setApplying(false)
+    }
+  }
+
+  function handleRowMargin(entry: BookCostingEntry, raw: string) {
+    if (!selectedShipmentId || entry.appliedToInventory) return
+    const parsed = Number(raw)
+    if (!Number.isFinite(parsed)) return
+    updateBookCostingMargin({
+      shipmentId: selectedShipmentId,
+      rowKey: bookCostingRowKey(entry),
+      marginPercent: clampBookCostingMargin(parsed),
+    })
+  }
+
+  function handleApplyMarginToAll() {
+    if (!selectedShipmentId || pendingCount === 0) return
+    updateBookCostingMargin({
+      shipmentId: selectedShipmentId,
+      marginPercent: clampBookCostingMargin(Number(bulkMargin)),
+      applyToAllPending: true,
+    })
+    showSuccess(`Margen ${clampBookCostingMargin(Number(bulkMargin))}% aplicado a ${pendingCount} libro(s).`)
+  }
 
   return (
     <div className="space-y-6">
@@ -60,15 +110,46 @@ export function CosteoLibroPage() {
               }
               className="md:w-80"
             />
-            {selectedShipment?.costs && (
-              <div className="flex-1 text-sm bg-surface border border-gray-100 rounded-lg px-4 py-3">
-                <span className="text-gray-500">Total costos del embarque aplicado al costeo:</span>{' '}
-                <span className="font-bold text-corporate tabular-nums">{formatDop(freightTotal)}</span>
-                <span className="text-gray-400 mx-2">·</span>
-                <span className="text-gray-500">Distribuido entre {filtered.length} líneas de producto</span>
+            <div className="flex flex-wrap items-end gap-3 md:ml-auto">
+              <div className="w-36">
+                <Input
+                  label="Margen de ganancia (%)"
+                  type="number"
+                  min={0}
+                  max={999}
+                  step={0.5}
+                  value={bulkMargin}
+                  onChange={(e) => setBulkMargin(e.target.value)}
+                  disabled={pendingCount === 0}
+                />
               </div>
-            )}
+              <Button
+                variant="outline"
+                disabled={!selectedShipmentId || pendingCount === 0}
+                onClick={handleApplyMarginToAll}
+              >
+                Aplicar a todos
+              </Button>
+              <Button
+                variant="primary"
+                disabled={!selectedShipmentId || pendingCount === 0 || applying}
+                onClick={() => void handleApplyToInventory()}
+              >
+                {applying ? 'Aplicando…' : `Aplicar a inventario (${pendingCount})`}
+              </Button>
+              <Link to="/inventario/costeo/nuevo">
+                <Button variant="outline" icon={ExternalLink}>
+                  Costeo inventario
+                </Button>
+              </Link>
+            </div>
           </div>
+          {allApplied && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-4 py-2">
+              <CheckCircle2 size={16} />
+              Costeo sincronizado con inventario. Los registros aparecen en Inventario → Costeo.
+            </div>
+          )}
         </CardBody>
       </Card>
 
@@ -87,14 +168,14 @@ export function CosteoLibroPage() {
           title="Costeo por Libro"
           subtitle={
             selectedShipment
-              ? `Costos de ${selectedShipment.code} distribuidos proporcionalmente`
+              ? 'Costo unitario (producto + flete). El margen de ganancia se define por libro y calcula el precio de venta.'
               : 'Seleccione un embarque con costos registrados'
           }
         />
         <CardBody className="!p-0">
           <Table
-            keyField="title"
-            data={filtered as (BookCostingEntry & Record<string, unknown>)[]}
+            keyField="rowKey"
+            data={filtered.map((b) => ({ ...b, rowKey: bookCostingRowKey(b) })) as (BookCostingEntry & { rowKey: string } & Record<string, unknown>)[]}
             columns={[
               {
                 key: 'isbn',
@@ -109,10 +190,58 @@ export function CosteoLibroPage() {
                 ),
               },
               { key: 'title', header: 'Título', render: (b) => <span className="font-medium">{b.title}</span> },
-              { key: 'orderId', header: 'Orden', render: (b) => <span className="font-mono text-xs">{b.orderId ?? '—'}</span> },
+              {
+                key: 'previousCost',
+                header: 'Costo inventario',
+                render: (b) => (
+                  <span className="text-sm text-gray-600">{formatUsd(b.previousCost ?? 0)}</span>
+                ),
+              },
               { key: 'productCost', header: 'Costo producto', render: (b) => <span className="text-sm">{formatUsd(b.productCost)}</span> },
               { key: 'freightAlloc', header: 'Flete asignado', render: (b) => <span className="text-sm">{formatUsd(b.freightAlloc)}</span> },
-              { key: 'finalCost', header: 'Costo final', render: (b) => <span className="font-semibold text-corporate">{formatUsd(b.finalCost)}</span> },
+              { key: 'finalCost', header: 'Costo total', render: (b) => <span className="font-semibold text-corporate">{formatUsd(b.finalCost)}</span> },
+              {
+                key: 'marginPercent',
+                header: 'Ganancia %',
+                render: (b) => (
+                  <div className="w-24" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="number"
+                      min={0}
+                      max={999}
+                      step={0.5}
+                      disabled={Boolean(b.appliedToInventory)}
+                      value={b.marginPercent}
+                      onChange={(e) => {
+                        if (e.target.value === '') return
+                        handleRowMargin(b, e.target.value)
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value === '') handleRowMargin(b, String(BOOK_COSTING_MARGIN_PERCENT))
+                      }}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm tabular-nums text-gray-900 focus:border-corporate focus:outline-none focus:ring-2 focus:ring-corporate/20 disabled:bg-gray-50 disabled:text-gray-500"
+                      aria-label={`Margen de ganancia de ${b.title}`}
+                    />
+                  </div>
+                ),
+              },
+              {
+                key: 'salePrice',
+                header: 'Precio venta',
+                render: (b) => (
+                  <span className="font-bold text-emerald-700 tabular-nums">{formatDop(b.salePrice ?? 0)}</span>
+                ),
+              },
+              {
+                key: 'appliedToInventory',
+                header: 'Inventario',
+                render: (b) =>
+                  b.appliedToInventory ? (
+                    <Badge variant="success">Aplicado</Badge>
+                  ) : (
+                    <Badge variant="warning">Pendiente</Badge>
+                  ),
+              },
             ]}
           />
         </CardBody>

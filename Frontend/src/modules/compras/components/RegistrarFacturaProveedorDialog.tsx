@@ -10,7 +10,6 @@ import { resolvePurchaseOrderLines } from '@/modules/compras/services/purchaseSe
 import { useERP } from '@/store/ERPProvider'
 import { useToast } from '@/context/ToastContext'
 import { getFriendlyErrorMessage } from '@/services/http'
-import { formatMoney } from '@/lib/money'
 
 interface RegistrarFacturaProveedorDialogProps {
   open: boolean
@@ -56,7 +55,7 @@ export function RegistrarFacturaProveedorDialog({
     () =>
       eligible.map((o) => ({
         value: o.id,
-        label: `${o.id} — ${o.supplier} (${formatMoney(o.total, o.currency)})`,
+        label: `${o.id} — ${o.supplier}`,
       })),
     [eligible]
   )
@@ -123,7 +122,7 @@ export function RegistrarFacturaProveedorDialog({
       open={open}
       onClose={onClose}
       title="Registrar factura de proveedor"
-      subtitle="Documento de cobro nacional (distinto de factura internacional)"
+      subtitle="Al recibir la mercancía: FacturaProveedores + CuentasPorPagar"
       mode="edit"
       onSave={handleSave}
       saveLabel={submitting ? 'Registrando…' : 'Registrar factura'}
@@ -132,7 +131,7 @@ export function RegistrarFacturaProveedorDialog({
     >
       {eligible.length === 0 ? (
         <p className="text-sm text-gray-600">
-          No hay órdenes nacionales con recepción confirmada pendientes de facturar.
+          No hay órdenes con recepción confirmada pendientes de facturar.
         </p>
       ) : (
         <div className="space-y-6">
@@ -147,7 +146,10 @@ export function RegistrarFacturaProveedorDialog({
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-lg bg-gray-50 p-4">
                 <DetailRow label="Proveedor" value={selectedOrder.supplier} />
-                <DetailRow label="Total orden" value={formatMoney(selectedOrder.total, selectedOrder.currency)} />
+                <DetailRow
+                  label="Unidades en orden"
+                  value={String(selectedOrder.items ?? lines.reduce((s, l) => s + l.qty, 0))}
+                />
                 <DetailRow
                   label="Número de factura"
                   value={<span className="font-mono text-corporate">{assignedNumero}</span>}
@@ -199,9 +201,6 @@ export function RegistrarFacturaProveedorDialog({
                       <li key={idx} className="flex justify-between gap-4">
                         <span>
                           {line.product} × {line.qty}
-                        </span>
-                        <span className="tabular-nums shrink-0">
-                          {formatMoney(line.qty * line.unitCost, selectedOrder.currency)}
                         </span>
                       </li>
                     ))}

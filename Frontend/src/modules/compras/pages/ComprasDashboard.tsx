@@ -8,27 +8,27 @@ import { Table } from '@/components/ui/Table'
 import { purchaseStatusMap } from '@/modules/compras/constants/comprasUi'
 import { useERP } from '@/store/ERPProvider'
 import { comprasApi } from '@/services/api/comprasApi'
-import { formatDop, formatMoney } from '@/lib/money'
-import type { PurchaseOrder } from '@/types/domain'
+import { formatDop } from '@/lib/money'
+import type { SupplierInvoice } from '@/modules/compras/components/SupplierInvoiceRecordDialog'
 
-/** Usa el mes más reciente con órdenes registradas (evita RD$0 cuando la BD no coincide con el mes calendario). */
-function resolvePurchaseMonthStats(orders: PurchaseOrder[]) {
-  const active = orders.filter((o) => o.status !== 'cancelled')
-  if (active.length === 0) {
-    return { total: 0, label: 'Sin órdenes registradas' }
+/** Acumula facturas pagadas del mes más reciente con movimiento. */
+function resolvePurchaseMonthStats(invoices: SupplierInvoice[]) {
+  const paid = invoices.filter((i) => i.status === 'paid' && i.amount > 0)
+  if (paid.length === 0) {
+    return { total: 0, label: 'Sin pagos registrados' }
   }
 
-  const latest = active.reduce((best, o) => (o.date > best.date ? o : best), active[0])
+  const latest = paid.reduce((best, i) => (i.date > best.date ? i : best), paid[0])
   const ref = new Date(latest.date)
   const month = ref.getMonth()
   const year = ref.getFullYear()
 
-  const total = active
-    .filter((o) => {
-      const d = new Date(o.date)
+  const total = paid
+    .filter((i) => {
+      const d = new Date(i.date)
       return d.getMonth() === month && d.getFullYear() === year
     })
-    .reduce((s, o) => s + o.total, 0)
+    .reduce((s, i) => s + i.amount, 0)
 
   const label = ref.toLocaleDateString('es-DO', { month: 'long', year: 'numeric' })
   return { total, label }
@@ -44,8 +44,16 @@ export function ComprasDashboard() {
     [state.purchaseOrders]
   )
 
+  const pendingCxp = useMemo(
+    () =>
+      state.supplierInvoices.filter(
+        (i) => i.status !== 'paid' && String(i.documentEstado ?? '').toLowerCase() !== 'anulada',
+      ),
+    [state.supplierInvoices],
+  )
+
   const stats = useMemo(() => {
-    const period = resolvePurchaseMonthStats(state.purchaseOrders)
+    const period = resolvePurchaseMonthStats(state.supplierInvoices)
     const extra = fromApi ? 0 : state.monthlyPurchasesExtra || 0
 
     return {
@@ -59,6 +67,7 @@ export function ComprasDashboard() {
     }
   }, [
     state.purchaseOrders,
+    state.supplierInvoices,
     state.receptions,
     state.monthlyPurchasesExtra,
     openOrders.length,
@@ -74,7 +83,7 @@ export function ComprasDashboard() {
         <StatCard
           title="Compras del Mes"
           value={formatDop(stats.monthlyPurchases)}
-          detail={fromApi ? `Acumulado ${stats.periodLabel}` : stats.periodLabel}
+          detail={fromApi ? `Pagos ${stats.periodLabel}` : stats.periodLabel}
           icon={<DollarSign size={22} />}
         />
         <StatCard
@@ -96,6 +105,20 @@ export function ComprasDashboard() {
           icon={<Truck size={22} />}
         />
       </div>
+
+      {pendingCxp.length > 0 && (
+        <Card>
+          <CardHeader
+            title="Cuentas por pagar"
+            subtitle={`${pendingCxp.length} factura${pendingCxp.length === 1 ? '' : 's'} pendiente${pendingCxp.length === 1 ? '' : 's'} de pago`}
+            action={
+              <Button size="sm" variant="outline" onClick={() => navigate('/compras/cuentas-por-pagar')}>
+                Consultar
+              </Button>
+            }
+          />
+        </Card>
+      )}
 
       {openOrders.length > 0 && (
         <Card>
@@ -125,14 +148,10 @@ export function ComprasDashboard() {
                   },
                 },
                 {
-                  key: 'total',
-                  header: 'Total',
+                  key: 'items',
+                  header: 'Unidades',
                   className: 'text-right',
-                  render: (o) => (
-                    <span className="font-semibold text-corporate tabular-nums">
-                      {formatMoney(o.total, o.currency)}
-                    </span>
-                  ),
+                  render: (o) => <span className="font-semibold tabular-nums">{o.items}</span>,
                 },
               ]}
             />

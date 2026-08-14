@@ -233,7 +233,9 @@ function mapSucursalPreferidaDb(value) {
   return v;
 }
 
-function buildSearchClause(alias = 'p') {
+function buildSearchClause(alias = 'p', withIdMatch = false) {
+  const idClause = withIdMatch ? ` OR ${alias}.id_persona = @idNum ` : '';
+  const codigoClause = ` OR ('CLI' + RIGHT('000000' + CAST(${alias}.id_persona AS VARCHAR(20)), 6)) LIKE @q `;
   return `
     ISNULL(${alias}.nombres, '') LIKE @q
     OR ISNULL(${alias}.apellidos, '') LIKE @q
@@ -241,7 +243,16 @@ function buildSearchClause(alias = 'p') {
     OR ${alias}.documento_numero LIKE @q
     OR ISNULL(${alias}.correo, '') LIKE @q
     OR ISNULL(tel.telefono, '') LIKE @q
+    ${codigoClause}
+    ${idClause}
   `;
+}
+
+function parseIdFromSearchQuery(q) {
+  const digits = String(q || '').replace(/\D/g, '');
+  if (!digits || !/^\d+$/.test(digits)) return null;
+  const idNum = parseInt(digits, 10);
+  return Number.isInteger(idNum) && idNum > 0 ? idNum : null;
 }
 
 router.get('/', async (req, res) => {
@@ -259,10 +270,12 @@ router.get('/', async (req, res) => {
     const request = pool.request();
     const whereCliente = sqlWhereClienteSolo('p');
     let where = ` WHERE ${whereCliente} `;
+    const idNum = q ? parseIdFromSearchQuery(q) : null;
 
     if (q) {
       request.input('q', sql.NVarChar(200), `%${q}%`);
-      where += ` AND (${buildSearchClause('p')}) `;
+      if (idNum) request.input('idNum', sql.Int, idNum);
+      where += ` AND (${buildSearchClause('p', Boolean(idNum))}) `;
     }
     if (estadoFilter) {
       request.input('estado', sql.VarChar(20), estadoFilter);
@@ -276,6 +289,7 @@ router.get('/', async (req, res) => {
       .request()
       .input('q', sql.NVarChar(200), q ? `%${q}%` : null)
       .input('estado', sql.VarChar(20), estadoFilter);
+    if (idNum) countRequest.input('idNum', sql.Int, idNum);
 
     const countResult = await countRequest.query(`
       SELECT COUNT(*) AS total
@@ -287,7 +301,7 @@ router.get('/', async (req, res) => {
         GROUP BY ptt.id_persona
       ) tel ON tel.id_persona = p.id_persona
       WHERE ${whereCliente}
-        AND (@q IS NULL OR (${buildSearchClause('p')}))
+        AND (@q IS NULL OR (${buildSearchClause('p', Boolean(idNum))}))
         AND (@estado IS NULL OR p.estado = @estado)
     `);
 

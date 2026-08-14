@@ -190,15 +190,17 @@ export function searchGlobal(query: string, state: ERPState): GlobalSearchResult
     )
   }
 
+  const supplierInvoiceIds = new Set(state.supplierInvoices.map((i) => i.id))
   for (const f of state.internationalInvoices) {
+    if (supplierInvoiceIds.has(f.id)) continue
     push(
       results,
       {
         id: f.id,
         title: f.id,
-        subtitle: `${f.supplier} · ${f.shipmentCode ?? 'Sin embarque'}`,
-        moduleLabel: 'Importaciones',
-        path: '/importaciones/facturas',
+        subtitle: `${f.supplier} · OC ${f.orderId}${f.shipmentCode ? ` · ${f.shipmentCode}` : ''}`,
+        moduleLabel: 'Compras',
+        path: '/compras/facturas',
         recordType: 'invoice',
         openInDialog: true,
       },
@@ -212,23 +214,25 @@ export function searchGlobal(query: string, state: ERPState): GlobalSearchResult
   }
 
   for (const c of state.consolidations) {
-    const codes = c.shipmentIds.map((id) => state.shipments.find((s) => s.id === id)?.code ?? id).join(', ')
+    const shipment = state.shipments.find((s) => s.id === c.shipmentId)
+    if (!shipment) continue
     push(
       results,
       {
         id: c.id,
-        title: c.name,
-        subtitle: c.id,
+        title: `${shipment.code} · ${c.code}`,
+        subtitle: `${c.warehouseName ?? 'Almacén'} — ${c.status}`,
         moduleLabel: 'Importaciones',
-        path: '/importaciones/consolidaciones',
+        path: '/importaciones/embarques',
         recordType: 'consolidation',
         openInDialog: true,
       },
       q,
       c.id,
-      c.name,
-      codes,
-      c.orderIds.join(' ')
+      c.code,
+      shipment.code,
+      c.warehouseName ?? '',
+      shipment.orderId ?? '',
     )
   }
 

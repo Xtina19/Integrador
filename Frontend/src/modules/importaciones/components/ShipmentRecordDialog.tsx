@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { Shipment, ShipmentCosts } from '@/types/domain'
+import { Link } from 'react-router-dom'
+import type { Shipment } from '@/types/domain'
 import { FormDialog, DetailRow } from '@/components/ui/FormDialog'
 import { Input, Select } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
@@ -7,14 +8,14 @@ import { importStatusLabels } from '@/constants/stateMachines'
 import { validateShipmentForm } from '@/business-rules/validators'
 import { trim } from '@/utils/formValidation'
 import {
-  shipmentCostFields,
-  emptyShipmentCosts,
   computeShipmentCostsTotal,
   hasShipmentCosts,
+  shipmentCostFields,
 } from '@/business-rules/shipmentCosts'
-import { extractCountry } from '@/lib/importSearchUtils'
+import { extractCountry, getConsolidationForShipment } from '@/lib/importSearchUtils'
 import { useERP } from '@/store/ERPProvider'
-import { formatDop } from '@/lib/money'
+import { formatDop, formatMoney } from '@/lib/money'
+import { ShipmentConsolidationPanel } from '@/modules/importaciones/components/ShipmentConsolidationPanel'
 
 interface ShipmentRecordDialogProps {
   shipment: Shipment | null
@@ -37,7 +38,6 @@ export function ShipmentRecordDialog({ shipment, mode, open, onClose, onEdit }: 
   const { state, updateShipment } = useERP()
   const [error, setError] = useState('')
   const [form, setForm] = useState({
-    code: '',
     type: 'Marítimo' as Shipment['type'],
     origin: '',
     destination: '',
@@ -46,12 +46,10 @@ export function ShipmentRecordDialog({ shipment, mode, open, onClose, onEdit }: 
     boxes: '',
     notes: '',
   })
-  const [costs, setCosts] = useState<ShipmentCosts>(emptyShipmentCosts())
 
   useEffect(() => {
     if (!shipment) return
     setForm({
-      code: shipment.code,
       type: shipment.type,
       origin: shipment.origin,
       destination: shipment.destination,
@@ -60,7 +58,6 @@ export function ShipmentRecordDialog({ shipment, mode, open, onClose, onEdit }: 
       boxes: String(shipment.boxes),
       notes: shipment.notes ?? '',
     })
-    setCosts(shipment.costs ?? emptyShipmentCosts())
     setError('')
   }, [shipment, mode, open])
 
@@ -69,7 +66,7 @@ export function ShipmentRecordDialog({ shipment, mode, open, onClose, onEdit }: 
       shipment && mode === 'edit'
         ? validateShipmentForm(
             {
-              code: form.code,
+              code: shipment.code,
               supplier: shipment.supplier ?? '',
               origin: form.origin,
               destination: form.destination,
@@ -78,7 +75,8 @@ export function ShipmentRecordDialog({ shipment, mode, open, onClose, onEdit }: 
               boxes: form.boxes,
             },
             state.shipments.map((s) => s.code),
-            shipment.code
+            shipment.code,
+            { autoCode: true }
           )
         : { valid: true, errors: [] },
     [form, mode, shipment, state.shipments]
@@ -86,10 +84,11 @@ export function ShipmentRecordDialog({ shipment, mode, open, onClose, onEdit }: 
 
   if (!shipment) return null
 
-  function handleSave() {
-    const result = updateShipment({
+  const linkedConsolidation = getConsolidationForShipment(shipment, state.consolidations)
+
+  async function handleSave() {
+    const result = await updateShipment({
       shipmentId: shipment!.id,
-      code: trim(form.code),
       type: form.type,
       origin: trim(form.origin),
       destination: trim(form.destination),
@@ -97,7 +96,6 @@ export function ShipmentRecordDialog({ shipment, mode, open, onClose, onEdit }: 
       arrival: form.arrival,
       boxes: Number(form.boxes) || 0,
       notes: form.notes,
-      costs,
     })
     if (!result.success) {
       setError(result.errors?.join(' ') ?? 'Error al guardar')
@@ -106,20 +104,16 @@ export function ShipmentRecordDialog({ shipment, mode, open, onClose, onEdit }: 
     onClose()
   }
 
-  function updateCost(key: keyof ShipmentCosts, value: string) {
-    setCosts((prev) => ({ ...prev, [key]: Number(value) || 0 }))
-  }
-
   return (
     <FormDialog
       open={open}
       onClose={onClose}
-      title={mode === 'view' ? 'Detalle del Embarque' : 'Editar Embarque'}
+      title={mode === 'view' ? 'Embarque y Consolidación' : 'Editar Embarque'}
       subtitle={shipment.code}
       mode={mode}
       onEdit={onEdit}
       onSave={handleSave}
-      saveDisabled={mode === 'edit' && (!validation.valid || !hasShipmentCosts(costs))}
+      saveDisabled={mode === 'edit' && !validation.valid}
     >
       {error && (
         <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2 mb-4">
@@ -148,6 +142,23 @@ export function ShipmentRecordDialog({ shipment, mode, open, onClose, onEdit }: 
           />
           <DetailRow label="Cantidad de cajas" value={shipment.boxes} />
           <DetailRow label="Observaciones" value={shipment.notes?.trim() ? shipment.notes : '—'} />
+          <ShipmentConsolidationPanel shipment={shipment} consolidation={linkedConsolidation} />
+          {(shipment.freightDocuments?.length ?? 0) > 0 && (
+            <div className="pt-4 mt-2 border-t border-gray-100">
+              <p className="text-sm font-semibold text-gray-900 mb-3">Documentos de flete</p>
+              {shipment.freightDocuments!.map((d) => (
+                <DetailRow
+                  key={d.id}
+                  label={`${d.code} · ${d.documentType}`}
+                  value={
+                    <span className="tabular-nums">
+                      {formatMoney(d.amount, d.currency)} — {d.serviceProvider}
+                    </span>
+                  }
+                />
+              ))}
+            </div>
+          )}
           {hasShipmentCosts(shipment.costs) && (
             <div className="pt-4 mt-2 border-t border-gray-100">
               <p className="text-sm font-semibold text-gray-900 mb-3">Costos asociados</p>
@@ -160,11 +171,16 @@ export function ShipmentRecordDialog({ shipment, mode, open, onClose, onEdit }: 
               />
             </div>
           )}
+          <p className="text-xs text-gray-500 pt-2">
+            <Link to="/importaciones/costos" className="text-corporate underline">
+              Registrar documentos de flete
+            </Link>
+          </p>
         </div>
       ) : (
         <div className="space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Input label="Código embarque *" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+            <Input label="Código embarque" value={shipment.code} disabled readOnly />
             <Select
               label="Tipo *"
               value={form.type}
@@ -193,28 +209,14 @@ export function ShipmentRecordDialog({ shipment, mode, open, onClose, onEdit }: 
               />
             </div>
           </div>
-          <div className="border-t border-gray-200 pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-gray-900">Costos del Embarque</h3>
-              <p className="text-sm text-gray-500">
-                Total: <span className="font-bold text-corporate tabular-nums">{formatDop(computeShipmentCostsTotal(costs))}</span>
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {shipmentCostFields.map(({ key, label }) => (
-                <Input
-                  key={key}
-                  label={label}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={costs[key] || ''}
-                  onChange={(e) => updateCost(key, e.target.value)}
-                  placeholder="0"
-                />
-              ))}
-            </div>
-          </div>
+          <p className="text-sm text-blue-800 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
+            Los costos se gestionan en{' '}
+            <Link to="/importaciones/costos" className="text-corporate font-medium underline">
+              Costos de Flete
+            </Link>{' '}
+            registrando documentos (facturas, BL, guías).
+          </p>
+          <ShipmentConsolidationPanel shipment={shipment} consolidation={linkedConsolidation} />
         </div>
       )}
     </FormDialog>

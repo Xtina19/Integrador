@@ -76,6 +76,7 @@ export interface RecepcionDto {
   estado: string
   activo: boolean
   detalles?: DetalleRecepcionDto[]
+  itemsRecibidos?: number
 }
 
 export interface DetalleRecepcionDto {
@@ -110,6 +111,29 @@ export interface FacturaProveedorDto {
   activo: boolean
   observaciones?: string | null
   detalles?: unknown[]
+  tipoCompra?: 'nacional' | 'internacional'
+  cuentaPagarId?: number | null
+  montoPagado?: number
+  montoPendiente?: number
+  estadoCxp?: string | null
+}
+
+export interface CuentaPorPagarDto {
+  id: number
+  facturaId: number
+  numeroFactura: string
+  proveedor: string
+  ordenCodigo: string
+  tipoCompra: 'nacional' | 'internacional'
+  fechaEmision: string
+  fechaVencimiento: string
+  fechaUltimoPago?: string | null
+  montoTotal: number
+  montoPagado: number
+  montoPendiente: number
+  estado: string
+  facturaEstado: string
+  observacion?: string | null
 }
 
 export interface CondicionPagoDto {
@@ -333,15 +357,18 @@ export const comprasApi = {
       return unwrap(res)
     }),
 
-  registrarPagoFactura: (id: number) =>
+  registrarPagoFactura: (id: number, body: { total: number; subtotal?: number; impuestos?: number }) =>
     safeCall(async () => {
       const res = await httpPost<ApiEnvelope<FacturaProveedorDto>>(
         `${BASE}/facturas/${id}/registrar-pago`,
-        {},
+        body,
         withAuth()
       )
       return unwrap(res)
     }),
+
+  listCuentasPorPagar: (params?: Record<string, string | number | undefined>) =>
+    safeCall(() => listPage<CuentaPorPagarDto>(`${BASE}/cuentas-por-pagar`, params)),
 
   listCondicionesPago: () =>
     safeCall(() => listPage<CondicionPagoDto>(`${BASE}/condiciones-pago`)),

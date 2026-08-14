@@ -146,6 +146,18 @@ export class NotaCredito {
     this._estado = 'emitida'
   }
 
+  /** Marca el saldo restante como utilizado (cierre manual administrativo). */
+  marcarComoUtilizadaDesdeAgregado(): void {
+    if (this._estado === 'anulada') {
+      throw new VentasDomainError('INVALID_CREDIT_NOTE', 'No se puede utilizar una NC anulada.')
+    }
+    if (this._estado === 'aplicada' || this.saldoPendiente <= 0) {
+      throw new VentasDomainError('INVALID_CREDIT_NOTE', 'La NC ya está totalmente utilizada.')
+    }
+    this._montoAplicado = this.monto.monto
+    this._estado = 'aplicada'
+  }
+
   /** Anula la NC. Solo si no tiene aplicaciones (saldo = monto completo). */
   anularDesdeAgregado(): void {
     if (this._estado === 'anulada') {

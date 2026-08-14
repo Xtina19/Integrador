@@ -82,6 +82,7 @@ function mapProducto(
     autor: p.autor ?? '—',
     categoria: p.categoria ?? '—',
     editorial: p.editorial ?? '—',
+    costoReferencia: p.costoReferencia ?? 0,
     stockConsolidado: p.existenciaTotal,
     stockMinimo: p.stockMinimo ?? 0,
 
@@ -97,10 +98,17 @@ function mapProducto(
       ubicacion: e.ubicacion ?? '',
     })),
 
-    transferenciasActivas: 0,
-    conteosAbiertos: 0,
-    ajustesPendientes: 0,
-    descartesRelacionados: 0,
+    transferenciasActivas: p.transferenciasActivas ?? 0,
+    conteosAbiertos: p.conteosAbiertos ?? 0,
+    ajustesPendientes: p.ajustesPendientes ?? 0,
+    descartesRelacionados: p.descartesRelacionados ?? 0,
+    ultimoMovimientoId: p.ultimoMovimientoId ?? undefined,
+    ultimoMovimientoFecha: p.ultimoMovimientoFecha
+      ? String(p.ultimoMovimientoFecha).slice(0, 10)
+      : undefined,
+    ultimaAuditoriaFecha: p.ultimaAuditoriaFecha
+      ? String(p.ultimaAuditoriaFecha).slice(0, 10)
+      : undefined,
 
     estado:
       p.existenciaTotal <= 0

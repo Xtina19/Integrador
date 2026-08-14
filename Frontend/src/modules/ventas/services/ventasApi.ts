@@ -1,19 +1,30 @@
 import { httpGet, httpPost, ApiError, getFriendlyErrorMessage } from '@/services/http'
 import { apiConfig, isApiEnabled } from '@/config/api'
 
-/** Usuario operativo Ventas (header x-user-id → UsuarioPermisosPort). */
-export type VentasUserId = 'usr-cajero' | 'usr-supervisor' | 'usr-admin'
+/** id_usuario de tabla Usuario (scriptdb) — header x-user-id. */
+export type VentasUserId = string
 
 const USER_STORAGE_KEY = 'librosys.ventas.userId'
 
-export function getVentasUserId(): VentasUserId {
-  const raw = localStorage.getItem(USER_STORAGE_KEY)
-  if (raw === 'usr-supervisor' || raw === 'usr-admin' || raw === 'usr-cajero') return raw
-  return 'usr-cajero'
+const LEGACY_DEMO_USER: Record<string, string> = {
+  'usr-admin': '1',
+  'usr-supervisor': '3',
+  'usr-cajero': '8',
 }
 
-export function setVentasUserId(userId: VentasUserId): void {
-  localStorage.setItem(USER_STORAGE_KEY, userId)
+export function getVentasUserId(): VentasUserId {
+  const raw = localStorage.getItem(USER_STORAGE_KEY)?.trim()
+  if (raw) {
+    const legacy = LEGACY_DEMO_USER[raw]
+    if (legacy) return legacy
+    const n = Number(raw)
+    if (Number.isInteger(n) && n > 0) return String(n)
+  }
+  return '1'
+}
+
+export function setVentasUserId(userId: VentasUserId | number): void {
+  localStorage.setItem(USER_STORAGE_KEY, String(userId))
 }
 
 interface ApiEnvelope<T> {
@@ -446,6 +457,21 @@ export const ventasApi = {
     return safeCall(async () => {
       const res = await httpPost<ApiEnvelope<VentaDetalleDto>>(
         `${BASE}/${ventaId}/notas-credito/${encodeURIComponent(ncId)}/revertir-aplicaciones`,
+        body ?? {},
+        withAuth(),
+      )
+      return unwrap(res)
+    })
+  },
+
+  async utilizarNotaCredito(
+    ventaId: string,
+    ncId: string,
+    body?: { expectedVersion?: number },
+  ): Promise<VentaDetalleDto> {
+    return safeCall(async () => {
+      const res = await httpPost<ApiEnvelope<VentaDetalleDto>>(
+        `${BASE}/${ventaId}/notas-credito/${encodeURIComponent(ncId)}/utilizar`,
         body ?? {},
         withAuth(),
       )

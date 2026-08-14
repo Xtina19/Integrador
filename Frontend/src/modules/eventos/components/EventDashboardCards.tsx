@@ -28,7 +28,7 @@ export function EventDashboardCards({ event, extended, salesTotal, staffCount }:
       <StatCard
         title="Estado"
         value={eventStatusLabels[event.status]}
-        detail={event.type === 'feria' ? 'Feria' : 'Evento'}
+        detail={event.type}
         icon={<Calendar size={20} />}
       />
       <StatCard
@@ -44,15 +44,15 @@ export function EventDashboardCards({ event, extended, salesTotal, staffCount }:
         icon={<BookOpen size={20} />}
       />
       <StatCard
-        title="Productos enviados"
+        title="Stock en sucursal"
         value={extended.inventory.reduce((s, i) => s + i.qty, 0)}
-        detail={`${extended.inventory.length} líneas`}
+        detail={`${extended.inventory.length} productos con existencias`}
         icon={<ShoppingCart size={20} />}
       />
       <StatCard
-        title="Ventas realizadas"
+        title="Ventas del evento"
         value={`RD$${salesTotal.toLocaleString()}`}
-        detail="En feria (simulado)"
+        detail="Sin vínculo con facturas de venta"
         icon={<DollarSign size={20} />}
       />
       <StatCard

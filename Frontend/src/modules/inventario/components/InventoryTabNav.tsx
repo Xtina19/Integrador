@@ -14,7 +14,6 @@ const tabs: {
       label: 'Transferencias',
     },
     { id: 'kardex', label: 'Kardex' },
-    { id: 'auditoria', label: 'Auditoría' },
   ]
 
 interface Props {

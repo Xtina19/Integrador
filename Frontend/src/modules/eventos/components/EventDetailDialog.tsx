@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pencil } from 'lucide-react'
 import type { LibroSysEvent } from '@/types/domain'
-import type { DetailEventTab } from '@/modules/eventos/types/eventExtended'
+import type { DetailEventTab, EventExtendedData } from '@/modules/eventos/types/eventExtended'
 import { EventModalShell, EventTabBar } from './EventTabBar'
 import { EventDashboardCards } from './EventDashboardCards'
 import { EventBudgetSummary } from './EventBudgetSummary'
@@ -11,11 +11,15 @@ import { EventStaffTabContent } from './EventStaffTabContent'
 import { DetailRow } from '@/components/ui/FormDialog'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { Table } from '@/components/ui/Table'
-import { useEventExtended } from '@/context/EventExtendedContext'
-import { getEventHistory, getEventSales } from '@/mocks/mockEventos'
 import { eventStatusLabels } from '@/constants/stateMachines'
-
+import { isEventEditable } from '@/modules/eventos/utils/eventFieldLock'
+import {
+  costoPersonalEvento,
+  eventosApi,
+  mapInventarioSucursal,
+  mapPersonalEvento,
+  mapUtensiliosEvento,
+} from '@/modules/eventos/services/eventosApi'
 
 const DETAIL_TABS: { id: DetailEventTab; label: string }[] = [
   { id: 'resumen', label: 'Resumen' },
@@ -33,21 +37,70 @@ interface EventDetailDialogProps {
   onEdit: () => void
 }
 
+function emptyExtended(eventId: string): EventExtendedData {
+  return {
+    eventId,
+    publishers: [],
+    capacity: 0,
+    inventory: [],
+    utensils: [],
+    staff: [],
+    operationalCost: 0,
+    notes: '',
+  }
+}
+
 export function EventDetailDialog({ event, open, onClose, onEdit }: EventDetailDialogProps) {
-  const { getExtended } = useEventExtended()
   const [activeTab, setActiveTab] = useState<DetailEventTab>('resumen')
+  const [extended, setExtended] = useState<EventExtendedData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const extended = useMemo(() => (event ? getExtended(event.id) : null), [event, getExtended])
-  const sales = useMemo(() => (event ? getEventSales(event.id) : []), [event])
-  const eventHistory = useMemo(() => (event ? getEventHistory(event.id) : []), [event])
+  useEffect(() => {
+    if (!open || !event) {
+      setExtended(null)
+      setError('')
+      setActiveTab('resumen')
+      return
+    }
 
+    let cancelled = false
+    setLoading(true)
+    setError('')
 
-const staffCount = extended?.staff?.length || event?.participants || 0
-  const salesTotal = sales.reduce((s, sale) => s + (sale.status === 'paid' ? sale.total : 0), 0)
+    void eventosApi.getEvent(event.id)
+      .then((data) => {
+        if (cancelled) return
+        setExtended({
+          eventId: String(data.id_evento),
+          publishers: (data.editoriales ?? []).map((e) => e.nombre),
+          capacity: Number(data.capacidad_esperada ?? 0),
+          inventory: mapInventarioSucursal(data.inventario),
+          utensils: mapUtensiliosEvento(data.utensilios),
+          staff: mapPersonalEvento(data.personal),
+          operationalCost: costoPersonalEvento(data.personal),
+          notes: data.observacion ?? '',
+        })
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setExtended(emptyExtended(event.id))
+        setError(err instanceof Error ? err.message : 'No se pudo cargar el detalle del evento.')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
 
-  if (!event || !extended) return null
+    return () => {
+      cancelled = true
+    }
+  }, [open, event])
 
-  const canEdit = event.status !== 'finalized'
+  if (!event) return null
+
+  const data = extended ?? emptyExtended(event.id)
+  const staffCount = data.staff.length || event.participants || 0
+  const canEdit = isEventEditable(event.status)
 
   return (
     <EventModalShell
@@ -72,95 +125,67 @@ const staffCount = extended?.staff?.length || event?.participants || 0
       <div className="space-y-6">
         <EventTabBar tabs={DETAIL_TABS} active={activeTab} onChange={setActiveTab} />
 
-        {activeTab === 'resumen' && (
+        {loading && (
+          <div className="text-sm text-gray-500">Cargando detalle del evento...</div>
+        )}
+        {error && (
+          <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2">{error}</div>
+        )}
+
+        {activeTab === 'resumen' && !loading && (
           <div className="space-y-6">
             <EventDashboardCards
               event={event}
-              extended={extended}
-              salesTotal={salesTotal}
+              extended={data}
+              salesTotal={0}
               staffCount={staffCount}
             />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <EventBudgetSummary
                 budget={event.budget ?? 0}
-                utensils={extended.utensils}
-                operationalCost={extended.operationalCost}
+                utensils={data.utensils}
+                operationalCost={data.operationalCost}
                 readOnly
               />
               <div className="space-y-1 rounded-lg border border-gray-100 p-4">
                 <DetailRow label="Código" value={<span className="font-mono">{event.id}</span>} />
-                <DetailRow label="Tipo" value={<Badge variant={event.type === 'feria' ? 'gold' : 'info'}>{event.type}</Badge>} />
+                <DetailRow label="Tipo" value={<Badge variant="info">{event.type}</Badge>} />
                 <DetailRow label="Fechas" value={event.startDate === event.endDate ? event.startDate : `${event.startDate} — ${event.endDate}`} />
-                <DetailRow label="Editoriales" value={extended.publishers.join(', ') || event.publisher || '—'} />
+                <DetailRow label="Editoriales" value={data.publishers.join(', ') || event.publisher || '—'} />
                 <DetailRow label="Responsable" value={event.responsible ?? '—'} />
-                <DetailRow label="Capacidad" value={extended.capacity || '—'} />
+                <DetailRow label="Capacidad" value={data.capacity || '—'} />
                 <DetailRow
                   label="Estado"
                   value={<Badge variant="info">{eventStatusLabels[event.status]}</Badge>}
                 />
-                {extended.notes && <DetailRow label="Observaciones" value={extended.notes} />}
+                {data.notes && <DetailRow label="Observaciones" value={data.notes} />}
               </div>
             </div>
           </div>
         )}
 
-        {activeTab === 'inventario' && (
-          <EventInventoryTabContent items={extended.inventory} onChange={() => {}} readOnly />
+        {activeTab === 'inventario' && !loading && (
+          <EventInventoryTabContent items={data.inventory} onChange={() => {}} readOnly />
         )}
 
-        {activeTab === 'personal' && (
-  <EventStaffTabContent
-    items={extended.staff ?? []}
-    onChange={() => {}}
-    readOnly
-  />
-)}
+        {activeTab === 'personal' && !loading && (
+          <EventStaffTabContent items={data.staff} onChange={() => {}} readOnly />
+        )}
 
-        {activeTab === 'utensilios' && (
-          <EventUtensilsTabContent items={extended.utensils} onChange={() => {}} readOnly />
+        {activeTab === 'utensilios' && !loading && (
+          <EventUtensilsTabContent items={data.utensils} onChange={() => {}} readOnly />
         )}
 
         {activeTab === 'ventas' && (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Ventas asociadas al evento mediante el campo <strong>Evento Asociado</strong> del módulo Ventas (estructura preparada para integración).
-            </p>
-            <Table
-              keyField="id"
-              data={sales as (typeof sales[0] & Record<string, unknown>)[]}
-              columns={[
-                { key: 'id', header: 'Factura', render: (s) => <span className="font-mono text-xs">{s.id}</span> },
-                { key: 'date', header: 'Fecha' },
-                { key: 'customer', header: 'Cliente' },
-                { key: 'total', header: 'Total', render: (s) => <span className="font-semibold text-corporate">RD${s.total.toLocaleString()}</span> },
-                {
-                  key: 'status',
-                  header: 'Estado',
-                  render: (s) => (
-                    <Badge variant={s.status === 'paid' ? 'success' : 'danger'}>
-                      {s.status === 'paid' ? 'Pagada' : 'Cancelada'}
-                    </Badge>
-                  ),
-                },
-              ]}
-            />
-            {sales.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-6">Sin ventas registradas para este evento</p>
-            )}
-          </div>
+          <p className="text-sm text-gray-500 text-center py-8">
+            Las facturas de venta no están vinculadas a un evento. Consulte las ventas de la sucursal en el módulo Ventas.
+          </p>
         )}
 
         {activeTab === 'historial' && (
-          <Table
-            keyField="id"
-            data={eventHistory as (typeof eventHistory[0] & Record<string, unknown>)[]}
-            columns={[
-              { key: 'date', header: 'Fecha', className: 'text-xs text-gray-500' },
-              { key: 'action', header: 'Acción', render: (h) => <span className="font-medium">{h.action}</span> },
-              { key: 'detail', header: 'Detalle' },
-              { key: 'user', header: 'Usuario' },
-            ]}
-          />
+          <p className="text-sm text-gray-500 text-center py-8">
+            El historial de eventos no está registrado en la base de datos.
+          </p>
         )}
       </div>
     </EventModalShell>

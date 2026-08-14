@@ -13,7 +13,6 @@ import { useERP } from '@/store/ERPProvider'
 import { useToast } from '@/context/ToastContext'
 import { useComprasCatalogos } from '@/modules/compras/hooks/useComprasCatalogos'
 import { purchaseStatusVariants } from '@/modules/compras/constants/comprasUi'
-import { formatMoney } from '@/lib/money'
 
 interface PurchaseOrderRecordDialogProps {
   order: PurchaseOrder | null
@@ -50,7 +49,11 @@ export function PurchaseOrderRecordDialog({
       currency: order.currency,
       purchaseType: order.purchaseType,
     })
-    setLines(order.lines?.length ? [...order.lines] : [{ product: 'Ítems generales', qty: order.items, unitCost: order.total / Math.max(order.items, 1) }])
+    setLines(
+      order.lines?.length
+        ? order.lines.map((l) => ({ ...l, unitCost: 0 }))
+        : [{ product: 'Ítems generales', qty: order.items, unitCost: 0 }]
+    )
     setError('')
   }, [order, mode, open])
 
@@ -76,7 +79,7 @@ export function PurchaseOrderRecordDialog({
 
   if (!order) return null
 
-  const total = lines.reduce((s, l) => s + l.qty * l.unitCost, 0)
+  const totalItems = lines.reduce((s, l) => s + l.qty, 0)
   const canEdit = order.status === 'draft' || order.status === 'pending'
 
   async function handleSave() {
@@ -127,15 +130,7 @@ export function PurchaseOrderRecordDialog({
             />
             <DetailRow label="Fecha" value={order.date} />
             <DetailRow label="Moneda" value={order.currency} />
-            <DetailRow label="Ítems" value={order.items} />
-            <DetailRow
-              label="Total"
-              value={
-                <span className="font-semibold text-corporate tabular-nums">
-                  {formatMoney(order.total, order.currency)}
-                </span>
-              }
-            />
+            <DetailRow label="Unidades" value={order.items} />
             <DetailRow
               label="Estado"
               value={
@@ -154,19 +149,6 @@ export function PurchaseOrderRecordDialog({
                 columns={[
                   { key: 'product', header: 'Producto', render: (l) => <span className="font-medium">{(l as unknown as PurchaseOrderLine).product}</span> },
                   { key: 'qty', header: 'Cantidad', render: (l) => (l as unknown as PurchaseOrderLine).qty },
-                  { key: 'unitCost', header: 'Costo unit.', render: (l) => formatMoney((l as unknown as PurchaseOrderLine).unitCost, order.currency) },
-                  {
-                    key: 'subtotal',
-                    header: 'Subtotal',
-                    render: (l) => {
-                      const line = l as unknown as PurchaseOrderLine
-                      return (
-                        <span className="font-semibold text-corporate tabular-nums">
-                          {formatMoney(line.qty * line.unitCost, order.currency)}
-                        </span>
-                      )
-                    },
-                  },
                 ]}
               />
             </div>
@@ -226,7 +208,7 @@ export function PurchaseOrderRecordDialog({
                     {
                       product: p?.titulo ?? '',
                       qty: 1,
-                      unitCost: p ? Number(p.costo.toFixed(2)) : 0,
+                      unitCost: 0,
                       productoId: p?.id,
                     },
                   ])
@@ -238,7 +220,7 @@ export function PurchaseOrderRecordDialog({
             <div className="space-y-3">
               {lines.map((line, idx) => (
                 <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-3 bg-surface rounded-lg">
-                  <div className="md:col-span-5">
+                  <div className="md:col-span-8">
                     <Select
                       label="Producto"
                       value={line.product}
@@ -251,7 +233,6 @@ export function PurchaseOrderRecordDialog({
                                   ...l,
                                   product: e.target.value,
                                   productoId: prod?.id,
-                                  unitCost: prod ? Number(prod.costo.toFixed(2)) : l.unitCost,
                                 }
                               : l
                           )
@@ -276,24 +257,6 @@ export function PurchaseOrderRecordDialog({
                       }
                     />
                   </div>
-                  <div className="md:col-span-3">
-                    <Input
-                      label="Costo unit."
-                      type="number"
-                      min={0}
-                      step={0.01}
-                      value={line.unitCost}
-                      onChange={(e) =>
-                        setLines((prev) =>
-                          prev.map((l, i) =>
-                            i === idx
-                              ? { ...l, unitCost: Number(Number(e.target.value).toFixed(2)) || 0 }
-                              : l
-                          )
-                        )
-                      }
-                    />
-                  </div>
                   <div className="md:col-span-2 flex justify-end">
                     <Button
                       size="sm"
@@ -308,7 +271,7 @@ export function PurchaseOrderRecordDialog({
               ))}
             </div>
             <p className="text-sm font-semibold text-corporate mt-4 text-right tabular-nums">
-              Total: {formatMoney(total, form.currency)}
+              Total unidades: {totalItems}
             </p>
           </div>
         </div>

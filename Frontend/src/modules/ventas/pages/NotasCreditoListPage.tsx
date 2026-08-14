@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Eye, FileText, Link2, Printer, Ban, RefreshCw, ListTree } from 'lucide-react'
+import { Eye, FileText, Link2, Printer, Ban, RefreshCw } from 'lucide-react'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Table } from '@/components/ui/Table'
 import { Toolbar } from '@/components/ui/Toolbar'
@@ -23,7 +23,7 @@ import {
 import { getFriendlyErrorMessage } from '@/services/http'
 import { useToast } from '@/context/ToastContext'
 
-type DialogMode = 'consultar' | 'aplicaciones' | 'anular' | null
+type DialogMode = 'consultar' | 'anular' | null
 
 /**
  * Centro de consulta administrativa de Notas de Crédito.
@@ -96,6 +96,25 @@ export function NotasCreditoListPage() {
     )
   }
 
+  function puedeUtilizar(nc: NotaCreditoAdminDto): boolean {
+    return nc.estado !== 'anulada' && nc.estado !== 'aplicada' && nc.saldoPendiente > 0
+  }
+
+  async function handleUtilizar(nc: NotaCreditoAdminDto) {
+    setBusy(true)
+    try {
+      await ventasApi.utilizarNotaCredito(nc.ventaOrigenId, nc.id, {
+        expectedVersion: nc.ventaVersion,
+      })
+      showSuccess(`NC ${nc.id} marcada como utilizada.`)
+      void load()
+    } catch (e) {
+      showError(getFriendlyErrorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   function imprimirNc(nc: NotaCreditoAdminDto) {
     const w = window.open('', '_blank', 'noopener,noreferrer,width=720,height=900')
     if (!w) {
@@ -118,20 +137,6 @@ export function NotasCreditoListPage() {
       <p class="meta">Sucursal: ${refLabel(nc.sucursalId)}</p>
       <p class="meta">Motivo: ${nc.motivo}</p>
       <p class="meta">Monto: ${formatDop(nc.monto)} · Aplicado: ${formatDop(nc.montoAplicado)} · Disponible: ${formatDop(nc.saldoPendiente)}</p>
-      <h2 style="font-size:14px;margin-top:20px">Aplicaciones</h2>
-      <table><thead><tr><th>Venta destino</th><th>Monto</th><th>Fecha</th></tr></thead>
-      <tbody>
-      ${
-        nc.aplicaciones.length === 0
-          ? '<tr><td colspan="3">Sin aplicaciones</td></tr>'
-          : nc.aplicaciones
-              .map(
-                (a) =>
-                  `<tr><td>${a.ventaDestinoId}</td><td>${formatDop(a.montoAplicado)}</td><td>${formatFecha(a.fecha)}</td></tr>`,
-              )
-              .join('')
-      }
-      </tbody></table>
       <script>window.onload=()=>{window.print()}</script>
       </body></html>`)
     w.document.close()
@@ -228,7 +233,12 @@ export function NotasCreditoListPage() {
         key: 'actions',
         header: 'Acciones',
         render: (r: NotaCreditoAdminDto) => (
-          <div className="flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+          <div className="flex flex-wrap items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            {puedeUtilizar(r) && (
+              <Button size="sm" disabled={busy} onClick={() => void handleUtilizar(r)}>
+                Utilizar
+              </Button>
+            )}
             <Button
               size="sm"
               variant="ghost"
@@ -253,17 +263,6 @@ export function NotasCreditoListPage() {
             >
               Factura
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              icon={ListTree}
-              onClick={() => {
-                setSelected(r)
-                setDialog('aplicaciones')
-              }}
-            >
-              Aplicaciones
-            </Button>
             {puedeAnular(r) && (
               <Button
                 size="sm"
@@ -281,7 +280,7 @@ export function NotasCreditoListPage() {
         ),
       },
     ],
-    [navigate],
+    [navigate, busy],
   )
 
   if (!ventasApi.isEnabled()) return <VentasApiRequiredBanner />
@@ -485,42 +484,6 @@ export function NotasCreditoListPage() {
             </div>
           </div>
         )}
-      </FormDialog>
-
-      <FormDialog
-        open={dialog === 'aplicaciones' && Boolean(selected)}
-        onClose={() => {
-          setDialog(null)
-          setSelected(null)
-        }}
-        title="Historial de aplicaciones"
-        subtitle={selected?.id}
-        mode="view"
-        maxWidth="md"
-      >
-        {selected &&
-          (selected.aplicaciones.length === 0 ? (
-            <p className="text-sm text-slate-500">Sin aplicaciones registradas.</p>
-          ) : (
-            <ul className="space-y-2 text-sm">
-              {selected.aplicaciones.map((a, i) => (
-                <li
-                  key={`${a.ventaDestinoId}-${i}`}
-                  className="rounded-lg border border-slate-100 px-3 py-2"
-                >
-                  <p>
-                    <span className="text-slate-500">Venta destino:</span> {a.ventaDestinoId}
-                  </p>
-                  <p>
-                    <span className="text-slate-500">Monto:</span> {formatDop(a.montoAplicado)}
-                  </p>
-                  <p>
-                    <span className="text-slate-500">Fecha:</span> {formatFecha(a.fecha)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          ))}
       </FormDialog>
 
       <FormDialog

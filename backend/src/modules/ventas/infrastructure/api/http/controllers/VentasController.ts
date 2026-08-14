@@ -125,6 +125,18 @@ export class VentasController {
     sendApplicationResult(res, result)
   }
 
+  async utilizarNotaCredito(req: Request, res: Response): Promise<void> {
+    const auth = getVentasAuth(req)
+    const body = V.validateUtilizarNotaCreditoBody(req.body)
+    const result = await this.composition.handlers.utilizarNotaCredito.execute({
+      ...body,
+      ventaId: String(req.params.id ?? ''),
+      notaCreditoId: String(req.params.ncId ?? ''),
+      usuarioId: auth.userId,
+    })
+    sendApplicationResult(res, result)
+  }
+
   async listarNotasCreditoDisponibles(req: Request, res: Response): Promise<void> {
     const clienteId = String(req.query.clienteId ?? '').trim()
     const result = await this.composition.handlers.listarNotasCreditoDisponibles.execute({

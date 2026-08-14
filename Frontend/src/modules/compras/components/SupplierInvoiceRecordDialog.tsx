@@ -23,6 +23,12 @@ export interface SupplierInvoice {
   /** DER pago: pendiente | parcial | pagada */
   estadoPago?: string
   fechaVencimiento?: string
+  cuentaPagarId?: number
+  montoPagado?: number
+  montoPendiente?: number
+  estadoCxp?: string
+  /** Nacional o internacional (misma factura proveedor). */
+  purchaseType?: 'national' | 'international'
 }
 
 interface SupplierInvoiceRecordDialogProps {
@@ -98,6 +104,14 @@ export function SupplierInvoiceRecordDialog({
           ) : null}
           {invoice.ncf ? <DetailRow label="NCF" value={invoice.ncf} /> : null}
           <DetailRow label="Proveedor" value={invoice.supplier} />
+          <DetailRow
+            label="Tipo"
+            value={
+              <Badge variant={invoice.purchaseType === 'international' ? 'info' : 'neutral'}>
+                {invoice.purchaseType === 'international' ? 'Internacional' : 'Nacional'}
+              </Badge>
+            }
+          />
           <DetailRow label="Orden de compra" value={<span className="font-mono">{invoice.orderId}</span>} />
           <DetailRow label="Fecha" value={invoice.date} />
           <DetailRow

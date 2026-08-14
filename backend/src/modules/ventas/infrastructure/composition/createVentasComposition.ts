@@ -13,12 +13,14 @@ import {
   RegistrarCambioHandler,
   ReimprimirVentaHandler,
   RevertirAplicacionesNotaCreditoHandler,
+  UtilizarNotaCreditoHandler,
 } from '../../application/handlers'
 import type { VentaRepository } from '../../domain/ports/VentaRepository'
 import type { InventarioComposition } from '../../../inventario/infrastructure/composition/createInventarioComposition'
 import { InMemoryVentasStore } from '../persistence/InMemoryVentasStore'
 import { InMemoryVentaRepository } from '../persistence/InMemoryVentaRepository'
 import { MysqlVentaRepository } from '../persistence/mysql/MysqlVentaRepository'
+import { SqlServerVentaRepository } from '../persistence/mssql/SqlServerVentaRepository'
 import type { SqlExecutor } from '../persistence/sql/SqlExecutor'
 import {
   EngineInventarioConsultaAdapter,
@@ -31,7 +33,11 @@ import {
   UuidIdGeneratorAdapter,
 } from '../adapters'
 import { seedVentasJoselito } from './seedVentasJoselito'
-import type { ProductoConsultaPort } from '../../application/ports/outbound'
+import type {
+  ClienteConsultaPort,
+  ProductoConsultaPort,
+  UsuarioPermisosPort,
+} from '../../application/ports/outbound'
 
 export interface VentasComposition {
   store: InMemoryVentasStore
@@ -39,13 +45,13 @@ export interface VentasComposition {
   ventas: VentaRepository
   ventaService: VentaApplicationService
   /** Puerto de permisos — usado por middleware HTTP de autorización. */
-  permisos: InMemoryUsuarioPermisosAdapter
+  permisos: UsuarioPermisosPort
   auditoria: InMemoryAuditoriaComercialAdapter
   /**
    * ACL de identidad de clientes (solo id/nombre/activo).
    * El maestro editable vive en Administración (FE); aquí no hay catálogo duplicado.
    */
-  clientes: InMemoryClienteConsultaAdapter
+  clientes: ClienteConsultaPort
   /** Composición Inventario compartida (Engine) — obligatoria en runtime montado. */
   inventario?: InventarioComposition
   handlers: {
@@ -61,6 +67,7 @@ export interface VentasComposition {
     emitirNotaCredito: EmitirNotaCreditoHandler
     anularNotaCredito: AnularNotaCreditoHandler
     revertirAplicacionesNotaCredito: RevertirAplicacionesNotaCreditoHandler
+    utilizarNotaCredito: UtilizarNotaCreditoHandler
     anularVenta: AnularVentaHandler
   }
 }
@@ -76,27 +83,37 @@ export function createVentasComposition(options?: {
   sequentialIds?: boolean
   seedJoselito?: boolean
   inventarioForzarError?: string
-  /** Si se provee, usa MySQL definitivo para `VentaRepository`. */
+  /** Persistencia relacional (MySQL legacy o SQL Server LibroSys). */
   sql?: SqlExecutor
+  sqlDialect?: 'mysql' | 'mssql'
   /** Composition Inventario compartida — Production path. */
   inventario?: InventarioComposition
   /** Si se provee, consulta productos desde SQL Server (tabla Producto). */
   productos?: ProductoConsultaPort
+  clientes?: ClienteConsultaPort
+  permisos?: UsuarioPermisosPort
 }): VentasComposition {
   const store = new InMemoryVentasStore()
-  if (options?.seedJoselito !== false) {
+  if (options?.seedJoselito === true) {
     seedVentasJoselito(store)
   }
 
-  const ventas: VentaRepository = options?.sql
-    ? new MysqlVentaRepository(options.sql)
-    : new InMemoryVentaRepository(store)
+  let ventas: VentaRepository
+  if (options?.sql) {
+    ventas =
+      options.sqlDialect === 'mssql'
+        ? new SqlServerVentaRepository(options.sql)
+        : new MysqlVentaRepository(options.sql)
+  } else {
+    ventas = new InMemoryVentaRepository(store)
+  }
+
   const ids = options?.sequentialIds
     ? new SequentialIdGeneratorAdapter()
     : new UuidIdGeneratorAdapter()
 
-  const permisos = new InMemoryUsuarioPermisosAdapter(store)
-  const clientes = new InMemoryClienteConsultaAdapter(store)
+  const permisos = options?.permisos ?? new InMemoryUsuarioPermisosAdapter(store)
+  const clientes = options?.clientes ?? new InMemoryClienteConsultaAdapter(store)
 
   if (!options?.inventario) {
     throw new Error(
@@ -150,6 +167,7 @@ export function createVentasComposition(options?: {
       emitirNotaCredito: new EmitirNotaCreditoHandler(ventaService),
       anularNotaCredito: new AnularNotaCreditoHandler(ventaService),
       revertirAplicacionesNotaCredito: new RevertirAplicacionesNotaCreditoHandler(ventaService),
+      utilizarNotaCredito: new UtilizarNotaCreditoHandler(ventaService),
       anularVenta: new AnularVentaHandler(ventaService),
     },
   }

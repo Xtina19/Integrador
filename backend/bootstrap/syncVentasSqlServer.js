@@ -11,7 +11,7 @@ const { getConnection } = require('../db')
 async function syncVentasCatalogFromSqlServer(inventario, ventasStore) {
   const pool = await getConnection()
   if (!pool) {
-    console.warn('[Ventas] Sin conexión SQL — se usa catálogo in-memory del seed')
+    console.warn('[Ventas] Sin conexión SQL — inventario sin catálogo remoto')
     return null
   }
 

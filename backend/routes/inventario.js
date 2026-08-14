@@ -1938,6 +1938,118 @@ router.get('/kardex', async (req, res) => {
     })
   }
 })
+
+async function consultarAuditoriaInventario(pool, filtros = {}) {
+  const request = pool.request()
+  request.input('usuarioId', sql.Int, filtros.usuarioId ? Number(filtros.usuarioId) : null)
+  request.input('documento', sql.VarChar(50), filtros.documento || null)
+  request.input('accion', sql.VarChar(100), filtros.accion || null)
+  request.input('resultado', sql.VarChar(20), filtros.resultado || null)
+  request.input('desde', sql.VarChar(10), filtros.from || null)
+  request.input('hasta', sql.VarChar(10), filtros.to || null)
+
+  const result = await request.query(`
+    SELECT TOP 500
+      CAST(a.id_auditoria AS VARCHAR(20)) AS id,
+      a.tipo_accion AS tipoAccion,
+      CAST(a.id_usuario AS VARCHAR(20)) AS usuarioId,
+      a.fecha,
+      a.resultado,
+      CAST(a.id_movimiento AS VARCHAR(20)) AS movimientoId,
+      a.documento_tipo AS documentoTipo,
+      CAST(a.documento_id AS VARCHAR(20)) AS documentoId,
+      CAST(a.id_producto AS VARCHAR(20)) AS productoId,
+      CAST(a.id_almacen AS VARCHAR(20)) AS almacenId,
+      a.detalle,
+      a.direccion_ip AS direccionIp
+    FROM AuditoriaInventario a
+    WHERE
+      (@usuarioId IS NULL OR a.id_usuario = @usuarioId)
+      AND (
+        @documento IS NULL
+        OR a.documento_tipo = @documento
+        OR CAST(a.documento_id AS VARCHAR(20)) = @documento
+      )
+      AND (@accion IS NULL OR a.tipo_accion = @accion)
+      AND (@resultado IS NULL OR a.resultado = @resultado)
+      AND (@desde IS NULL OR CONVERT(date, a.fecha) >= CONVERT(date, @desde))
+      AND (@hasta IS NULL OR CONVERT(date, a.fecha) <= CONVERT(date, @hasta))
+    ORDER BY a.fecha DESC, a.id_auditoria DESC
+  `)
+  return result.recordset
+}
+
+// GET /api/inventario/auditoria — AuditoriaInventario (scriptdb)
+router.get('/auditoria', async (req, res) => {
+  try {
+    const pool = await getConnection()
+    const rows = await consultarAuditoriaInventario(pool, {
+      usuarioId: req.query.usuarioId,
+      documento: req.query.documento,
+      accion: req.query.accion,
+      resultado: req.query.resultado,
+      from: req.query.from,
+      to: req.query.to,
+    })
+    return res.json({ success: true, data: rows, total: rows.length })
+  } catch (err) {
+    console.error('Error cargando auditoría de inventario:', err)
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'AUDIT_LIST_ERROR',
+        message: 'No se pudo cargar la auditoría de inventario.',
+        details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+      },
+    })
+  }
+})
+
+router.get('/auditoria/export', async (req, res) => {
+  try {
+    const pool = await getConnection()
+    const rows = await consultarAuditoriaInventario(pool, {
+      usuarioId: req.query.usuarioId,
+      documento: req.query.documento,
+      accion: req.query.accion,
+      resultado: req.query.resultado,
+      from: req.query.from,
+      to: req.query.to,
+    })
+    const header = [
+      'id',
+      'tipoAccion',
+      'usuarioId',
+      'fecha',
+      'resultado',
+      'documentoTipo',
+      'documentoId',
+      'productoId',
+      'almacenId',
+    ]
+    const csv = [
+      header.join(','),
+      ...rows.map((r) =>
+        header
+          .map((k) => `"${String(r[k] ?? '').replace(/"/g, '""')}"`)
+          .join(','),
+      ),
+    ].join('\n')
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', 'attachment; filename="auditoria-inventario.csv"')
+    return res.status(200).send(csv)
+  } catch (err) {
+    console.error('Error exportando auditoría de inventario:', err)
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'AUDIT_EXPORT_ERROR',
+        message: 'No se pudo exportar la auditoría.',
+      },
+    })
+  }
+})
+
 // ============================================================
 // CONTEOS FISICOS
 // ============================================================
@@ -4965,5 +5077,166 @@ router.post(
     }
   },
 )
+
+// === Costeos de inventario (Nuevo Costeo / Importaciones) ===
+router.get('/costeos', async (req, res) => {
+  try {
+    const pool = await getConnection()
+    const limit = Math.min(Number(req.query.limit) || 50, 200)
+    const productoId = req.query.productoId ? Number(req.query.productoId) : null
+    const origen = req.query.origen ? String(req.query.origen) : null
+
+    let where = '1=1'
+    if (productoId) where += ' AND a.id_producto = @productoId'
+    if (origen) where += " AND a.detalle LIKE @origenLike"
+
+    const result = await pool.request()
+      .input('productoId', sql.Int, productoId)
+      .input('origenLike', sql.NVarChar, origen ? `%origen=${origen}%` : null)
+      .query(`
+        SELECT TOP (${limit})
+          a.id_auditoria AS id,
+          a.fecha,
+          a.id_producto AS productoId,
+          p.titulo AS producto,
+          p.isbn,
+          a.detalle
+        FROM AuditoriaInventario a
+        INNER JOIN Producto p ON p.id_producto = a.id_producto
+        WHERE a.tipo_accion = 'COSTEO' AND ${where}
+        ORDER BY a.fecha DESC
+      `)
+
+    const data = result.recordset.map((row) => {
+      let parsed = {}
+      try { parsed = JSON.parse(row.detalle || '{}') } catch { /* noop */ }
+      return {
+        id: String(row.id),
+        fecha: row.fecha,
+        productoId: String(row.productoId),
+        producto: row.producto,
+        isbn: row.isbn || '',
+        previousCost: Number(parsed.previousCost ?? 0),
+        newCost: Number(parsed.newCost ?? 0),
+        previousPrice: parsed.previousPrice != null ? Number(parsed.previousPrice) : undefined,
+        newPrice: parsed.newPrice != null ? Number(parsed.newPrice) : undefined,
+        marginPercent: parsed.marginPercent != null ? Number(parsed.marginPercent) : undefined,
+        costType: String(parsed.costType ?? ''),
+        notes: String(parsed.notes ?? ''),
+        origen: String(parsed.origen ?? ''),
+        documentoRef: parsed.documentoRef ?? null,
+        resultado: 'OK',
+      }
+    })
+
+    return res.json({ success: true, data })
+  } catch (err) {
+    console.error('[inventario/costeos GET]', err)
+    return res.status(500).json({ success: false, error: err.message })
+  }
+})
+
+router.post('/costeos', async (req, res) => {
+  try {
+    const productoId = Number(req.body?.productoId)
+    const newCost = Number(req.body?.newCost)
+    const newPriceRaw = req.body?.newPrice
+    const newPrice = newPriceRaw != null && newPriceRaw !== '' ? Number(newPriceRaw) : null
+    const marginPercent = req.body?.marginPercent != null ? Number(req.body.marginPercent) : null
+    const costType = String(req.body?.costType || 'manual')
+    const notes = String(req.body?.notes || '')
+    const origen = String(req.body?.origen || 'manual')
+    const documentoRef = req.body?.documentoRef ? String(req.body.documentoRef) : null
+
+    if (!productoId || Number.isNaN(newCost)) {
+      return res.status(400).json({ success: false, error: 'productoId y newCost son requeridos' })
+    }
+
+    const pool = await getConnection()
+    const tx = new sql.Transaction(pool)
+    await tx.begin()
+
+    try {
+      const prevRes = await new sql.Request(tx)
+        .input('id', sql.Int, productoId)
+        .query('SELECT costo_referencia, precio, titulo, isbn FROM Producto WHERE id_producto = @id')
+
+      const prev = prevRes.recordset[0]
+      if (!prev) {
+        await tx.rollback()
+        return res.status(404).json({ success: false, error: 'Producto no encontrado' })
+      }
+
+      const previousCost = Number(prev.costo_referencia ?? 0)
+      const previousPrice = Number(prev.precio ?? 0)
+      const priceToSet =
+        newPrice != null && !Number.isNaN(newPrice) && newPrice > 0 ? newPrice : null
+
+      await new sql.Request(tx)
+        .input('id', sql.Int, productoId)
+        .input('costo', sql.Decimal(12, 2), newCost)
+        .query('UPDATE Producto SET costo_referencia = @costo WHERE id_producto = @id')
+
+      if (priceToSet != null) {
+        await new sql.Request(tx)
+          .input('id', sql.Int, productoId)
+          .input('precio', sql.Decimal(10, 2), priceToSet)
+          .query('UPDATE Producto SET precio = @precio WHERE id_producto = @id')
+      }
+
+      const detalle = JSON.stringify({
+        previousCost,
+        newCost,
+        previousPrice,
+        newPrice: priceToSet,
+        marginPercent,
+        costType,
+        notes,
+        origen,
+        documentoRef,
+      })
+
+      const ins = await new sql.Request(tx)
+        .input('tipo', sql.VarChar, 'COSTEO')
+        .input('productoId', sql.Int, productoId)
+        .input('detalle', sql.NVarChar(sql.MAX), detalle)
+        .query(`
+          INSERT INTO AuditoriaInventario (id_usuario, tipo_accion, id_producto, resultado, detalle)
+          OUTPUT INSERTED.id_auditoria, INSERTED.fecha
+          VALUES (1, @tipo, @productoId, 'OK', @detalle)
+        `)
+
+      await tx.commit()
+
+      const row = ins.recordset[0]
+      return res.status(201).json({
+        success: true,
+        data: {
+          id: String(row.id_auditoria),
+          fecha: row.fecha,
+          productoId: String(productoId),
+          producto: prev.titulo,
+          isbn: prev.isbn || '',
+          previousCost,
+          newCost,
+          previousPrice,
+          newPrice: priceToSet,
+          marginPercent,
+          costType,
+          notes,
+          origen,
+          documentoRef,
+          resultado: 'OK',
+        },
+      })
+    } catch (inner) {
+      await tx.rollback()
+      throw inner
+    }
+  } catch (err) {
+    console.error('[inventario/costeos POST]', err)
+    return res.status(500).json({ success: false, error: err.message })
+  }
+})
 
 module.exports = router

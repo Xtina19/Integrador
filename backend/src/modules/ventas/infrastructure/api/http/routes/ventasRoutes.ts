@@ -103,6 +103,11 @@ export function createVentasRouter(composition: VentasComposition): Router {
     asyncHandler((req, res) => controller.revertirAplicacionesNotaCredito(req, res)),
   )
   router.post(
+    '/:id/notas-credito/:ncId/utilizar',
+    auth('nota_credito'),
+    asyncHandler((req, res) => controller.utilizarNotaCredito(req, res)),
+  )
+  router.post(
     '/:id/anular',
     auth('anular'),
     asyncHandler((req, res) => controller.cancelar(req, res)),

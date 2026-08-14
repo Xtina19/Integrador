@@ -166,8 +166,8 @@ export function createInitialERPState(): ERPState {
     })),
     shipments: seedShipments.map((s) => {
       const invoice = seedInvoices.find((f) => f.shipment === s.code)
-      const consolidation = seedConsolidations.find((c) =>
-        c.shipmentCodes?.includes(s.code)
+      const consolidation = seedConsolidations.find(
+        (c) => 'shipmentCode' in c && c.shipmentCode === s.code,
       )
       return {
         ...s,
@@ -188,19 +188,27 @@ export function createInitialERPState(): ERPState {
       status: f.status,
       shipmentId: seedShipments.find((s) => s.code === f.shipment)?.id,
       shipmentCode: f.shipment,
-      consolidationId: seedConsolidations.find((c) => c.invoiceIds?.includes(f.id))?.id,
+      consolidationId: seedConsolidations.find(
+        (c) => 'shipmentCode' in c && c.shipmentCode === f.shipment,
+      )?.id,
       stage: f.stage,
     })),
-    consolidations: seedConsolidations.map((c) => ({
-      id: c.id,
-      name: c.name,
-      orderIds: c.orderIds ?? [],
-      shipmentIds: c.shipmentIds ?? [],
-      invoiceIds: c.invoiceIds ?? [],
-      totalBoxes: c.totalBoxes,
-      status: c.status,
-      notes: c.notes,
-    })),
+    consolidations: seedConsolidations.map((c) => {
+      const shipmentCode = 'shipmentCode' in c ? String(c.shipmentCode) : ''
+      const shipment = seedShipments.find((s) => s.code === shipmentCode)
+      return {
+        id: c.id,
+        code: c.code,
+        shipmentId: shipment?.id ?? '',
+        warehouseName: c.warehouseName,
+        date: c.date,
+        totalBultos: c.totalBultos,
+        weightKg: c.weightKg,
+        volumeM3: c.volumeM3,
+        status: c.status,
+        notes: c.notes,
+      }
+    }),
     bookCosting: seedBookCosting.map((b) => ({
       ...b,
       orderId: 'OC-INT-2026-091',

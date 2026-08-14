@@ -75,5 +75,5 @@ export const UTENSIL_OPTIONS = [
   'Impresoras',
 ] as const satisfies readonly string[]
 
-export type FormEventTab = 'detalle' | 'personal' | 'inventario' | 'utensilios' | 'resumen'
+export type FormEventTab = 'detalle' | 'personal' | 'utensilios' | 'resumen'
 export type DetailEventTab = 'resumen' | 'inventario' | 'personal' | 'utensilios' | 'ventas' | 'historial'

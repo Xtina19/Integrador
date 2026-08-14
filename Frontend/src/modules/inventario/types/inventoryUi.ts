@@ -1,6 +1,6 @@
 /** Tipos UI alineados al dominio aprobado de Inventario (solo frontend). */
 
-export type InventoryTabId = 'general' | 'movimientos' | 'transferencias' | 'kardex' | 'auditoria'
+export type InventoryTabId = 'general' | 'movimientos' | 'transferencias' | 'kardex'
 
 /** Pestañas antiguas redirigidas a Movimientos con filtro. */
 export type InventoryLegacyTabId =  'conteos' | 'ajustes' | 'descartes'
@@ -85,6 +85,7 @@ export interface ProductoInventarioVista {
   autor: string
   categoria: string
   editorial: string
+  costoReferencia?: number
   stockConsolidado: number
   stockMinimo: number
   porAlmacen: StockPorAlmacen[]

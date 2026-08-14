@@ -22,11 +22,30 @@ export function emptyShipmentCosts(): ShipmentCosts {
   }
 }
 
-export function computeShipmentCostsTotal(costs: ShipmentCosts): number {
+export function computeShipmentCostsTotal(costs?: ShipmentCosts | null): number {
+  if (!costs) return 0
   return shipmentCostFields.reduce((sum, { key }) => sum + (costs[key] || 0), 0)
 }
 
-export function hasShipmentCosts(costs?: ShipmentCosts): boolean {
-  if (!costs) return false
+export function hasShipmentCosts(costs?: ShipmentCosts | null): boolean {
   return computeShipmentCostsTotal(costs) > 0
+}
+
+export const freightDocumentTypes = [
+  'Factura flete',
+  'Conocimiento de embarque',
+  'Guía aérea',
+  'Factura aduana',
+  'Recibo portuario',
+  'Otros',
+] as const
+
+export const freightConceptOptions = shipmentCostFields.map(({ key, label }) => ({
+  key,
+  label,
+}))
+
+export function conceptLabelToKey(label: string): keyof ShipmentCosts | 'other' {
+  const found = shipmentCostFields.find((f) => f.label === label)
+  return found?.key ?? 'other'
 }

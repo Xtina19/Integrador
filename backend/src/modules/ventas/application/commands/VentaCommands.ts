@@ -74,6 +74,13 @@ export interface RevertirAplicacionesNotaCreditoCommand {
   expectedVersion?: number
 }
 
+export interface UtilizarNotaCreditoCommand {
+  ventaId: string
+  notaCreditoId: string
+  usuarioId: string
+  expectedVersion?: number
+}
+
 export interface AnularVentaCommand {
   ventaId: string
   usuarioId: string

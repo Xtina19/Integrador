@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/Input'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { SupplierInvoiceRecordDialog, type SupplierInvoice } from '@/modules/compras/components/SupplierInvoiceRecordDialog'
 import { RegistrarFacturaProveedorDialog } from '@/modules/compras/components/RegistrarFacturaProveedorDialog'
+import { RegistrarPagoFacturaDialog } from '@/modules/compras/components/RegistrarPagoFacturaDialog'
 import { useToast } from '@/context/ToastContext'
 import { useERP } from '@/store/ERPProvider'
 import { comprasApi } from '@/services/api/comprasApi'
@@ -100,16 +101,17 @@ export function FacturasProveedoresPage() {
     setDeleteId(null)
   }
 
-  async function handleRegisterPayment() {
-    if (!payId) return
+  async function handleRegisterPayment(total: number) {
+    if (!payId) return false
     const inv = invoices.find((f) => f.id === payId)
-    const result = await registerSupplierInvoicePayment(payId)
+    const result = await registerSupplierInvoicePayment(payId, { total })
     if (!result.success) {
       showError(result.errors?.join(' ') ?? 'No se pudo registrar el pago.')
-    } else {
-      showSuccess(`Pago registrado — ${inv?.id ?? payId} marcada como pagada.`)
+      return false
     }
+    showSuccess(`Pago registrado — ${inv?.id ?? payId} por ${formatMoney(total, inv?.currency || 'DOP')}.`)
     setPayId(null)
+    return true
   }
 
   return (
@@ -150,7 +152,7 @@ export function FacturasProveedoresPage() {
           subtitle={
             loading
               ? 'Cargando…'
-              : `${filtered.length} factura${filtered.length === 1 ? '' : 's'} — compras nacionales`
+              : `${filtered.length} factura${filtered.length === 1 ? '' : 's'} — nacionales e internacionales`
           }
         />
         <CardBody className="!p-0">
@@ -173,6 +175,15 @@ export function FacturasProveedoresPage() {
                 render: (f) => <span className="font-mono text-xs">{f.numeroFactura ?? '—'}</span>,
               },
               { key: 'supplier', header: 'Proveedor', render: (f) => <span className="font-medium">{f.supplier}</span> },
+              {
+                key: 'purchaseType',
+                header: 'Tipo',
+                render: (f) => (
+                  <Badge variant={f.purchaseType === 'international' ? 'info' : 'neutral'}>
+                    {f.purchaseType === 'international' ? 'Internacional' : 'Nacional'}
+                  </Badge>
+                ),
+              },
               { key: 'orderId', header: 'Orden', className: 'font-mono text-xs' },
               { key: 'date', header: 'Fecha', className: 'text-sm' },
               {
@@ -181,7 +192,21 @@ export function FacturasProveedoresPage() {
                 className: 'text-right',
                 render: (f) => (
                   <span className="font-semibold text-corporate tabular-nums">
-                    {formatMoney(f.amount, f.currency || 'DOP')}
+                    {f.amount > 0 ? formatMoney(f.amount, f.currency || 'DOP') : '—'}
+                  </span>
+                ),
+              },
+              {
+                key: 'montoPendiente',
+                header: 'CxP pendiente',
+                className: 'text-right',
+                render: (f) => (
+                  <span className="tabular-nums text-sm">
+                    {f.estadoCxp
+                      ? formatMoney(Number(f.montoPendiente ?? (f.status === 'paid' ? 0 : f.amount)), f.currency || 'DOP')
+                      : f.amount > 0 && f.status !== 'paid'
+                        ? formatMoney(f.amount, f.currency || 'DOP')
+                        : '—'}
                   </span>
                 ),
               },
@@ -246,13 +271,11 @@ export function FacturasProveedoresPage() {
         onRegistered={handleRegistered}
       />
 
-      <ConfirmDialog
+      <RegistrarPagoFacturaDialog
         open={!!payId}
-        title="Registrar pago"
-        message="Se marcará la factura como pagada en su totalidad. ¿Continuar?"
-        confirmLabel="Confirmar pago"
-        onConfirm={() => void handleRegisterPayment()}
+        invoice={invoices.find((f) => f.id === payId) ?? null}
         onClose={() => setPayId(null)}
+        onConfirm={handleRegisterPayment}
       />
 
       <ConfirmDialog

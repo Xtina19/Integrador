@@ -21,7 +21,6 @@ import { DetalleDescartePage } from '@/pages/inventario/DetalleDescartePage'
 import { FichaProductoPage } from '@/pages/inventario/FichaProductoPage'
 import { DetalleMovimientoPage } from '@/pages/inventario/DetalleMovimientoPage'
 import { DetalleKardexPage } from '@/pages/inventario/DetalleKardexPage'
-import { DetalleAuditoriaPage } from '@/pages/inventario/DetalleAuditoriaPage'
 import { Events } from '@/pages/Events'
 import { NuevoEventoPage } from '@/pages/eventos/NuevoEventoPage'
 import { Users } from '@/pages/Users'
@@ -83,15 +82,13 @@ import { OrdenesCompraPage } from '@/pages/compras/OrdenesCompraPage'
 import { NuevaOrdenCompraPage } from '@/pages/compras/NuevaOrdenCompraPage'
 import { RecepcionesPage } from '@/pages/compras/RecepcionesPage'
 import { FacturasProveedoresPage } from '@/pages/compras/FacturasProveedoresPage'
+import { CuentasPorPagarPage } from '@/pages/compras/CuentasPorPagarPage'
 import { ImportacionesLayout } from '@/pages/importaciones/ImportacionesLayout'
 import { ImportacionesDashboard } from '@/pages/importaciones/ImportacionesDashboard'
 import { EmbarquesPage } from '@/pages/importaciones/EmbarquesPage'
 import { RegistrarEmbarquePage } from '@/pages/importaciones/RegistrarEmbarquePage'
-import { FacturasInternacionalesPage } from '@/pages/importaciones/FacturasInternacionalesPage'
-import { ConsolidacionesPage } from '@/pages/importaciones/ConsolidacionesPage'
 import { CostosFletePage } from '@/pages/importaciones/CostosFletePage'
 import { CosteoLibroPage } from '@/pages/importaciones/CosteoLibroPage'
-import { PalletsCajasPage } from '@/pages/importaciones/PalletsCajasPage'
 
 function RedirectMonedaPath({ action }: { action: 'editar' | 'ver' | 'eliminar' }) {
   const { id } = useParams()
@@ -134,6 +131,7 @@ export function AppRoutes() {
         <Route path="inventario/categorias/eliminar/:id" element={<CategoryDeletePage />} />
 
         <Route path="inventario/editoriales" element={<Navigate to="/editoriales/lista" replace />} />
+        <Route path="inventario/editoriales" element={<Navigate to="/editoriales/lista" replace />} />
         <Route path="inventario/editoriales/*" element={<RedirectLegacyPath fromPrefix="/inventario/editoriales" toPrefix="/editoriales" />} />
 
         <Route path="inventario/productos" element={<AdminProducts />} />
@@ -151,7 +149,8 @@ export function AppRoutes() {
 
         <Route path="inventario/movimientos/:id" element={<DetalleMovimientoPage />} />
         <Route path="inventario/kardex/:productoId" element={<DetalleKardexPage />} />
-        <Route path="inventario/auditoria/:id" element={<DetalleAuditoriaPage />} />
+        <Route path="inventario/auditoria/:id" element={<Navigate to="/auditoria" replace />} />
+        <Route path="inventario/auditoria" element={<Navigate to="/auditoria" replace />} />
 
         <Route path="editoriales" element={<EditorialesLayout />}>
           <Route index element={<EditorialesDashboard />} />
@@ -192,19 +191,19 @@ export function AppRoutes() {
           <Route path="proveedores/ver/:id" element={<SupplierDetailPage />} />
           <Route path="proveedores/eliminar/:id" element={<SupplierDeletePage />} />
           <Route path="ordenes" element={<OrdenesCompraPage />} />
-          <Route path="recepciones" element={<RecepcionesPage />} />
           <Route path="facturas" element={<FacturasProveedoresPage />} />
+          <Route path="recepciones" element={<RecepcionesPage />} />
+          <Route path="cuentas-por-pagar" element={<CuentasPorPagarPage />} />
         </Route>
         <Route path="compras/ordenes/nuevo" element={<NuevaOrdenCompraPage />} />
 
         <Route path="importaciones" element={<ImportacionesLayout />}>
           <Route index element={<ImportacionesDashboard />} />
           <Route path="embarques" element={<EmbarquesPage />} />
-          <Route path="facturas" element={<FacturasInternacionalesPage />} />
-          <Route path="consolidaciones" element={<ConsolidacionesPage />} />
+          <Route path="facturas" element={<Navigate to="/compras/facturas" replace />} />
+          <Route path="consolidaciones" element={<Navigate to="/importaciones/embarques" replace />} />
           <Route path="costos" element={<CostosFletePage />} />
           <Route path="costeo" element={<CosteoLibroPage />} />
-          <Route path="pallets" element={<PalletsCajasPage />} />
         </Route>
         <Route path="importaciones/embarques/nuevo" element={<RegistrarEmbarquePage />} />
 

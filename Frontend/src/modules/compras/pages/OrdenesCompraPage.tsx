@@ -16,7 +16,6 @@ import { useERP } from '@/store/ERPProvider'
 import { useToast } from '@/context/ToastContext'
 import { useGlobalSearchRecordEffect, useRecordHighlightScroll } from '@/context/GlobalSearchNavigationContext'
 import { purchaseStatusMap, purchaseStatusVariants } from '@/modules/compras/constants/comprasUi'
-import { formatMoney } from '@/lib/money'
 
 export function OrdenesCompraPage() {
   const navigate = useNavigate()
@@ -133,17 +132,7 @@ export function OrdenesCompraPage() {
                 ),
               },
               { key: 'date', header: 'Fecha', className: 'text-sm' },
-              { key: 'items', header: 'Ítems', render: (o) => <span className="font-semibold">{o.items}</span> },
-              {
-                key: 'total',
-                header: 'Total',
-                className: 'text-right',
-                render: (o) => (
-                  <span className="font-semibold text-corporate tabular-nums">
-                    {formatMoney(o.total, o.currency)}
-                  </span>
-                ),
-              },
+              { key: 'items', header: 'Unidades', render: (o) => <span className="font-semibold">{o.items}</span> },
               {
                 key: 'status',
                 header: 'Estado',

@@ -10,12 +10,22 @@ import { proveedoresApi } from '@/services/api/proveedoresApi'
 import { getFriendlyErrorMessage } from '@/services/http'
 import { inventoryService, type CreateProductInput, type CreateAdjustmentInput, type UpdateProductInput } from '@/services/inventoryService'
 import { transferService, type CreateTransferInput } from '@/services/transferService'
-import { importService, type CreateShipmentInput, type UpdateShipmentInput, type UpdateInternationalInvoiceInput, type UpdateConsolidationInput } from '@/services/importService'
+import { importService, type CreateShipmentInput, type UpdateShipmentInput, type UpdateInternationalInvoiceInput, type UpdateConsolidationInput, computeBookCostingForShipment } from '@/services/importService'
+import { importacionesApi } from '@/services/api/importacionesApi'
+import { loadImportacionesFromApi } from '@/services/api/importacionesLoader'
+import { isImportacionesSyncedToApi } from '@/modules/importaciones/services/importacionesDualMode'
 import { eventService, type CreateEventInput, type UpdateEventInput } from '@/services/eventService'
 import { dashboardService } from '@/services/dashboardService'
 import { prependActivity, prependNotification } from '@/services/activityService'
-import type { Activity, Notification, InternationalInvoice } from '@/types/domain'
+import type { Activity, Notification, InternationalInvoice, FreightCostDocument } from '@/types/domain'
 import { shouldUseLocalCompras } from '@/modules/compras/services/comprasDualMode'
+import { costeoInventarioApi } from '@/services/api/costeoInventarioApi'
+import { bookCostingRowKey, withBookCostingMargin } from '@/modules/importaciones/business-rules/bookCosting'
+import { productosApi } from '@/services/api/productosApi'
+import type { ProductoCosteoRef } from '@/services/importService'
+import { conceptLabelToKey, emptyShipmentCosts } from '@/business-rules/shipmentCosts'
+import { nextSequentialCode } from '@/utils/idGenerator'
+import { storeFreightFile } from '@/modules/importaciones/lib/freightFileStore'
 import {
   isFacturaAnulada,
   isFacturaPagada,
@@ -38,7 +48,9 @@ interface ERPContextValue {
   notifications: Notification[]
   unreadNotifications: number
   comprasReady: boolean
+  importacionesReady: boolean
   refreshCompras: () => Promise<void>
+  refreshImportaciones: () => Promise<void>
   registerSupplierInvoice: (input: {
     orderId: string
     ncf?: string
@@ -47,7 +59,10 @@ interface ERPContextValue {
     fechaRecepcionDocumento?: string
   }) => Promise<{ success: boolean; errors?: string[] }>
   anularSupplierInvoice: (invoiceId: string) => Promise<{ success: boolean; errors?: string[] }>
-  registerSupplierInvoicePayment: (invoiceId: string) => Promise<{ success: boolean; errors?: string[] }>
+  registerSupplierInvoicePayment: (
+    invoiceId: string,
+    input: { total: number }
+  ) => Promise<{ success: boolean; errors?: string[] }>
 
   createPurchaseOrder: (input: CreatePurchaseInput) => { success: boolean; errors?: string[] } | Promise<{ success: boolean; errors?: string[] }>
   updatePurchaseOrder: (input: UpdatePurchaseInput) => { success: boolean; errors?: string[] } | Promise<{ success: boolean; errors?: string[] }>
@@ -68,14 +83,36 @@ interface ERPContextValue {
   receiveTransfer: (transferId: string) => { success: boolean; errors?: string[] }
   finalizeTransfer: (transferId: string) => { success: boolean; errors?: string[] }
 
-  registerShipment: (input: CreateShipmentInput) => { success: boolean; errors?: string[] }
-  advanceShipment: (shipmentId: string) => { success: boolean; errors?: string[] }
-  updateShipment: (input: UpdateShipmentInput) => { success: boolean; errors?: string[] }
+  registerShipment: (input: CreateShipmentInput) => Promise<{ success: boolean; errors?: string[] }> | { success: boolean; errors?: string[] }
+  registerFreightDocument: (input: {
+    shipmentId: string
+    documentId?: string
+    numeroDocumento: string
+    tipoDocumento: string
+    concepto: string
+    proveedorServicio: string
+    fechaDocumento: string
+    moneda: string
+    monto: number
+    nombreArchivo: string
+    mimeType?: string
+    archivo?: File
+    observacion: string
+  }) => Promise<{ success: boolean; errors?: string[] }>
+  advanceShipment: (shipmentId: string) => Promise<{ success: boolean; errors?: string[] }> | { success: boolean; errors?: string[] }
+  updateShipment: (input: UpdateShipmentInput) => Promise<{ success: boolean; errors?: string[] }> | { success: boolean; errors?: string[] }
   updateInternationalInvoice: (input: UpdateInternationalInvoiceInput) => { success: boolean; errors?: string[] }
-  updateConsolidation: (input: UpdateConsolidationInput) => { success: boolean; errors?: string[] }
-  deleteShipment: (shipmentId: string) => { success: boolean; errors?: string[] }
+  updateConsolidation: (input: UpdateConsolidationInput) => Promise<{ success: boolean; errors?: string[] }> | { success: boolean; errors?: string[] }
+  deleteShipment: (shipmentId: string) => Promise<{ success: boolean; errors?: string[] }> | { success: boolean; errors?: string[] }
   deleteInternationalInvoice: (invoiceId: string) => { success: boolean; errors?: string[] }
   deleteConsolidation: (consolidationId: string) => { success: boolean; errors?: string[] }
+  applyImportCosting: (shipmentId: string) => Promise<{ success: boolean; errors?: string[] }>
+  updateBookCostingMargin: (input: {
+    shipmentId: string
+    marginPercent: number
+    rowKey?: string
+    applyToAllPending?: boolean
+  }) => void
 
   registerEvent: (input: CreateEventInput) => { success: boolean; errors?: string[]; eventId?: string }
   updateEvent: (input: UpdateEventInput) => { success: boolean; errors?: string[] }
@@ -104,6 +141,56 @@ function applySideEffects(
 export function ERPProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<ERPState>(createInitialERPState)
   const [comprasReady, setComprasReady] = useState(!comprasApi.isEnabled())
+  const [importacionesReady, setImportacionesReady] = useState(!importacionesApi.isEnabled())
+
+  const refreshImportaciones = useCallback(async () => {
+    if (!importacionesApi.isEnabled()) {
+      setImportacionesReady(true)
+      return
+    }
+    try {
+      const loaded = await loadImportacionesFromApi()
+      setState((s) => {
+        const isSeedShipment = (sh: { id: string; dbId?: number }) =>
+          !sh.dbId && /^EMB-2026-/.test(sh.id)
+        const localShipments = s.shipments.filter((sh) => !sh.dbId && !isSeedShipment(sh))
+        const isSeedInvoice = (f: { id: string; dbId?: number }) =>
+          !f.dbId && /^FI-2026-/.test(f.id)
+        const localInvoices = s.internationalInvoices.filter(
+          (f) => !f.dbId && !f.pendingEmbarque && !isSeedInvoice(f),
+        )
+        const fromApi = loaded.shipments.length > 0 || loaded.internationalInvoices.length > 0
+
+        let bookCosting = s.bookCosting
+        const mergedShipments = fromApi ? [...loaded.shipments, ...localShipments] : s.shipments
+        for (const sh of mergedShipments) {
+          if (sh.status === 'costed' && !bookCosting.some((b) => b.shipmentId === sh.id)) {
+            const entries = computeBookCostingForShipment(
+              { ...s, shipments: mergedShipments },
+              sh,
+            )
+            if (entries.length) {
+              bookCosting = [...bookCosting.filter((b) => b.shipmentId !== sh.id), ...entries]
+            }
+          }
+        }
+
+        return {
+          ...s,
+          shipments: fromApi ? mergedShipments : s.shipments,
+          internationalInvoices: fromApi
+            ? [...loaded.internationalInvoices, ...localInvoices]
+            : s.internationalInvoices,
+          consolidations: loaded.consolidations.length ? loaded.consolidations : s.consolidations,
+          bookCosting,
+        }
+      })
+      setImportacionesReady(true)
+    } catch (e) {
+      console.error('[Importaciones] No se pudo hidratar desde API:', getFriendlyErrorMessage(e))
+      setImportacionesReady(true)
+    }
+  }, [])
 
   const refreshCompras = useCallback(async () => {
     if (!comprasApi.isEnabled()) {
@@ -149,6 +236,10 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     void refreshCompras()
   }, [refreshCompras])
+
+  useEffect(() => {
+    void refreshImportaciones()
+  }, [refreshImportaciones])
 
   useEffect(() => {
     saveLocalSupplierInvoices(state.supplierInvoices)
@@ -203,6 +294,7 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
               amount: Number(created.total),
               status: 'pending' as const,
               currency: order.currency,
+              purchaseType: order.purchaseType,
               numeroFactura: created.numeroFactura,
               ncf: created.ncf ?? undefined,
               documentEstado: created.estado,
@@ -251,7 +343,7 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
   )
 
   const registerSupplierInvoicePayment = useCallback(
-    async (invoiceId: string) => {
+    async (invoiceId: string, input: { total: number }) => {
       const inv = state.supplierInvoices.find((i) => i.id === invoiceId)
       if (!inv) return { success: false, errors: ['Factura no encontrada.'] }
       if (isFacturaAnulada(inv)) {
@@ -260,27 +352,53 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
       if (isFacturaPagada(inv)) {
         return { success: false, errors: ['La factura ya está pagada.'] }
       }
+      const total = Number(input.total)
+      if (!total || total <= 0) {
+        return { success: false, errors: ['Indique el monto total de la factura.'] }
+      }
 
       if (shouldUseLocalCompras(inv)) {
         setState((s) => ({
           ...s,
           supplierInvoices: s.supplierInvoices.map((i) =>
             i.id === invoiceId
-              ? { ...i, status: 'paid' as const, documentEstado: 'Pagada', estadoPago: 'Pagado' }
+              ? {
+                  ...i,
+                  amount: total,
+                  status: 'paid' as const,
+                  documentEstado: 'Pagada',
+                  estadoPago: 'Pagado',
+                }
               : i
+          ),
+          internationalInvoices: s.internationalInvoices.map((f) =>
+            f.orderId === inv.orderId || f.id === inv.id
+              ? { ...f, amount: total, status: 'paid' as const }
+              : f
           ),
         }))
         return { success: true }
       }
 
       try {
-        await comprasApi.registrarPagoFactura(inv.dbId!)
+        await comprasApi.registrarPagoFactura(inv.dbId!, { total })
         setState((s) => ({
           ...s,
           supplierInvoices: s.supplierInvoices.map((i) =>
             i.id === invoiceId
-              ? { ...i, status: 'paid' as const, documentEstado: 'Pagada', estadoPago: 'Pagado' }
+              ? {
+                  ...i,
+                  amount: total,
+                  status: 'paid' as const,
+                  documentEstado: 'Pagada',
+                  estadoPago: 'Pagado',
+                }
               : i
+          ),
+          internationalInvoices: s.internationalInvoices.map((f) =>
+            f.orderId === inv.orderId || f.id === inv.id
+              ? { ...f, amount: total, status: 'paid' as const }
+              : f
           ),
         }))
         await refreshCompras()
@@ -345,9 +463,9 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
         return {
           productoId: resolvedId,
           cantidadSolicitada: Math.round(l.qty),
-          costoUnitario: roundMoney(l.unitCost),
+          costoUnitario: 0,
           descuento: 0,
-          impuesto: input.purchaseType === 'national' ? roundMoney(l.qty * l.unitCost * 0.18) : 0,
+          impuesto: 0,
         }
       })
 
@@ -357,6 +475,7 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
 
       const created = await comprasApi.createOrden({
         proveedorId: Number(proveedor.id),
+        proveedorNombre: input.supplier,
         monedaId,
         condicionPagoId: condicionId,
         tipoCompra: input.purchaseType === 'international' ? 'internacional' : 'nacional',
@@ -416,9 +535,9 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
         return {
           productoId,
           cantidadSolicitada: Math.round(l.qty),
-          costoUnitario: roundMoney(l.unitCost),
+          costoUnitario: 0,
           descuento: 0,
-          impuesto: input.purchaseType === 'national' ? roundMoney(l.qty * l.unitCost * 0.18) : 0,
+          impuesto: 0,
         }
       })
 
@@ -478,6 +597,10 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
           return updated
         }),
         receptions: result.reception ? [...s.receptions, result.reception] : s.receptions,
+        supplierInvoices:
+          'supplierInvoice' in result && result.supplierInvoice
+            ? [...s.supplierInvoices, result.supplierInvoice]
+            : s.supplierInvoices,
         internationalInvoices:
           'internationalInvoice' in result && result.internationalInvoice
             ? [...s.internationalInvoices, result.internationalInvoice]
@@ -511,7 +634,12 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
         : purchaseService.completeReception(state, receptionId, items ?? 0)
       if (!result.success) return { success: false, errors: result.errors }
 
-      const invUpdate = inventoryService.applyReceptionToInventory(state, result.orderId, result.itemsReceived)
+      const invUpdate = inventoryService.applyReceptionToInventory(
+        state,
+        result.orderId,
+        result.itemsReceived,
+        isInternational ? reception?.shipmentId : undefined,
+      )
       const updatedInvoice: InternationalInvoice | undefined =
         isInternational && 'updatedInvoice' in result
           ? (result as { updatedInvoice?: InternationalInvoice }).updatedInvoice
@@ -689,7 +817,33 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
     return { success: true }
   }, [state])
 
-  const registerShipment = useCallback((input: CreateShipmentInput) => {
+  const registerShipment = useCallback(async (input: CreateShipmentInput) => {
+    if (importacionesApi.isEnabled()) {
+      const invoice = state.internationalInvoices.find((f) => f.id === input.invoiceId)
+      const ordenCompraId = input.ordenCompraId ?? invoice?.orderDbId
+      if (!ordenCompraId) {
+        return { success: false, errors: ['Seleccione una orden internacional aprobada.'] }
+      }
+      try {
+        await importacionesApi.createEmbarque({
+          ordenCompraId,
+          type: input.type,
+          origin: input.origin,
+          destination: input.destination,
+          departure: input.departure,
+          arrival: input.arrival,
+          boxes: input.boxes,
+          notes: input.notes,
+          moneda: invoice?.currency === 'DOP' ? 'DOP' : 'USD',
+        })
+        await refreshImportaciones()
+        await refreshCompras()
+        return { success: true }
+      } catch (e) {
+        return { success: false, errors: [getFriendlyErrorMessage(e)] }
+      }
+    }
+
     const result = importService.registerShipment(state, input)
     if (!result.success) return { success: false, errors: result.errors }
     setState((s) => ({
@@ -701,9 +855,119 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
     }))
     applySideEffects(setState, result.activity, result.notification)
     return { success: true }
-  }, [state])
+  }, [state, refreshImportaciones, refreshCompras])
 
-  const advanceShipment = useCallback((shipmentId: string) => {
+  const registerFreightDocument = useCallback(
+    async (input: {
+      shipmentId: string
+      documentId?: string
+      numeroDocumento: string
+      tipoDocumento: string
+      concepto: string
+      proveedorServicio: string
+      fechaDocumento: string
+      moneda: string
+      monto: number
+      nombreArchivo: string
+      mimeType?: string
+      contenidoArchivo?: string
+      observacion: string
+    }) => {
+      const shipment = state.shipments.find((s) => s.id === input.shipmentId)
+      if (!shipment) return { success: false, errors: ['Embarque no encontrado.'] }
+
+      if (importacionesApi.isEnabled() && shipment.dbId) {
+        try {
+          const body = {
+            numeroDocumento: input.numeroDocumento || undefined,
+            tipoDocumento: input.tipoDocumento,
+            concepto: input.concepto,
+            proveedorServicio: input.proveedorServicio,
+            fechaDocumento: input.fechaDocumento,
+            moneda: input.moneda,
+            monto: input.monto,
+            nombreArchivo: input.nombreArchivo || undefined,
+            mimeType: input.mimeType,
+            archivo: input.archivo,
+            contenidoArchivo: undefined,
+            observacion: input.observacion || undefined,
+          }
+          if (input.documentId && shipment.freightDocuments?.some((d) => d.id === input.documentId)) {
+            const doc = shipment.freightDocuments!.find((d) => d.id === input.documentId)!
+            await importacionesApi.updateDocumentoFlete(doc.dbId!, body)
+          } else {
+            await importacionesApi.createDocumentoFlete(shipment.dbId, body)
+          }
+          await refreshImportaciones()
+          return { success: true }
+        } catch (e) {
+          return { success: false, errors: [getFriendlyErrorMessage(e)] }
+        }
+      }
+
+      const existingCodes = state.shipments.flatMap((s) => (s.freightDocuments ?? []).map((d) => d.code))
+      const code = input.documentId
+        ? shipment.freightDocuments?.find((d) => d.id === input.documentId)?.code ??
+          nextSequentialCode('DCF', existingCodes)
+        : nextSequentialCode('DCF', existingCodes)
+      const docId = input.documentId ?? code
+      const document: FreightCostDocument = {
+        id: docId,
+        code,
+        shipmentId: shipment.id,
+        shipmentCode: shipment.code,
+        documentNumber: input.numeroDocumento || undefined,
+        documentType: input.tipoDocumento,
+        concept: input.concepto,
+        serviceProvider: input.proveedorServicio,
+        documentDate: input.fechaDocumento,
+        currency: input.moneda,
+        amount: input.monto,
+        status: 'registered',
+        fileName: input.nombreArchivo || undefined,
+        hasFile: Boolean(input.archivo || input.nombreArchivo),
+        mimeType: input.mimeType,
+        notes: input.observacion || undefined,
+      }
+
+      if (input.archivo) {
+        storeFreightFile(docId, input.archivo, input.nombreArchivo || 'documento-flete.pdf')
+      }
+
+      setState((s) => ({
+        ...s,
+        shipments: s.shipments.map((sh) => {
+          if (sh.id !== shipment.id) return sh
+          const docs = sh.freightDocuments ?? []
+          const nextDocs = input.documentId
+            ? docs.map((d) => (d.id === input.documentId ? document : d))
+            : [...docs, document]
+          const costs = { ...(sh.costs ?? emptyShipmentCosts()) }
+          const key = conceptLabelToKey(input.concepto)
+          if (!input.documentId) {
+            costs[key] = (costs[key] || 0) + input.monto
+          }
+          return { ...sh, freightDocuments: nextDocs, costs }
+        }),
+      }))
+      return { success: true }
+    },
+    [state, refreshImportaciones],
+  )
+
+  const advanceShipment = useCallback(async (shipmentId: string) => {
+    const shipment = state.shipments.find((s) => s.id === shipmentId)
+    if (importacionesApi.isEnabled() && isImportacionesSyncedToApi(shipment)) {
+      try {
+        await importacionesApi.avanzarEmbarque(shipment!.dbId!)
+        await refreshImportaciones()
+        await refreshCompras()
+        return { success: true }
+      } catch (e) {
+        return { success: false, errors: [getFriendlyErrorMessage(e)] }
+      }
+    }
+
     const result = importService.advanceStatus(state, shipmentId)
     if (!result.success) return { success: false, errors: result.errors }
     setState((s) => {
@@ -742,9 +1006,100 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
     })
     applySideEffects(setState, result.activity, result.notification)
     return { success: true }
+  }, [state, refreshImportaciones, refreshCompras])
+
+  const applyImportCosting = useCallback(async (shipmentId: string) => {
+    let productCatalog: ProductoCosteoRef[] = []
+    try {
+      const rows = await productosApi.list()
+      productCatalog = rows.map((p) => ({
+        id: String(p.id),
+        isbn: p.isbn ?? '',
+        title: p.title ?? '',
+        cost: Number(p.cost ?? 0) || 0,
+      }))
+    } catch (e) {
+      return { success: false, errors: [getFriendlyErrorMessage(e)] }
+    }
+
+    const result = importService.applyBookCostingToInventory(state, shipmentId, productCatalog)
+    if (!result.success) return { success: false, errors: result.errors }
+
+    try {
+      for (const update of result.productUpdates) {
+        await costeoInventarioApi.registrar({
+          productoId: String(update.productoId),
+          newCost: update.newCost,
+          newPrice: update.newPrice,
+          marginPercent: update.marginPercent,
+          costType: update.costType,
+          notes: update.notes,
+          origen: 'importacion',
+          documentoRef: update.documentoRef,
+        })
+      }
+    } catch (e) {
+      return { success: false, errors: [getFriendlyErrorMessage(e)] }
+    }
+
+    setState((s) => ({
+      ...s,
+      bookCosting: result.bookCosting,
+      products: s.products.map((p) => {
+        const upd = result.productUpdates.find(
+          (u) =>
+            (u.isbn && p.isbn === u.isbn) ||
+            p.title.trim().toLowerCase() === u.title.trim().toLowerCase(),
+        )
+        return upd ? { ...p, cost: upd.newCost, price: upd.newPrice } : p
+      }),
+    }))
+    applySideEffects(setState, result.activity, result.notification)
+    return { success: true }
   }, [state])
 
-  const updateShipment = useCallback((input: UpdateShipmentInput) => {
+  const updateBookCostingMargin = useCallback(
+    (input: {
+      shipmentId: string
+      marginPercent: number
+      rowKey?: string
+      applyToAllPending?: boolean
+    }) => {
+      setState((s) => ({
+        ...s,
+        bookCosting: s.bookCosting.map((entry) => {
+          if (entry.shipmentId !== input.shipmentId || entry.appliedToInventory) return entry
+          if (input.applyToAllPending) return withBookCostingMargin(entry, input.marginPercent)
+          if (input.rowKey && bookCostingRowKey(entry) === input.rowKey) {
+            return withBookCostingMargin(entry, input.marginPercent)
+          }
+          return entry
+        }),
+      }))
+    },
+    [],
+  )
+
+  const updateShipment = useCallback(async (input: UpdateShipmentInput) => {
+    const shipment = state.shipments.find((s) => s.id === input.shipmentId)
+    if (importacionesApi.isEnabled() && isImportacionesSyncedToApi(shipment)) {
+      try {
+        await importacionesApi.updateEmbarque(shipment!.dbId!, {
+          type: input.type,
+          origin: input.origin,
+          destination: input.destination,
+          departure: input.departure,
+          arrival: input.arrival,
+          boxes: input.boxes,
+          notes: input.notes,
+        })
+        await refreshImportaciones()
+        return { success: true }
+      } catch (e) {
+        return { success: false, errors: [getFriendlyErrorMessage(e)] }
+      }
+    }
+
     const result = importService.updateShipment(state, input)
     if (!result.success) return { success: false, errors: result.errors }
     setState((s) => ({
@@ -754,7 +1109,7 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
     }))
     applySideEffects(setState, result.activity, null)
     return { success: true }
-  }, [state])
+  }, [state, refreshImportaciones])
 
   const updateInternationalInvoice = useCallback((input: UpdateInternationalInvoiceInput) => {
     const result = importService.updateInternationalInvoice(state, input)
@@ -769,7 +1124,21 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
     return { success: true }
   }, [state])
 
-  const updateConsolidation = useCallback((input: UpdateConsolidationInput) => {
+  const updateConsolidation = useCallback(async (input: UpdateConsolidationInput) => {
+    const consolidation = state.consolidations.find((c) => c.id === input.consolidationId)
+    if (importacionesApi.isEnabled() && isImportacionesSyncedToApi(consolidation)) {
+      try {
+        await importacionesApi.updateConsolidacion(consolidation!.dbId!, {
+          status: input.status,
+          notes: input.notes,
+        })
+        await refreshImportaciones()
+        return { success: true }
+      } catch (e) {
+        return { success: false, errors: [getFriendlyErrorMessage(e)] }
+      }
+    }
+
     const result = importService.updateConsolidation(state, input)
     if (!result.success) return { success: false, errors: result.errors }
     setState((s) => ({
@@ -780,9 +1149,20 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
     }))
     applySideEffects(setState, result.activity, null)
     return { success: true }
-  }, [state])
+  }, [state, refreshImportaciones])
 
-  const deleteShipment = useCallback((shipmentId: string) => {
+  const deleteShipment = useCallback(async (shipmentId: string) => {
+    const shipment = state.shipments.find((s) => s.id === shipmentId)
+    if (importacionesApi.isEnabled() && isImportacionesSyncedToApi(shipment)) {
+      try {
+        await importacionesApi.deleteEmbarque(shipment!.dbId!)
+        await refreshImportaciones()
+        return { success: true }
+      } catch (e) {
+        return { success: false, errors: [getFriendlyErrorMessage(e)] }
+      }
+    }
+
     const result = importService.deleteShipment(state, shipmentId)
     if (!result.success) return { success: false, errors: result.errors }
     setState((s) => ({
@@ -791,7 +1171,7 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
     }))
     applySideEffects(setState, result.activity, null)
     return { success: true }
-  }, [state])
+  }, [state, refreshImportaciones])
 
   const deleteInternationalInvoice = useCallback((invoiceId: string) => {
     const result = importService.deleteInternationalInvoice(state, invoiceId)
@@ -810,6 +1190,14 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
     setState((s) => ({
       ...s,
       consolidations: s.consolidations.filter((c) => c.id !== consolidationId),
+      shipments: result.shipmentId
+        ? s.shipments.map((sh) =>
+            sh.id === result.shipmentId ? { ...sh, consolidationId: undefined } : sh,
+          )
+        : s.shipments,
+      internationalInvoices: s.internationalInvoices.map((f) =>
+        f.consolidationId === consolidationId ? { ...f, consolidationId: undefined } : f,
+      ),
     }))
     applySideEffects(setState, result.activity, null)
     return { success: true }
@@ -868,7 +1256,9 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
       notifications: state.notifications,
       unreadNotifications,
       comprasReady,
+      importacionesReady,
       refreshCompras,
+      refreshImportaciones,
       registerSupplierInvoice,
       anularSupplierInvoice,
       registerSupplierInvoicePayment,
@@ -889,7 +1279,10 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
       receiveTransfer,
       finalizeTransfer,
       registerShipment,
+      registerFreightDocument,
       advanceShipment,
+      applyImportCosting,
+      updateBookCostingMargin,
       updateShipment,
       updateInternationalInvoice,
       updateConsolidation,
@@ -908,7 +1301,9 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
       lowStockProducts,
       unreadNotifications,
       comprasReady,
+      importacionesReady,
       refreshCompras,
+      refreshImportaciones,
       registerSupplierInvoice,
       anularSupplierInvoice,
       registerSupplierInvoicePayment,
@@ -929,7 +1324,10 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
       receiveTransfer,
       finalizeTransfer,
       registerShipment,
+      registerFreightDocument,
       advanceShipment,
+      applyImportCosting,
+      updateBookCostingMargin,
       updateShipment,
       updateInternationalInvoice,
       updateConsolidation,

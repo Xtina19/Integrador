@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Search } from 'lucide-react'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
@@ -25,10 +25,14 @@ function estadoBadge(estado: ClienteEstado) {
 
 export function AdminClients() {
   const navigate = useNavigate()
-  const { clientes, loading } = useClientesCatalog()
+  const { clientes, loading, refresh } = useClientesCatalog()
   const [q, setQ] = useState('')
   const [tipo, setTipo] = useState<ClienteTipo | ''>('')
   const [estado, setEstado] = useState<ClienteEstado | ''>('')
+
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
 
   const filtered = useMemo(() => {
     const text = q.trim().toLowerCase()

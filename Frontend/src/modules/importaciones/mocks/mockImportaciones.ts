@@ -20,9 +20,44 @@ export const internationalInvoices = [
   { id: 'FI-2026-043', orderId: 'OC-INT-2026-089', shipment: 'EMB-009', supplier: 'Penguin Random House', date: '2026-05-28', currency: 'USD', amount: 68500, status: 'pending' as const, stage: 'consolidation' as const },
 ]
 
+/** Una consolidación por embarque — recepción en almacén destino (scriptdb: Consolidacion.id_embarque). */
 export const consolidations = [
-  { id: 'CON-2026-008', name: 'Consolidación España Q2', orderIds: ['OC-INT-2026-091', 'OC-INT-2026-089'], shipmentIds: ['EMB-2026-012', 'EMB-2026-009'], invoiceIds: ['FI-2026-045', 'FI-2026-043'], shipmentCodes: ['EMB-012', 'EMB-009'], orders: 5, shipments: 2, totalBoxes: 186, status: 'active' as const, notes: 'Consolidación marítima desde puertos de España — Q2 2026' },
-  { id: 'CON-2026-007', name: 'Consolidación México Junio', orderIds: ['OC-INT-2026-090'], shipmentIds: ['EMB-2026-011'], invoiceIds: ['FI-2026-044'], shipmentCodes: ['EMB-011'], orders: 3, shipments: 1, totalBoxes: 45, status: 'closed' as const, notes: 'Embarque aéreo cerrado — recepción completada en almacén central' },
+  {
+    id: 'CON-2026-012',
+    code: 'CONS-012',
+    shipmentCode: 'EMB-012',
+    warehouseName: 'Almacén Central',
+    date: '2026-06-25',
+    totalBultos: 84,
+    weightKg: 680,
+    volumeM3: 2.4,
+    status: 'pending' as const,
+    notes: 'Recepción programada — embarque marítimo desde Barcelona',
+  },
+  {
+    id: 'CON-2026-009',
+    code: 'CONS-009',
+    shipmentCode: 'EMB-009',
+    warehouseName: 'Almacén Central',
+    date: '2026-06-28',
+    totalBultos: 102,
+    weightKg: 720,
+    volumeM3: 3.1,
+    status: 'pending' as const,
+    notes: 'En tránsito marítimo desde Valencia',
+  },
+  {
+    id: 'CON-2026-011',
+    code: 'CONS-011',
+    shipmentCode: 'EMB-011',
+    warehouseName: 'Almacén Central',
+    date: '2026-06-12',
+    totalBultos: 12,
+    weightKg: 180,
+    volumeM3: 0.8,
+    status: 'closed' as const,
+    notes: 'Embarque aéreo recibido y cerrado en almacén central',
+  },
 ]
 
 export const shipmentCostsByCode: Record<string, ShipmentCosts> = {
@@ -53,17 +88,10 @@ export const freightCosts = [
 ]
 
 export const bookCosting = [
-  { isbn: '978-0307474728', title: 'Cien años de soledad', productCost: 8.50, freightAlloc: 1.20, finalCost: 12.45 },
-  { isbn: '978-8497592432', title: 'La sombra del viento', productCost: 6.80, freightAlloc: 0.95, finalCost: 9.85 },
-  { isbn: '978-8498384453', title: 'Harry Potter y la piedra filosofal', productCost: 9.20, freightAlloc: 1.35, finalCost: 13.80 },
-  { isbn: '978-0451524935', title: '1984', productCost: 4.50, freightAlloc: 0.65, finalCost: 6.90 },
-]
-
-export const palletsBoxes = [
-  { id: 'PAL-012-A', shipment: 'EMB-012', type: 'Pallet', boxes: 42, weight: '680 kg', location: 'Puerto SD — Muelle 3' },
-  { id: 'PAL-012-B', shipment: 'EMB-012', type: 'Pallet', boxes: 42, weight: '695 kg', location: 'Puerto SD — Muelle 3' },
-  { id: 'CAJ-011-01', shipment: 'EMB-011', type: 'Caja', boxes: 1, weight: '18 kg', location: 'Almacén Central — Zona A' },
-  { id: 'PAL-009-A', shipment: 'EMB-009', type: 'Pallet', boxes: 51, weight: '720 kg', location: 'En tránsito marítimo' },
+  { isbn: '978-0307474728', title: 'Cien años de soledad', productCost: 8.50, freightAlloc: 1.20, finalCost: 9.70, salePrice: 14.55, marginPercent: 50 },
+  { isbn: '978-8497592432', title: 'La sombra del viento', productCost: 6.80, freightAlloc: 0.95, finalCost: 7.75, salePrice: 11.63, marginPercent: 50 },
+  { isbn: '978-8498384453', title: 'Harry Potter y la piedra filosofal', productCost: 9.20, freightAlloc: 1.35, finalCost: 10.55, salePrice: 15.83, marginPercent: 50 },
+  { isbn: '978-0451524935', title: '1984', productCost: 4.50, freightAlloc: 0.65, finalCost: 5.15, salePrice: 7.73, marginPercent: 50 },
 ]
 
 export const shipmentStatusMap: Record<string, { label: string; variant: 'info' | 'warning' | 'success' }> = {

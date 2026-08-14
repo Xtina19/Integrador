@@ -9,7 +9,9 @@ Referencia oficial: `public/scriptdb`. El código debe leerse como escrito por u
 
 ## Base de datos
 
-- Único script: `public/scriptdb`.
+- **Único script: `public/scriptdb`. Es la base de datos. Punto.**
+- **Flujo obligatorio:** (1) definir tabla/columna/FK/relación en `scriptdb` → (2) implementar backend → (3) implementar frontend.
+- **Prohibido:** inventar relaciones en código (p. ej. parsear `observacion` para simular FKs).
 - Cabeceras de rutas: `adaptada exclusivamente a public/scriptdb` + tablas usadas.
 - Comentarios en español, mismo formato que scriptdb (`-- MODULO`, secciones con `===`).
 
@@ -26,6 +28,7 @@ Referencia oficial: `public/scriptdb`. El código debe leerse como escrito por u
 |----------|--------|
 | Maestros | Tablas scriptdb |
 | **Compras** | `OrdenCompra`, `DetalleOrdenCompra`, `RecepcionOrdenCompra`, `DetalleRecepcionOrdenCompra`, `FacturaProveedores`, `CuentasPorPagar` |
+| **Importaciones** | `Embarque`, `DocumentoCostoFlete`, `CostoEmbarque` (legacy), `FacturaInternacional`, `Consolidacion` |
 | Formas de pago | `PagoFactura.forma_pago` → `lib/formasPago.js` |
 | Roles | `Usuario.rol` → SQL + `lib/rolesSemilla.js` |
 | Tipo persona | `Natural` / `Jurídica` → `lib/personaTipo.js` |

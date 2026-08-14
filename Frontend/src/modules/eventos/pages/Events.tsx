@@ -19,48 +19,21 @@ import { EventDetailDialog } from '@/modules/eventos/components/EventDetailDialo
 import { useToast } from '@/context/ToastContext'
 import { eventStatusLabels } from '@/constants/stateMachines'
 import type { EventStatus, LibroSysEvent } from '@/types/domain'
-
-const API_BASE = 'http://localhost:3001/api'
+import { isEventEditable } from '@/modules/eventos/utils/eventFieldLock'
+import { eventosApi, type EventoListadoApi, type EventoResumenApi } from '@/modules/eventos/services/eventosApi'
 
 type Tab = 'general'
 
-const eventStatusVariants: Record<EventStatus, 'success' | 'warning' | 'info' | 'neutral'> = {
+const eventStatusVariants: Record<EventStatus, 'success' | 'warning' | 'info' | 'neutral' | 'danger'> = {
   scheduled: 'info',
   staff_assigned: 'neutral',
   in_progress: 'success',
   finalized: 'neutral',
+  cancelled: 'danger',
 }
 
 
 type FormDialogState = { mode: 'create' } | { mode: 'edit'; eventId: string }
-
-interface ApiEditorial {
-  id_editorial: number
-  nombre: string
-}
-
-interface ApiEvent {
-  id_evento: number
-  nombre: string
-  tipo_evento: string
-  ubicacion: string
-  fecha_inicio: string
-  fecha_fin: string
-  capacidad_esperada: number | null
-  presupuesto: number | null
-  costo_actual: number | null
-  disponible: number | null
-  estado: string
-  observacion: string | null
-  fecha_registro: string
-  editoriales: ApiEditorial[]
-}
-
-interface ApiEventSummary {
-  eventos_activos: number
-  presupuesto_total: number
-  ganancia_eventos: number
-}
 
 type UiEvent = LibroSysEvent & {
   budget: number
@@ -92,12 +65,16 @@ function mapApiStatus(status: string): EventStatus {
     case 'finalized':
       return 'finalized'
 
+    case 'cancelado':
+    case 'cancelled':
+      return 'cancelled'
+
     default:
       return 'scheduled'
   }
 }
 
-function mapApiEvent(event: ApiEvent): UiEvent {
+function mapApiEvent(event: EventoListadoApi): UiEvent {
   const budget = Number(event.presupuesto ?? 0)
   const spent = Number(event.costo_actual ?? 0)
 
@@ -111,6 +88,7 @@ function mapApiEvent(event: ApiEvent): UiEvent {
     status: mapApiStatus(event.estado),
     participants: Number(event.capacidad_esperada ?? 0),
     reservations: 0,
+    responsible: event.responsable ?? undefined,
     budget,
     spent,
     remaining: Number(event.disponible ?? budget - spent),
@@ -134,7 +112,7 @@ export function Events() {
   const [eventsError, setEventsError] = useState('')
 
   const [eventSummary, setEventSummary] =
-    useState<ApiEventSummary>({
+    useState<EventoResumenApi>({
       eventos_activos: 0,
       presupuesto_total: 0,
       ganancia_eventos: 0,
@@ -152,20 +130,7 @@ export function Events() {
 
   async function loadEventSummary() {
     try {
-      const response = await fetch(
-        `${API_BASE}/eventos/resumen`
-      )
-
-      const responseText = await response.text()
-
-      if (!response.ok) {
-        throw new Error(
-          responseText ||
-          'No se pudo cargar el resumen de eventos.'
-        )
-      }
-
-      const data = JSON.parse(responseText) as ApiEventSummary
+      const data = await eventosApi.getResumen()
 
       setEventSummary({
         eventos_activos: Number(data.eventos_activos ?? 0),
@@ -191,26 +156,8 @@ export function Events() {
     setEventsError('')
 
     try {
-      const response = await fetch(`${API_BASE}/eventos`)
-      const responseText = await response.text()
-
-      if (!response.ok) {
-        throw new Error(responseText || `No se pudieron cargar los eventos. Código ${response.status}`)
-      }
-
-      let data: unknown
-
-      try {
-        data = JSON.parse(responseText)
-      } catch {
-        throw new Error('El backend no devolvió un JSON válido. ' + `${responseText.slice(0, 200)}`)
-      }
-
-      if (!Array.isArray(data)) {
-        throw new Error('La respuesta del backend no contiene una lista de eventos.')
-      }
-
-      setEvents((data as ApiEvent[]).map(mapApiEvent))
+      const data = await eventosApi.listEvents()
+      setEvents(data.map(mapApiEvent))
     } catch (error) {
       console.error('Error cargando eventos:', error)
       setEvents([])
@@ -259,28 +206,7 @@ export function Events() {
     if (!deleteEventId) return
 
     try {
-      const response = await fetch(
-        `${API_BASE}/eventos/${deleteEventId}`,
-        {
-          method: 'DELETE',
-        }
-      )
-
-      const responseText = await response.text()
-
-      let result: { success?: boolean; error?: string } | null = null
-
-      if (responseText) {
-        try {
-          result = JSON.parse(responseText)
-        } catch {
-          result = null
-        }
-      }
-
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.error || responseText || 'No se pudo eliminar el evento.')
-      }
+      await eventosApi.deleteEvent(deleteEventId)
 
       showSuccess('Evento eliminado correctamente')
       setDeleteEventId(null)
@@ -448,7 +374,7 @@ export function Events() {
                       <TableActions
                         onView={() => setViewEventId(currentEvent.id)}
                         onEdit={
-                          currentEvent.status !== 'finalized'
+                          isEventEditable(currentEvent.status)
                             ? () => {
                               setViewEventId(null)
                               setFormDialog({
@@ -730,7 +656,7 @@ export function Events() {
         open={Boolean(viewEventId && viewEvent)}
         onClose={() => setViewEventId(null)}
         onEdit={() => {
-          if (!viewEvent || viewEvent.status === 'finalized') return
+          if (!viewEvent || !isEventEditable(viewEvent.status)) return
 
           setViewEventId(null)
           setFormDialog({ mode: 'edit', eventId: viewEvent.id })

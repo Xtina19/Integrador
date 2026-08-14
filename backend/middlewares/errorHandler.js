@@ -52,9 +52,30 @@ function buildEnvelope(req, { code, message, developerMessage, details, httpStat
   }
 }
 
+function isPayloadTooLarge(err) {
+  return (
+    err?.type === 'entity.too.large' ||
+    err?.status === 413 ||
+    err?.statusCode === 413 ||
+    err?.code === 'LIMIT_FILE_SIZE' ||
+    /entity too large/i.test(String(err?.message || ''))
+  )
+}
+
 function errorHandler(err, req, res, next) {
   if (res.headersSent) {
     return next(err)
+  }
+
+  if (isPayloadTooLarge(err)) {
+    return res.status(413).json(
+      buildEnvelope(req, {
+        code: 'PAYLOAD_TOO_LARGE',
+        message: 'El PDF o imagen es demasiado grande. Use un archivo de hasta 25 MB.',
+        developerMessage: err?.message || 'request entity too large',
+        httpStatus: 413,
+      })
+    )
   }
 
   if (err instanceof AppError) {

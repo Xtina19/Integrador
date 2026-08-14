@@ -259,6 +259,13 @@ export function validateRevertirAplicacionesNotaCreditoBody(body: unknown) {
   }
 }
 
+export function validateUtilizarNotaCreditoBody(body: unknown) {
+  const b = asRecord(body)
+  return {
+    expectedVersion: optionalNumber(b.expectedVersion, 'expectedVersion'),
+  }
+}
+
 export function validateAnularVentaBody(body: unknown) {
   const b = asRecord(body)
   return {

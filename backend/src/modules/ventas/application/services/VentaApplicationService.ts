@@ -22,6 +22,7 @@ import type {
   RegistrarCambioCommand,
   ReimprimirVentaCommand,
   RevertirAplicacionesNotaCreditoCommand,
+  UtilizarNotaCreditoCommand,
 } from '../commands/VentaCommands'
 import type {
   GetHistorialVentaQuery,
@@ -429,6 +430,24 @@ export class VentaApplicationService {
       if (!venta.ok) return venta
       const v = venta.value
       v.revertirAplicacionesNotaCredito({
+        notaCreditoId: cmd.notaCreditoId,
+        historialId: this.deps.ids.generate(),
+        usuarioId: cmd.usuarioId,
+      })
+      await this.deps.ventas.save(v)
+      v.pullEvents()
+      return ok(v.toProps())
+    } catch (error) {
+      return mapDomainError(error)
+    }
+  }
+
+  async utilizarNotaCredito(cmd: UtilizarNotaCreditoCommand): Promise<ApplicationResult<VentaDto>> {
+    try {
+      const venta = await this.requireVenta(cmd.ventaId, cmd.expectedVersion)
+      if (!venta.ok) return venta
+      const v = venta.value
+      v.utilizarNotaCredito({
         notaCreditoId: cmd.notaCreditoId,
         historialId: this.deps.ids.generate(),
         usuarioId: cmd.usuarioId,

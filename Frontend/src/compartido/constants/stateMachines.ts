@@ -27,10 +27,11 @@ const importTransitions: Record<ImportStatus, ImportStatus[]> = {
 }
 
 const eventTransitions: Record<EventStatus, EventStatus[]> = {
-  scheduled: ['staff_assigned'],
-  staff_assigned: ['in_progress'],
-  in_progress: ['finalized'],
+  scheduled: ['staff_assigned', 'in_progress', 'cancelled'],
+  staff_assigned: ['in_progress', 'cancelled'],
+  in_progress: ['finalized', 'cancelled'],
   finalized: [],
+  cancelled: [],
 }
 
 export function canTransitionPurchase(from: PurchaseStatus, to: PurchaseStatus): boolean {
@@ -80,4 +81,5 @@ export const eventStatusLabels: Record<EventStatus, string> = {
   staff_assigned: 'Personal Asignado',
   in_progress: 'En Curso',
   finalized: 'Finalizado',
+  cancelled: 'Cancelado',
 }

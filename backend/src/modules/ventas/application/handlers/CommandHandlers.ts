@@ -7,6 +7,7 @@ import type {
   RegistrarCambioCommand,
   ReimprimirVentaCommand,
   RevertirAplicacionesNotaCreditoCommand,
+  UtilizarNotaCreditoCommand,
 } from '../commands/VentaCommands'
 import type { ApplicationResult } from '../results/ApplicationResult'
 import type { VentaDto } from '../dto/VentaDtos'
@@ -46,6 +47,13 @@ export class RevertirAplicacionesNotaCreditoHandler {
   constructor(private readonly service: VentaApplicationService) {}
   execute(command: RevertirAplicacionesNotaCreditoCommand): Promise<ApplicationResult<VentaDto>> {
     return this.service.revertirAplicacionesNotaCredito(command)
+  }
+}
+
+export class UtilizarNotaCreditoHandler {
+  constructor(private readonly service: VentaApplicationService) {}
+  execute(command: UtilizarNotaCreditoCommand): Promise<ApplicationResult<VentaDto>> {
+    return this.service.utilizarNotaCredito(command)
   }
 }
 

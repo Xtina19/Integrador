@@ -84,7 +84,7 @@ export function mapTipoCompraToUi(tipo: string): PurchaseType {
 
 export function mapRecepcionEstadoToUi(estado: string): Reception['status'] {
   const e = String(estado || '').toLowerCase()
-  if (e === 'confirmada' || e === 'recibido') return 'complete'
+  if (e === 'confirmada' || e === 'recibido' || e === 'parcial') return 'complete'
   return 'pending'
 }
 
@@ -132,7 +132,7 @@ export function recepcionToUi(
   purchaseType: PurchaseType = 'national'
 ): Reception {
   const detalles = dto.detalles ?? []
-  const items = detalles.reduce((s, d) => s + Number(d.cantidadRecibida || 0), 0)
+  const itemsFromDetalles = detalles.reduce((s, d) => s + Number(d.cantidadRecibida || 0), 0)
   return {
     id: dto.codigo,
     dbId: dto.id,
@@ -140,7 +140,7 @@ export function recepcionToUi(
     orderDbId: dto.ordenCompraId,
     supplier: supplierName,
     date: String(dto.fechaRecepcion).slice(0, 10),
-    items: items || detalles.length,
+    items: itemsFromDetalles || Number(dto.itemsRecibidos || 0) || detalles.length,
     status: mapRecepcionEstadoToUi(dto.estado),
     purchaseType,
   }
@@ -152,6 +152,7 @@ export function facturaToSupplierInvoice(
   supplierName: string,
   monedas: MonedaCatalog[] = []
 ): SupplierInvoice {
+  const purchaseType = dto.tipoCompra === 'internacional' ? 'international' : 'national'
   return {
     id: dto.codigo,
     dbId: dto.id,
@@ -163,7 +164,13 @@ export function facturaToSupplierInvoice(
     ncf: dto.ncf ?? undefined,
     status: mapPagoEstadoToUi(dto.estadoPago),
     currency: monedaCode(dto.monedaId, monedas),
+    purchaseType,
     documentEstado: dto.estado,
     estadoPago: dto.estadoPago,
+    cuentaPagarId: dto.cuentaPagarId ?? undefined,
+    montoPagado: dto.montoPagado,
+    montoPendiente: dto.montoPendiente,
+    estadoCxp: dto.estadoCxp ?? undefined,
+    fechaVencimiento: dto.fechaVencimiento ? String(dto.fechaVencimiento).slice(0, 10) : undefined,
   }
 }

@@ -37,7 +37,6 @@ export function validatePurchaseOrder(lines: PurchaseOrderLine[], supplier: stri
     !lines.length ? 'No se puede guardar una orden sin productos.' : null,
     lines.some((l) => !trim(l.product)) ? 'Cada línea debe tener un producto seleccionado.' : null,
     lines.some((l) => l.qty <= 0) ? 'Cada línea debe tener cantidad mayor a cero.' : null,
-    lines.some((l) => l.unitCost < 0) ? 'No se permiten costos unitarios negativos.' : null
   )
   return toValidationResult(errors)
 }
@@ -138,20 +137,27 @@ export interface ShipmentFormInput {
 export function validateShipmentForm(
   input: ShipmentFormInput,
   existingCodes: string[],
-  excludeCode?: string
+  excludeCode?: string,
+  options?: { autoCode?: boolean }
 ): ValidationResult {
-  const base = validateShipment(input.supplier, input.code)
+  const codeErrors = options?.autoCode
+    ? []
+    : collectErrors(
+        validateCode(input.code, 'Código de embarque'),
+        validateUnique(input.code, existingCodes, 'código de embarque', excludeCode)
+      )
   const errors = collectErrors(
+    ...codeErrors,
+    requireSelect(input.supplier, 'un proveedor'),
     input.invoiceId !== undefined ? requireSelect(input.invoiceId, 'una factura internacional') : null,
     requireText(input.origin, 'Origen', 2, 120),
     requireText(input.destination, 'Destino', 2, 120),
     validateDate(input.departure, 'Fecha de salida'),
     validateDate(input.arrival, 'Fecha estimada de llegada'),
     validateDateOrder(input.departure, input.arrival),
-    validatePositiveInt(input.boxes, 'Cantidad de cajas'),
-    validateUnique(input.code, existingCodes, 'código de embarque', excludeCode)
+    validatePositiveInt(input.boxes, 'Cantidad de cajas')
   )
-  return toValidationResult([...new Set([...errors, ...base.errors])])
+  return toValidationResult(errors)
 }
 
 export function validateTransferFinalize(status: string): ValidationResult {
@@ -302,14 +308,12 @@ export function validateInternationalInvoiceUpdate(input: InternationalInvoiceUp
 }
 
 export interface ConsolidationUpdateInput {
-  name: string
   status: string
   notes?: string
 }
 
 export function validateConsolidationUpdate(input: ConsolidationUpdateInput): ValidationResult {
   const errors = collectErrors(
-    requireText(input.name, 'Nombre'),
     requireSelect(input.status, 'un estado'),
     input.notes ? validateDescription(input.notes) : null
   )

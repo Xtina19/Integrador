@@ -8,7 +8,7 @@ import {
 
 export { nextNumeroFacturaProveedor } from '@/modules/compras/services/comprasScriptdb'
 
-/** OC nacional con recepción confirmada y sin factura activa registrada. */
+/** OC con recepción confirmada (nacional) u orden aprobada (internacional), sin factura activa. */
 export function ordersEligibleForFactura(
   orders: PurchaseOrder[],
   receptions: Reception[],
@@ -18,20 +18,22 @@ export function ordersEligibleForFactura(
     invoices.filter((i) => !isFacturaAnulada(i)).map((i) => i.orderId)
   )
   const receivedOrderCodes = new Set(
-    receptions
-      .filter((r) => r.status === 'complete' && r.purchaseType !== 'international')
-      .map((r) => r.orderId)
+    receptions.filter((r) => r.status === 'complete').map((r) => r.orderId)
+  )
+  const approvedOrderCodes = new Set(
+    orders.filter((o) => o.status === 'approved' || o.status === 'received').map((o) => o.id)
   )
 
-  return orders.filter(
-    (o) =>
-      o.purchaseType !== 'international' &&
-      receivedOrderCodes.has(o.id) &&
-      !invoicedOrderCodes.has(o.id)
-  )
+  return orders.filter((o) => {
+    if (invoicedOrderCodes.has(o.id)) return false
+    if (o.purchaseType === 'international') {
+      return approvedOrderCodes.has(o.id)
+    }
+    return receivedOrderCodes.has(o.id)
+  })
 }
 
-/** Alta local alineada a FacturaProveedores + CuentasPorPagar (scriptdb). */
+/** Alta local alineada a FacturaProveedores + CuentasPorPagar (scriptdb). Monto se define al pagar. */
 export function registerLocalSupplierInvoice(
   order: PurchaseOrder,
   input: {
@@ -62,12 +64,12 @@ export function registerLocalSupplierInvoice(
     supplier: order.supplier,
     orderId: order.id,
     date: input.fechaEmision,
-    amount: order.total,
+    amount: 0,
     status: 'pending',
     currency: order.currency || 'DOP',
+    purchaseType: order.purchaseType,
     numeroFactura: codigo,
     ncf: input.ncf?.trim() || undefined,
-    /** FacturaProveedores.estado — public/scriptdb */
     documentEstado: 'Pendiente',
     estadoPago: 'Pendiente',
     fechaVencimiento: vencimiento,
@@ -101,9 +103,9 @@ export function buildRegistrarFacturaBody(
       productoId: d.productoId,
       detalleOrdenCompraId: d.id,
       cantidad: Number(d.cantidadSolicitada),
-      costoUnitario: Number(d.costoUnitario),
-      descuento: Number(d.descuento ?? 0),
-      impuesto: Number(d.impuesto ?? 0),
+      costoUnitario: 0,
+      descuento: 0,
+      impuesto: 0,
     })),
   }
 }

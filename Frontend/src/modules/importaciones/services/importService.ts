@@ -13,12 +13,16 @@ import { validateShipmentForm, validateInternationalInvoiceUpdate, validateConso
 import { trim } from '@/utils/formValidation'
 import { computeShipmentCostsTotal, hasShipmentCosts } from '@/business-rules/shipmentCosts'
 import { createActivity, createNotification } from '@/services/activityService'
-import { nextId } from '@/utils/idGenerator'
+import {
+  allocateFreightPerUnit,
+  BOOK_COSTING_MARGIN_PERCENT,
+  computeBookCostingSalePrice,
+} from '@/modules/importaciones/business-rules/bookCosting'
+import { nextId, nextEmbarqueCode } from '@/utils/idGenerator'
 import { nowFormatted } from '@/utils/timeUtils'
 import { formatDop } from '@/lib/money'
 
 export interface CreateShipmentInput {
-  code: string
   type: Shipment['type']
   origin: string
   destination: string
@@ -27,13 +31,14 @@ export interface CreateShipmentInput {
   boxes: number
   supplier: string
   invoiceId: string
+  /** Id OrdenCompra en BD (API importaciones). */
+  ordenCompraId?: number
   costs: ShipmentCosts
   notes?: string
 }
 
 export interface UpdateShipmentInput {
   shipmentId: string
-  code: string
   type: Shipment['type']
   origin: string
   destination: string
@@ -55,7 +60,6 @@ export interface UpdateInternationalInvoiceInput {
 
 export interface UpdateConsolidationInput {
   consolidationId: string
-  name: string
   status: Consolidation['status']
   notes?: string
 }
@@ -68,69 +72,108 @@ function findOrder(state: ERPState, orderId: string) {
   return state.purchaseOrders.find((o) => o.id === orderId)
 }
 
-function buildBookCosting(order: PurchaseOrder, shipmentId: string, freightTotal: number): BookCostingEntry[] {
+export interface ProductoCosteoRef {
+  id: string
+  isbn: string
+  title: string
+  cost: number
+}
+
+function parseNumericProductoId(id: string | number | undefined): number | null {
+  if (id == null || id === '') return null
+  const n = typeof id === 'number' ? id : Number(String(id).trim())
+  return Number.isInteger(n) && n > 0 ? n : null
+}
+
+function normalizeIsbn(isbn: string | undefined): string {
+  return (isbn ?? '').replace(/[-\s]/g, '').trim()
+}
+
+function resolveProductoForCosteo(
+  entry: BookCostingEntry,
+  catalog: ProductoCosteoRef[],
+): { productoId: number; previousCost: number } | null {
+  const fromEntry = parseNumericProductoId(entry.productId)
+  if (fromEntry) {
+    const p = catalog.find((c) => parseNumericProductoId(c.id) === fromEntry)
+    return { productoId: fromEntry, previousCost: p?.cost ?? entry.previousCost ?? 0 }
+  }
+  const normIsbn = normalizeIsbn(entry.isbn)
+  const normTitle = entry.title?.trim().toLowerCase()
+  const match =
+    (normIsbn ? catalog.find((p) => normalizeIsbn(p.isbn) === normIsbn) : undefined) ??
+    (normTitle ? catalog.find((p) => p.title.trim().toLowerCase() === normTitle) : undefined)
+  if (!match) return null
+  const productoId = parseNumericProductoId(match.id)
+  if (!productoId) return null
+  return { productoId, previousCost: match.cost ?? 0 }
+}
+
+function buildBookCosting(
+  order: PurchaseOrder,
+  shipmentId: string,
+  freightTotal: number,
+  previous: BookCostingEntry[] = [],
+): BookCostingEntry[] {
   if (!order.lines?.length) return []
-  const subtotal = order.lines.reduce((s, l) => s + l.qty * l.unitCost, 0)
-  return order.lines.map((line) => {
-    const lineShare = subtotal > 0 ? (line.qty * line.unitCost) / subtotal : 0
-    const freightAlloc = Number(((freightTotal * lineShare) / Math.max(line.qty, 1)).toFixed(2))
-    const productCost = line.unitCost
+  const freightPerUnit = allocateFreightPerUnit(order.lines, freightTotal)
+
+  return order.lines.map((line, idx) => {
+    const freightAlloc = freightPerUnit[idx] ?? 0
+    const productCost = Number(line.unitCost ?? 0)
+    const finalCost = Number((productCost + freightAlloc).toFixed(2))
+    const productId = line.productoId != null ? String(line.productoId) : undefined
+    const prev = previous.find(
+      (p) => (productId && p.productId === productId) || p.title === line.product,
+    )
+    const marginPercent = prev?.marginPercent ?? BOOK_COSTING_MARGIN_PERCENT
+    const salePrice = computeBookCostingSalePrice(finalCost, marginPercent)
+
     return {
-      isbn: '',
+      isbn: prev?.isbn ?? '',
       title: line.product,
+      productId,
       orderId: order.id,
       shipmentId,
       productCost,
       freightAlloc,
-      finalCost: Number((productCost + freightAlloc).toFixed(2)),
+      finalCost,
+      salePrice,
+      marginPercent,
     }
   })
 }
 
-function findOrCreateConsolidation(
-  state: ERPState,
-  invoice: InternationalInvoice,
-  shipment: Shipment
-): Consolidation | null {
-  const existing = state.consolidations.find(
-    (c) =>
-      c.status === 'active' &&
-      c.invoiceIds.some((id) => {
-        const inv = state.internationalInvoices.find((f) => f.id === id)
-        return inv?.supplier === invoice.supplier
-      })
-  )
-  if (existing) {
-    return {
-      ...existing,
-      orderIds: existing.orderIds.includes(invoice.orderId)
-        ? existing.orderIds
-        : [...existing.orderIds, invoice.orderId],
-      shipmentIds: existing.shipmentIds.includes(shipment.id)
-        ? existing.shipmentIds
-        : [...existing.shipmentIds, shipment.id],
-      invoiceIds: existing.invoiceIds.includes(invoice.id)
-        ? existing.invoiceIds
-        : [...existing.invoiceIds, invoice.id],
-      totalBoxes: existing.totalBoxes + shipment.boxes,
-    }
-  }
+function createConsolidationForShipment(state: ERPState, shipment: Shipment): Consolidation {
+  const existing = state.consolidations.find((c) => c.shipmentId === shipment.id)
+  if (existing) return existing
+
+  const codeSuffix = shipment.code.replace(/^EMB-?/i, '')
   return {
     id: nextId('CON'),
-    name: `Consolidación ${invoice.supplier} ${nowFormatted().slice(0, 7)}`,
-    orderIds: [invoice.orderId],
-    shipmentIds: [shipment.id],
-    invoiceIds: [invoice.id],
-    totalBoxes: shipment.boxes,
-    status: 'active',
+    code: `CONS-${codeSuffix}`,
+    shipmentId: shipment.id,
+    warehouseName: 'Almacén Central',
+    date: shipment.arrival,
+    totalBultos: shipment.boxes,
+    status: 'pending',
+    notes: '',
   }
+}
+
+function consolidationStatusForShipment(status: Shipment['status']): Consolidation['status'] | undefined {
+  if (status === 'received' || status === 'costed') return 'processed'
+  if (status === 'finalized') return 'closed'
+  return undefined
 }
 
 export const importService = {
   registerShipment(state: ERPState, input: CreateShipmentInput) {
+    const existingCodes = state.shipments.map((s) => s.code)
+    const code = nextEmbarqueCode(existingCodes)
     const validation = validateShipmentForm(
       {
-        code: input.code,
+        code,
         supplier: input.supplier,
         origin: input.origin,
         destination: input.destination,
@@ -139,7 +182,9 @@ export const importService = {
         boxes: input.boxes,
         invoiceId: input.invoiceId,
       },
-      state.shipments.map((s) => s.code)
+      existingCodes,
+      undefined,
+      { autoCode: true }
     )
     if (!validation.valid) return { success: false as const, errors: validation.errors }
 
@@ -166,7 +211,7 @@ export const importService = {
 
     const shipment: Shipment = {
       id: nextId('EMB'),
-      code: trim(input.code),
+      code,
       type: input.type,
       origin: trim(input.origin),
       destination: trim(input.destination),
@@ -232,17 +277,23 @@ export const importService = {
       updatedInvoice = { ...invoice }
 
       if (next === 'customs') {
-        const created = findOrCreateConsolidation(state, invoice, shipment)
-        if (created) {
-          const isNew = !state.consolidations.some((c) => c.id === created.id)
-          if (isNew) consolidation = created
-          else consolidationUpdate = created
-          updatedInvoice = {
-            ...updatedInvoice,
-            consolidationId: created.id,
-            stage: 'consolidation',
-          }
-          shipment.consolidationId = created.id
+        const created = createConsolidationForShipment(state, shipment)
+        const isNew = !state.consolidations.some((c) => c.id === created.id)
+        if (isNew) consolidation = created
+        else consolidationUpdate = created
+        updatedInvoice = {
+          ...updatedInvoice,
+          consolidationId: created.id,
+          stage: 'consolidation',
+        }
+        shipment.consolidationId = created.id
+      }
+
+      const consolidationStatus = consolidationStatusForShipment(next)
+      if (consolidationStatus && shipment.consolidationId) {
+        const current = state.consolidations.find((c) => c.id === shipment.consolidationId)
+        if (current) {
+          consolidationUpdate = { ...current, status: consolidationStatus }
         }
       }
 
@@ -344,7 +395,7 @@ export const importService = {
 
     const validation = validateShipmentForm(
       {
-        code: input.code,
+        code: shipment.code,
         supplier: shipment.supplier ?? '',
         origin: input.origin,
         destination: input.destination,
@@ -353,7 +404,8 @@ export const importService = {
         boxes: input.boxes,
       },
       state.shipments.map((s) => s.code),
-      shipment.code
+      shipment.code,
+      { autoCode: true }
     )
     if (!validation.valid) return { success: false as const, errors: validation.errors }
 
@@ -363,7 +415,6 @@ export const importService = {
 
     const updated: Shipment = {
       ...shipment,
-      code: trim(input.code),
       type: input.type,
       origin: trim(input.origin),
       destination: trim(input.destination),
@@ -376,7 +427,7 @@ export const importService = {
 
     const updatedInvoices = shipment.invoiceId
       ? state.internationalInvoices.map((f) =>
-          f.id === shipment.invoiceId ? { ...f, shipmentCode: input.code } : f
+          f.id === shipment.invoiceId ? { ...f, shipmentCode: shipment.code } : f
         )
       : undefined
 
@@ -384,7 +435,7 @@ export const importService = {
       success: true as const,
       shipment: updated,
       updatedInvoices,
-      activity: createActivity(`Embarque ${input.code} actualizado.`, 'Importaciones'),
+      activity: createActivity(`Embarque ${shipment.code} actualizado.`, 'Importaciones'),
     }
   },
 
@@ -421,7 +472,6 @@ export const importService = {
     if (!consolidation) return { success: false as const, errors: ['Consolidación no encontrada.'] }
 
     const validation = validateConsolidationUpdate({
-      name: input.name,
       status: input.status,
       notes: input.notes,
     })
@@ -429,7 +479,6 @@ export const importService = {
 
     const updated: Consolidation = {
       ...consolidation,
-      name: trim(input.name),
       status: input.status,
       notes: input.notes,
     }
@@ -477,7 +526,100 @@ export const importService = {
     return {
       success: true as const,
       consolidationId,
-      activity: createActivity(`Consolidación ${consolidationId} eliminada.`, 'Importaciones'),
+      shipmentId: consolidation.shipmentId,
+      activity: createActivity(`Consolidación ${consolidation.code} eliminada.`, 'Importaciones'),
     }
   },
+
+  applyBookCostingToInventory(state: ERPState, shipmentId: string, productCatalog: ProductoCosteoRef[]) {
+    const shipment = state.shipments.find((s) => s.id === shipmentId)
+    if (!shipment) return { success: false as const, errors: ['Embarque no encontrado.'] }
+
+    const pending = state.bookCosting.filter((b) => b.shipmentId === shipmentId && !b.appliedToInventory)
+    if (!pending.length) {
+      return { success: false as const, errors: ['No hay líneas de costeo pendientes para este embarque.'] }
+    }
+
+    const productUpdates: {
+      productoId: number
+      isbn: string
+      title: string
+      newCost: number
+      newPrice: number
+      marginPercent: number
+      costType: string
+      notes: string
+      documentoRef: string
+    }[] = []
+    const unresolved: string[] = []
+
+    const bookCosting = state.bookCosting.map((entry) => {
+      if (entry.shipmentId !== shipmentId || entry.appliedToInventory) return entry
+      const resolved = resolveProductoForCosteo(entry, productCatalog)
+      if (!resolved) {
+        unresolved.push(entry.title || entry.isbn || 'Producto sin nombre')
+        return entry
+      }
+      productUpdates.push({
+        productoId: resolved.productoId,
+        isbn: entry.isbn,
+        title: entry.title,
+        newCost: entry.finalCost,
+        newPrice: entry.salePrice,
+        marginPercent: entry.marginPercent,
+        costType: 'importacion',
+        notes: `Costeo importación ${shipment.code} — margen ${entry.marginPercent}%`,
+        documentoRef: shipment.code,
+      })
+      return {
+        ...entry,
+        productId: String(resolved.productoId),
+        previousCost: resolved.previousCost,
+        appliedToInventory: true,
+        appliedAt: nowFormatted(),
+      }
+    })
+
+    if (unresolved.length) {
+      return {
+        success: false as const,
+        errors: [
+          `No se encontró producto en catálogo para: ${unresolved.join(', ')}. Regístrelo en Administración → Productos.`,
+        ],
+      }
+    }
+
+    if (!productUpdates.length) {
+      return {
+        success: false as const,
+        errors: ['No se encontraron productos en inventario para aplicar el costeo.'],
+      }
+    }
+
+    return {
+      success: true as const,
+      bookCosting,
+      productUpdates,
+      activity: createActivity(
+        `Costeo del embarque ${shipment.code} aplicado a ${productUpdates.length} producto(s).`,
+        'Importaciones',
+      ),
+      notification: createNotification(
+        'success',
+        'Costeo aplicado',
+        `${productUpdates.length} producto(s) actualizados`,
+        'Inventario',
+      ),
+    }
+  },
+}
+
+/** Costeo por libro tras embarque costeado (API o local). */
+export function computeBookCostingForShipment(state: ERPState, shipment: Shipment): BookCostingEntry[] {
+  if (!shipment.orderId || !hasShipmentCosts(shipment.costs)) return []
+  const order = findOrder(state, shipment.orderId)
+  if (!order?.lines?.length) return []
+  const freightTotal = computeShipmentCostsTotal(shipment.costs!)
+  const previous = state.bookCosting.filter((b) => b.shipmentId === shipment.id)
+  return buildBookCosting(order, shipment.id, freightTotal, previous)
 }

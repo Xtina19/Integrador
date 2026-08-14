@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { PackageCheck, Receipt } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { PackageCheck, Receipt, Wallet } from 'lucide-react'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Table } from '@/components/ui/Table'
@@ -17,8 +18,9 @@ import { receptionStatusMap } from '@/modules/compras/constants/comprasUi'
 import { ordersEligibleForFactura } from '@/modules/compras/services/facturaProveedorUi'
 
 export function RecepcionesPage() {
-  const { state, completeReception, deleteReception } = useERP()
+  const { state, completeReception, deleteReception, refreshCompras } = useERP()
   const { showSuccess, showError } = useToast()
+  const navigate = useNavigate()
   const receptions = state.receptions
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -34,12 +36,18 @@ export function RecepcionesPage() {
     )
   }, [state.purchaseOrders, state.receptions, state.supplierInvoices])
 
+  const invoicedOrderIds = useMemo(
+    () =>
+      new Set(
+        state.supplierInvoices
+          .filter((i) => String(i.documentEstado ?? '').toLowerCase() !== 'anulada')
+          .map((i) => i.orderId),
+      ),
+    [state.supplierInvoices],
+  )
+
   function canRegisterFactura(reception: Reception): boolean {
-    return (
-      reception.status === 'complete' &&
-      reception.purchaseType !== 'international' &&
-      eligibleOrderIds.has(reception.orderId)
-    )
+    return reception.status === 'complete' && eligibleOrderIds.has(reception.orderId)
   }
 
   const selectedReception = dialog ? receptions.find((r) => r.id === dialog.receptionId) ?? null : null
@@ -57,12 +65,16 @@ export function RecepcionesPage() {
   }, [search, statusFilter, receptions])
 
   async function handleComplete(receptionId: string) {
+    const reception = receptions.find((r) => r.id === receptionId)
     const result = await completeReception(receptionId)
     if (!result.success) {
       showError(result.errors?.join(' ') ?? 'No se pudo completar la recepción.')
       return
     }
-    showSuccess('Recepción confirmada. Puede registrar la factura del proveedor.')
+    showSuccess('Recepción confirmada. El stock se actualizó en inventario.')
+    if (reception && reception.purchaseType !== 'international') {
+      setRegisterForOrderId(reception.orderId)
+    }
   }
 
   async function handleDelete() {
@@ -161,6 +173,16 @@ export function RecepcionesPage() {
                         Facturar
                       </Button>
                     )}
+                    {r.status === 'complete' && invoicedOrderIds.has(r.orderId) && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={Wallet}
+                        onClick={() => navigate('/compras/cuentas-por-pagar')}
+                      >
+                        Ver CxP
+                      </Button>
+                    )}
                     <TableActions
                       onView={() => setDialog({ receptionId: r.id, mode: 'view' })}
                       onEdit={r.status === 'pending' ? () => setDialog({ receptionId: r.id, mode: 'edit' }) : undefined}
@@ -193,7 +215,10 @@ export function RecepcionesPage() {
         open={registerForOrderId != null}
         preselectedOrderId={registerForOrderId}
         onClose={() => setRegisterForOrderId(undefined)}
-        onRegistered={() => setRegisterForOrderId(undefined)}
+        onRegistered={async () => {
+          setRegisterForOrderId(undefined)
+          await refreshCompras()
+        }}
       />
     </div>
   )

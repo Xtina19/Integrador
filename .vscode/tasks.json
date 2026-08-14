@@ -2,19 +2,32 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "frontend: dev",
+      "label": "LibroSys: backend + frontend",
       "type": "shell",
       "command": "npm run dev",
-      "options": { "cwd": "${workspaceFolder}/frontend" },
-      "group": "build",
-      "presentation": { "reveal": "always", "panel": "new" }
-    },
-    {
-      "label": "frontend: build",
-      "type": "shell",
-      "command": "npm run build",
-      "options": { "cwd": "${workspaceFolder}/frontend" },
-      "group": "build"
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": false
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "librosys",
+        "pattern": { "regexp": "^$" },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "(Servidor corriendo|Local:\\s+http://localhost:5173)"
+        }
+      }
     },
     {
       "label": "backend: start",
@@ -23,6 +36,13 @@
       "options": { "cwd": "${workspaceFolder}/backend" },
       "group": "build",
       "presentation": { "reveal": "always", "panel": "new" }
+    },
+    {
+      "label": "frontend: build",
+      "type": "shell",
+      "command": "npm run build",
+      "options": { "cwd": "${workspaceFolder}/Frontend" },
+      "group": "build"
     }
   ]
 }

@@ -16,6 +16,23 @@ export function nextId(prefix: string, year = 2026): string {
   return `${prefix}-${year}-${num}`
 }
 
+/** Código secuencial PREFIX-NNN según valores existentes (scriptdb: EMB-001, FP-001, …). */
+export function nextSequentialCode(prefix: string, existingValues: string[], pad = 3): string {
+  const base = `${prefix}-`
+  let max = 0
+  for (const value of existingValues) {
+    if (!value?.startsWith(base)) continue
+    const n = Number.parseInt(value.slice(base.length), 10)
+    if (Number.isFinite(n) && n > max) max = n
+  }
+  return `${base}${String(max + 1).padStart(pad, '0')}`
+}
+
+/** Código embarque secuencial (Embarque.codigo_embarque en scriptdb). */
+export function nextEmbarqueCode(existingCodes: string[]): string {
+  return nextSequentialCode('EMB', existingCodes)
+}
+
 /** Código OC secuencial según órdenes existentes (nacional e internacional). */
 export function nextOrdenCompraCode(
   existingIds: string[],

@@ -10,12 +10,34 @@ interface ClientesCatalogContextValue {
   loading: boolean
   getById: (id: string) => Cliente | undefined
   buscarActivos: (texto: string) => Cliente[]
+  buscarTodos: (texto: string) => Cliente[]
   createCliente: (input: ClienteInput, opts?: { creadoPor?: string }) => Promise<Cliente>
   updateCliente: (id: string, input: Partial<ClienteInput>, opts?: { actualizadoPor?: string }) => Promise<void>
   refresh: () => Promise<void>
 }
 
 const ClientesCatalogContext = createContext<ClientesCatalogContextValue | null>(null)
+
+/** Resuelve id_persona desde código CLI000059, 059 o 59. */
+export function parseClienteIdFromQuery(texto: string): number | null {
+  const raw = String(texto || '').trim()
+  if (!raw) return null
+  const cliMatch = /^CLI0*(\d+)$/i.exec(raw)
+  if (cliMatch) {
+    const n = parseInt(cliMatch[1], 10)
+    return Number.isInteger(n) && n > 0 ? n : null
+  }
+  if (/^\d+$/.test(raw)) {
+    const n = parseInt(raw, 10)
+    return Number.isInteger(n) && n > 0 ? n : null
+  }
+  const digits = raw.replace(/\D/g, '')
+  if (digits && /^\d+$/.test(digits)) {
+    const n = parseInt(digits, 10)
+    return Number.isInteger(n) && n > 0 ? n : null
+  }
+  return null
+}
 
 function mapApiCliente(raw: Record<string, unknown>, actor = 'Sistema'): Cliente {
   const fechaAlta = raw.fechaAlta ? String(raw.fechaAlta).slice(0, 10) : new Date().toISOString().slice(0, 10)
@@ -82,21 +104,26 @@ export function ClientesCatalogProvider({ children }: { children: React.ReactNod
 
   const getById = useCallback((id: string) => clientes.find((c) => c.id === id), [clientes])
 
-  const buscarActivos = useCallback(
+  const buscarTodos = useCallback(
     (texto: string) => {
       const q = texto.trim().toLowerCase()
       if (!q) return []
-      return clientes.filter((c) => {
-        if (c.estado !== 'activo') return false
-        return (
+      const idNum = parseClienteIdFromQuery(texto)
+      return clientes.filter(
+        (c) =>
           c.nombre.toLowerCase().includes(q) ||
           c.codigo.toLowerCase().includes(q) ||
           c.documento.toLowerCase().includes(q) ||
-          c.institucion.toLowerCase().includes(q)
-        )
-      })
+          c.institucion.toLowerCase().includes(q) ||
+          (idNum != null && Number(c.id) === idNum),
+      )
     },
     [clientes],
+  )
+
+  const buscarActivos = useCallback(
+    (texto: string) => buscarTodos(texto).filter((c) => c.estado === 'activo'),
+    [buscarTodos],
   )
 
   const createCliente = useCallback(
@@ -133,8 +160,8 @@ export function ClientesCatalogProvider({ children }: { children: React.ReactNod
   )
 
   const value = useMemo(
-    () => ({ clientes, loading, getById, buscarActivos, createCliente, updateCliente, refresh }),
-    [clientes, loading, getById, buscarActivos, createCliente, updateCliente, refresh],
+    () => ({ clientes, loading, getById, buscarActivos, buscarTodos, createCliente, updateCliente, refresh }),
+    [clientes, loading, getById, buscarActivos, buscarTodos, createCliente, updateCliente, refresh],
   )
 
   return <ClientesCatalogContext.Provider value={value}>{children}</ClientesCatalogContext.Provider>

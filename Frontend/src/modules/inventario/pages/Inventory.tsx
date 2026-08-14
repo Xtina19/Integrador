@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/Button'
 import { InventoryDashboard } from '../components/InventoryDashboard'
 import { InventoryTabNav } from '../components/InventoryTabNav'
 import type {
-  AuditoriaInventarioVista,
   InventoryLegacyTabId,
   InventoryTabId,
   KardexLineaVista,
@@ -18,16 +17,14 @@ import type {
 import { GeneralTab } from '../tabs/GeneralTab'
 import { MovimientosTab } from '../tabs/MovimientosTab'
 import { KardexTab } from '../tabs/KardexTab'
-import { AuditoriaTab } from '../tabs/AuditoriaTab'
 import { movimientosApi } from '@/services/api/movimientosApi'
 import { kardexApi } from '@/services/api/kardexApi'
-import { auditoriaInventarioApi } from '@/services/api/auditoriaInventarioApi'
 import { inventarioQueryApi } from '@/services/api/inventarioQueryApi'
 import { MOVIMIENTO_CONTEXT } from '../utils/movimientosContext'
 import { TransferenciasTab } from '../tabs/TransferenciasTab'
 import { transferenciasApi } from '@/services/api/transferenciasApi'
 
-const VALID_TABS: InventoryTabId[] = ['general', 'movimientos', 'transferencias', 'kardex', 'auditoria']
+const VALID_TABS: InventoryTabId[] = ['general', 'movimientos', 'transferencias', 'kardex']
 
 const LEGACY_TAB_TO_FILTRO: Record<InventoryLegacyTabId, MovimientoFiltroId> = {
   conteos: 'conteos',
@@ -112,22 +109,6 @@ function mapApiKardexToVista(
   }
 }
 
-function mapApiAuditoriaToVista(
-  item: Awaited<ReturnType<typeof auditoriaInventarioApi.listar>>[number],
-): AuditoriaInventarioVista {
-  return {
-    id: item.id,
-    fecha: item.fecha,
-    usuario: item.usuario,
-    accion: item.accion,
-    documentoTipo: item.documentoTipo,
-    documentoId: item.documentoId,
-    ip: item.ip ?? '—',
-    resultado: item.resultado,
-    detalle: item.detalle,
-  }
-}
-
 function mapTransferenciaToVista(
   item: Awaited<
     ReturnType<
@@ -178,9 +159,6 @@ export function Inventory() {
 
   const [kardexLineas, setKardexLineas] =
     useState<KardexLineaVista[]>([])
-
-  const [auditoria, setAuditoria] =
-    useState<AuditoriaInventarioVista[]>([])
 
   const [kpis, setKpis] =
     useState<InventoryDashboardKpis>(
@@ -271,24 +249,6 @@ export function Inventory() {
     }
   }, [kardexProductoId])
 
-  const loadAuditoria = useCallback(async () => {
-    try {
-      const data =
-        await auditoriaInventarioApi.listar()
-
-      setAuditoria(
-        data.map(mapApiAuditoriaToVista),
-      )
-    } catch (err) {
-      console.error(
-        'Error cargando auditoría:',
-        err,
-      )
-
-      setAuditoria([])
-    }
-  }, [])
-
   useEffect(() => {
     void loadDashboard()
   }, [loadDashboard])
@@ -311,11 +271,6 @@ export function Inventory() {
 
     if (activeTab === 'kardex') {
       void loadKardex()
-      return
-    }
-
-    if (activeTab === 'auditoria') {
-      void loadAuditoria()
     }
   }, [
     activeTab,
@@ -323,11 +278,14 @@ export function Inventory() {
     loadMovimientos,
     loadTransferencias,
     loadKardex,
-    loadAuditoria,
   ])
 
   useEffect(() => {
     const rawTab = searchParams.get('tab')
+    if (rawTab === 'auditoria') {
+      navigate('/auditoria', { replace: true })
+      return
+    }
     if (isLegacyTab(rawTab)) {
       const next = new URLSearchParams(searchParams)
       next.set('tab', 'movimientos')
@@ -337,7 +295,7 @@ export function Inventory() {
     }
     setActiveTab(parseTab(rawTab))
     setMovimientoFiltro(parseFiltro(searchParams.get('filtro')))
-  }, [searchParams, setSearchParams])
+  }, [searchParams, setSearchParams, navigate])
 
   const changeTab = useCallback(
     (tab: InventoryTabId) => {
@@ -394,6 +352,10 @@ export function Inventory() {
         navigate(`/inventario/conteos/${id}`)
         return
       }
+      if (t.includes('recepcion') || t.includes('ordencompra')) {
+        navigate('/compras/recepciones')
+        return
+      }
       navigate(`/inventario/movimientos/${id}`)
     },
     [navigate]
@@ -415,20 +377,6 @@ export function Inventory() {
             Costeo
           </Button>
         </>
-      )
-    }
-    if (activeTab === 'transferencias') {
-      return (
-        <Button
-          icon={Plus}
-          onClick={() =>
-            navigate(
-              '/inventario/transferencias/nuevo',
-            )
-          }
-        >
-          Nueva transferencia
-        </Button>
       )
     }
     if (movimientoContext?.buttonLabel && movimientoContext.buttonPath) {
@@ -476,7 +424,6 @@ export function Inventory() {
           onClearProductoFilter={() => setKardexProductoId(null)}
         />
       )}
-      {activeTab === 'auditoria' && <AuditoriaTab registros={auditoria} onOpenDocumento={openDocumento} />}
     </div>
   )
 }

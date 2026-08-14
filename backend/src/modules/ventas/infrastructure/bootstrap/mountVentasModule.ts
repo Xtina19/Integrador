@@ -4,7 +4,12 @@
  */
 import type { Express, Request, Response, NextFunction } from 'express'
 import type { InventarioComposition } from '../../../inventario/infrastructure/composition/createInventarioComposition'
-import type { ProductoConsultaPort } from '../../application/ports/outbound'
+import type {
+  ClienteConsultaPort,
+  ProductoConsultaPort,
+  UsuarioPermisosPort,
+} from '../../application/ports/outbound'
+import type { SqlExecutor } from '../persistence/sql/SqlExecutor'
 import { createVentasComposition } from '../composition/createVentasComposition'
 import { createVentasRouter } from '../api/http/routes/ventasRoutes'
 import { sendHttpError } from '../api/http/errorHandler'
@@ -15,6 +20,10 @@ let mounted = false
 export interface MountVentasOptions {
   seedJoselito?: boolean
   productos?: ProductoConsultaPort
+  clientes?: ClienteConsultaPort
+  permisos?: UsuarioPermisosPort
+  sql?: SqlExecutor
+  sqlDialect?: 'mysql' | 'mssql'
 }
 
 export function mountVentasModule(
@@ -32,9 +41,13 @@ export function mountVentasModule(
 
   const composition = createVentasComposition({
     sequentialIds: false,
-    seedJoselito: options?.seedJoselito !== false,
+    seedJoselito: options?.seedJoselito === true,
     inventario,
     productos: options?.productos,
+    clientes: options?.clientes,
+    permisos: options?.permisos,
+    sql: options?.sql,
+    sqlDialect: options?.sqlDialect,
   })
 
   legacyApp.get('/api/v1/ventas/openapi.json', (_req, res) => {
@@ -66,8 +79,24 @@ export function mountVentasModule(
 
   legacyApp.use('/api/v1/ventas', createVentasRouter(composition))
 
-  legacyApp.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  legacyApp.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
     if (res.headersSent) return
+    const anyErr = err as { type?: string; status?: number; statusCode?: number; code?: string; message?: string }
+    if (
+      anyErr?.type === 'entity.too.large' ||
+      anyErr?.status === 413 ||
+      anyErr?.statusCode === 413 ||
+      anyErr?.code === 'LIMIT_FILE_SIZE' ||
+      /entity too large/i.test(String(anyErr?.message || ''))
+    ) {
+      return sendHttpError(
+        res,
+        413,
+        'PAYLOAD_TOO_LARGE',
+        'El PDF o imagen es demasiado grande. Use un archivo de hasta 25 MB.',
+      )
+    }
+    if (typeof next === 'function') return next(err)
     sendHttpError(
       res,
       500,

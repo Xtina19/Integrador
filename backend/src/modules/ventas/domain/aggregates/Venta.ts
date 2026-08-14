@@ -719,6 +719,28 @@ export class Venta {
     )
   }
 
+  /** Marca saldo restante como utilizado (cierre manual). No toca inventario. */
+  utilizarNotaCredito(input: {
+    notaCreditoId: string
+    historialId: string
+    usuarioId: string
+  }): void {
+    const nc = this._notasCredito.find((n) => n.id === input.notaCreditoId)
+    if (!nc) {
+      throw new VentasDomainError('INVALID_CREDIT_NOTE', 'Nota de crédito no encontrada en la factura.')
+    }
+    nc.marcarComoUtilizadaDesdeAgregado()
+    this._version += 1
+    this._historial.push(
+      HistorialVenta.crear({
+        id: input.historialId,
+        tipoEvento: 'aplicacion_nc',
+        usuarioId: input.usuarioId,
+        detalle: `NC ${input.notaCreditoId} marcada como utilizada`,
+      }),
+    )
+  }
+
   /** Anula NC sin aplicaciones. No toca inventario. */
   anularNotaCredito(input: {
     notaCreditoId: string

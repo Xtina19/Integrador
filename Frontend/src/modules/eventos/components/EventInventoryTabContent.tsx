@@ -3,11 +3,11 @@ import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input, Select } from '@/components/ui/Input'
 import { Table } from '@/components/ui/Table'
-import type { EventInventoryItem } from '@/modules/eventos/types/eventExtended'
 import { fetchArray } from '../utils/apiLists'
+import { apiConfig } from '@/config/api'
+import type { EventInventoryItem } from '@/modules/eventos/types/eventExtended'
 
-
-const API_BASE = 'http://localhost:3001/api'
+const API_BASE = `${apiConfig.baseUrl}/api`
 
 interface ProductoOption {
   id_producto: number
@@ -109,8 +109,14 @@ export function EventInventoryTabContent({ items, onChange, readOnly = false }: 
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h4 className="text-sm font-semibold text-gray-900">Inventario destinado al evento</h4>
-          <p className="text-xs text-gray-500 mt-0.5">Productos del catálogo que serán enviados al evento</p>
+          <h4 className="text-sm font-semibold text-gray-900">
+            {readOnly ? 'Inventario de la sucursal' : 'Inventario destinado al evento'}
+          </h4>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {readOnly
+              ? 'Stock actual en los almacenes de la sucursal del evento. El evento no reserva unidades propias.'
+              : 'Productos del catálogo que serán enviados al evento'}
+          </p>
         </div>
         {!readOnly && (
           <Button size="sm" icon={Plus} onClick={() => { resetForm(); setShowForm(true) }}>
@@ -180,7 +186,11 @@ export function EventInventoryTabContent({ items, onChange, readOnly = false }: 
         ]}
       />
       {items.length === 0 && (
-        <p className="text-sm text-gray-400 text-center py-6">No hay productos asignados al evento</p>
+        <p className="text-sm text-gray-400 text-center py-6">
+          {readOnly
+            ? 'No hay existencias en los almacenes de la sucursal del evento'
+            : 'No hay productos asignados al evento'}
+        </p>
       )}
     </div>
   )

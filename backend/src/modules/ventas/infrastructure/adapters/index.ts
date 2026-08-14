@@ -2,6 +2,8 @@ export { UuidIdGeneratorAdapter, SequentialIdGeneratorAdapter } from './IdGenera
 export { InMemoryClienteConsultaAdapter } from './ClienteConsultaAdapter'
 export { InMemoryProductoConsultaAdapter } from './ProductoConsultaAdapter'
 export { SqlServerProductoConsultaAdapter } from './SqlServerProductoConsultaAdapter'
+export { SqlServerClienteConsultaAdapter } from './SqlServerClienteConsultaAdapter'
+export { SqlServerUsuarioPermisosAdapter } from './SqlServerUsuarioPermisosAdapter'
 export { EngineInventarioConsultaAdapter } from './EngineInventarioConsultaAdapter'
 export { EngineInventarioEfectosAdapter } from './EngineInventarioEfectosAdapter'
 export { InMemoryUsuarioPermisosAdapter } from './UsuarioPermisosAdapter'

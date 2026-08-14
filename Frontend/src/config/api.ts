@@ -15,10 +15,10 @@ export const apiConfig = {
 /** Flags por módulo: cuando es false, el frontend sigue usando Mock Data. */
 export const dataSourceConfig = {
   inventario: envFlag('VITE_USE_API_INVENTARIO'),
-  ventas: envFlag('VITE_USE_API_VENTAS'),
+  ventas: envFlag('VITE_USE_API_VENTAS', true),
   compras: envFlag('VITE_USE_API_COMPRAS', true),
-  importaciones: envFlag('VITE_USE_API_IMPORTACIONES'),
-  eventos: envFlag('VITE_USE_API_EVENTOS'),
+  importaciones: envFlag('VITE_USE_API_IMPORTACIONES', true),
+  eventos: envFlag('VITE_USE_API_EVENTOS', true),
   editoriales: envFlag('VITE_USE_API_EDITORIALES'),
   usuarios: envFlag('VITE_USE_API_USUARIOS'),
   transferencias: envFlag('VITE_USE_API_TRANSFERENCIAS'),

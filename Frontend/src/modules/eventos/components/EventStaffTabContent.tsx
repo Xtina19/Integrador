@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/Button'
 import { Input, Select } from '@/components/ui/Input'
 import { Table } from '@/components/ui/Table'
 import { fetchArray } from '../utils/apiLists'
+import { apiConfig } from '@/config/api'
 import type { EventStaffMember } from '@/modules/eventos/types/eventExtended'
 
-const API_BASE = 'http://localhost:3001/api'
+const API_BASE = `${apiConfig.baseUrl}/api`
 
 const ROLES = ['Coordinador', 'Seguridad', 'Logística', 'Recepción']
 

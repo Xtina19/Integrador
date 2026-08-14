@@ -12,7 +12,8 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "quality:report": "node scripts/quality-report.mjs",
-    "quality": "npm run typecheck && npm run test && npm run quality:report"
+    "quality": "npm run typecheck && npm run test && npm run quality:report",
+    "seed:ventas": "node scripts/seedVentasScriptdb.js"
   },
   "keywords": [],
   "author": "",
@@ -22,6 +23,7 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "mssql": "^12.6.0",
+    "multer": "^2.2.0",
     "mysql2": "^3.23.0"
   },
   "devDependencies": {
