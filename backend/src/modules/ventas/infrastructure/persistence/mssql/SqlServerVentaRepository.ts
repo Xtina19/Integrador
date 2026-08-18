@@ -9,7 +9,7 @@ import type {
   NotaCreditoRecord,
   VentaRecord,
 } from '../models/VentaPersistenceModels'
-import { mysqlDateToIso } from '../mysql/MysqlVentaRowMapper'
+import { sqlDateToIso as mysqlDateToIso } from '../sql/sqlDateToIso'
 import { SqlServerCatalogBridge } from './SqlServerCatalogBridge'
 import {
   descuentoToCols,
@@ -17,6 +17,9 @@ import {
   toSqlDatetime,
   type FacturaVentaCabeceraRow,
 } from './SqlServerVentaRowMapper'
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { aplicarSalidaInventarioVentaSql } = require('../../../../../../lib/salidaInventario.js')
 
 const CABECERA_SELECT = `
   SELECT fv.*, m.codigo_iso
@@ -395,6 +398,26 @@ export class SqlServerVentaRepository implements VentaRepository {
     const idUsuario = bridge.requireId(record.usuarioEmisionId, 'usuario')
     const idPersona = bridge.parseId(record.clienteId)
     const idMoneda = await bridge.monedaId(record.moneda)
+    const idTipoFactura = bridge.parseId(record.tipoFacturaId)
+    let idEvento = bridge.parseId(record.eventoId)
+
+    if (idTipoFactura) {
+      const tipoRes = await tx.query<{ requiere_evento: boolean | number; codigo: string }>(
+        `SELECT requiere_evento, codigo FROM TipoFactura WHERE id_tipo_factura = ? AND estado = 'Activo'`,
+        [idTipoFactura],
+      )
+      if (!tipoRes.rows[0]) {
+        throw new Error('Tipo de factura inválido o inactivo.')
+      }
+      if (Boolean(tipoRes.rows[0].requiere_evento) && !idEvento) {
+        throw new Error('Debe seleccionar un evento para facturar con este tipo de factura.')
+      }
+      if (!Boolean(tipoRes.rows[0].requiere_evento)) {
+        idEvento = null
+      }
+    } else {
+      idEvento = null
+    }
 
     const existing = await tx.query<{ id_factura: number; version: number }>(
       `SELECT id_factura, version FROM FacturaVenta WHERE codigo_dominio = ?`,
@@ -413,6 +436,7 @@ export class SqlServerVentaRepository implements VentaRepository {
       await tx.query(
         `UPDATE FacturaVenta SET
           numero_factura = ?, estado = ?, tipo_venta = ?,
+          id_tipo_factura = ?, id_evento = ?,
           id_persona = ?, id_sucursal = ?, id_almacen = ?,
           id_usuario_emision = ?, id_moneda = ?, fecha_emision = ?,
           subtotal = ?, total_descuentos = ?, total = ?, version = ?,
@@ -423,6 +447,8 @@ export class SqlServerVentaRepository implements VentaRepository {
           record.numeroFactura,
           record.estado,
           record.tipoVenta,
+          idTipoFactura,
+          idEvento,
           idPersona,
           idSucursal,
           idAlmacen,
@@ -445,17 +471,20 @@ export class SqlServerVentaRepository implements VentaRepository {
       const ins = await tx.query<{ id_factura: number }>(
         `INSERT INTO FacturaVenta (
           codigo_dominio, numero_factura, estado, tipo_venta,
+          id_tipo_factura, id_evento,
           id_persona, id_sucursal, id_almacen, id_usuario_emision, id_moneda,
           fecha_emision, subtotal, total_descuentos, total, version,
           tiene_cambios, tiene_devoluciones, tiene_notas_credito, motivo_anulacion
         )
         OUTPUT INSERTED.id_factura
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           record.id,
           record.numeroFactura,
           record.estado,
           record.tipoVenta,
+          idTipoFactura,
+          idEvento,
           idPersona,
           idSucursal,
           idAlmacen,
@@ -476,6 +505,12 @@ export class SqlServerVentaRepository implements VentaRepository {
     }
 
     await this.insertChildren(tx, bridge, facturaPk, record)
+
+    // Puente Ventas → Inventario (public/scriptdb): descuenta stock SQL al emitir.
+    const estadoNorm = String(record.estado || '').trim().toLowerCase()
+    if (estadoNorm === 'emitida') {
+      await aplicarSalidaInventarioVentaSql(tx, facturaPk, { idUsuario })
+    }
   }
 
   private async deleteChildren(tx: SqlExecutor, facturaPk: number): Promise<void> {

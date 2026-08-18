@@ -23,7 +23,6 @@ export interface MountVentasOptions {
   clientes?: ClienteConsultaPort
   permisos?: UsuarioPermisosPort
   sql?: SqlExecutor
-  sqlDialect?: 'mysql' | 'mssql'
 }
 
 export function mountVentasModule(
@@ -47,7 +46,6 @@ export function mountVentasModule(
     clientes: options?.clientes,
     permisos: options?.permisos,
     sql: options?.sql,
-    sqlDialect: options?.sqlDialect,
   })
 
   legacyApp.get('/api/v1/ventas/openapi.json', (_req, res) => {

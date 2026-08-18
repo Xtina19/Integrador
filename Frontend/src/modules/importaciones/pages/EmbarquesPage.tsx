@@ -19,6 +19,11 @@ import { ShipmentRecordDialog } from '@/modules/importaciones/components/Shipmen
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/context/ToastContext'
 
+function shipmentHasCosteoFlete(shipment: Shipment | undefined): boolean {
+  if (!shipment) return false
+  return (shipment.freightDocuments ?? []).some((d) => d.status !== 'void')
+}
+
 const importStatusVariants: Record<ImportStatus, 'info' | 'warning' | 'success'> = {
   registered: 'info',
   in_transit: 'warning',
@@ -38,6 +43,7 @@ export function EmbarquesPage() {
   const [dialog, setDialog] = useState<{ shipmentId: string; mode: 'view' | 'edit' } | null>(null)
   const [highlightId, setHighlightId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [costeoBlock, setCosteoBlock] = useState<{ shipmentId: string } | null>(null)
 
   useGlobalSearchRecordEffect('shipment', {
     onView: (recordId) => setDialog({ shipmentId: recordId, mode: 'view' }),
@@ -73,9 +79,21 @@ export function EmbarquesPage() {
   }, [state.shipments, state.consolidations, search, statusFilter, consolidationFilter])
 
   async function handleAdvance(shipmentId: string) {
+    const shipment = state.shipments.find((s) => s.id === shipmentId)
+    // Recibido → Costeado: exige documento en Costos de Flete
+    if (shipment?.status === 'received' && !shipmentHasCosteoFlete(shipment)) {
+      setCosteoBlock({ shipmentId })
+      return
+    }
+
     const result = await advanceShipment(shipmentId)
     if (!result.success) {
-      showError(result.errors?.join(' ') ?? 'No se pudo avanzar el embarque.')
+      const msg = result.errors?.join(' ') ?? 'No se pudo avanzar el embarque.'
+      if (/costeo de flete|COSTEO_FLETE_REQUERIDO|COSTEO_REQUERIDO/i.test(msg)) {
+        setCosteoBlock({ shipmentId })
+        return
+      }
+      showError(msg)
       return
     }
     showSuccess('Estado del embarque actualizado.')
@@ -236,6 +254,40 @@ export function EmbarquesPage() {
         }}
         message="¿Está seguro de eliminar este embarque?"
       />
+
+      {costeoBlock && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setCosteoBlock(null)}
+            aria-label="Cerrar"
+          />
+          <div className="relative w-full max-w-md rounded-xl border border-gray-100 bg-white shadow-xl">
+            <div className="space-y-3 p-6">
+              <h3 className="text-lg font-semibold text-gray-900">Falta costeo de flete</h3>
+              <p className="text-sm text-gray-600">
+                Este embarque no tiene costeo de flete. Debe registrarlo en Costos de Flete antes de
+                marcar el estado Costeado.
+              </p>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
+              <Button variant="outline" onClick={() => setCosteoBlock(null)}>
+                Cerrar
+              </Button>
+              <Button
+                onClick={() => {
+                  const sid = costeoBlock.shipmentId
+                  setCosteoBlock(null)
+                  navigate(`/importaciones/costos?embarqueId=${encodeURIComponent(sid)}`)
+                }}
+              >
+                Ir a Costos de Flete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

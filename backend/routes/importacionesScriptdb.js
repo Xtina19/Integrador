@@ -880,6 +880,27 @@ router.post('/embarques/:id/avanzar', async (req, res) => {
     const nextFe = FE_STATUS_FLOW[idx + 1];
     if (!nextFe) return fail(res, 409, 'No hay transición disponible');
 
+    if (nextFe === 'costed') {
+      const costeo = await pool.request().input('id', sql.Int, id).query(`
+        SELECT COUNT(*) AS documentos
+        FROM DocumentoCostoFlete
+        WHERE id_embarque = @id AND estado <> 'Anulado'
+      `);
+      const tieneCosteoFlete = Number(costeo.recordset[0]?.documentos || 0) > 0;
+      if (!tieneCosteoFlete) {
+        return res.status(409).json({
+          success: false,
+          error: {
+            code: 'COSTEO_FLETE_REQUERIDO',
+            message:
+              'Este embarque no tiene costeo de flete. Debe registrar el costeo de flete antes de marcar Costeado.',
+            redirectTo: '/importaciones/costos',
+            embarqueId: id,
+          },
+        });
+      }
+    }
+
     const nextDb = FE_TO_DB_ESTADO[nextFe];
     await pool
       .request()

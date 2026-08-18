@@ -37,7 +37,6 @@ async function mountVentasDdd(app) {
   mountVentasModule(app, inventario, {
     seedJoselito: false,
     sql,
-    sqlDialect: 'mssql',
     productos: new SqlServerProductoConsultaAdapter(pool),
     clientes: new SqlServerClienteConsultaAdapter(pool),
     permisos: new SqlServerUsuarioPermisosAdapter(pool),

@@ -21,7 +21,6 @@ import {
   TrendingUp,
   FileText,
   ClipboardList,
-  HelpCircle,
   UserRound,
   CreditCard,
   Shield,
@@ -36,10 +35,6 @@ const navItems = [
   { to: '/editoriales', icon: Building2, label: 'Editoriales' },
   { to: '/eventos', icon: CalendarDays, label: 'Eventos y Ferias' },
   { to: '/reportes', icon: FileText, label: 'Reportes' },
-  { to: '/administracion/usuarios', icon: Users, label: 'Usuarios' },
-  { to: '/auditoria', icon: ClipboardList, label: 'Auditoría' },
-  { to: '/configuracion', icon: Settings, label: 'Configuración' },
-  { to: '/ayuda', icon: HelpCircle, label: 'Ayuda' },
 ]
 
 const adminSubItems = [
@@ -54,10 +49,12 @@ const adminSubItems = [
   { to: '/configuracion/formas-pago', icon: CreditCard, label: 'Formas de Pago' },
   { to: '/administracion/usuarios', icon: Users, label: 'Usuarios' },
   { to: '/administracion/roles', icon: Shield, label: 'Roles' },
+  { to: '/auditoria', icon: ClipboardList, label: 'Auditoría' },
 ]
 
 const adminActivePrefixes = [
   '/administracion',
+  '/auditoria',
   '/inventario/productos',
   '/inventario/categorias',
   '/inventario/almacenes',

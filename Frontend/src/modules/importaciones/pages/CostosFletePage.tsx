@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Download, FileText, Plus } from 'lucide-react'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -34,11 +35,25 @@ const statusVariant: Record<FreightCostDocument['status'], 'default' | 'success'
 
 export function CostosFletePage() {
   const { state, registerFreightDocument, refreshImportaciones } = useERP()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editDoc, setEditDoc] = useState<FreightCostDocument | null>(null)
+  const [initialShipmentId, setInitialShipmentId] = useState<string | undefined>()
   const [viewCostsShipmentId, setViewCostsShipmentId] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState('')
+
+  useEffect(() => {
+    const fromQuery = searchParams.get('embarqueId')
+    if (!fromQuery) return
+    if (!state.shipments.some((s) => s.id === fromQuery || String(s.dbId) === fromQuery)) return
+    setInitialShipmentId(fromQuery)
+    setEditDoc(null)
+    setDialogOpen(true)
+    const next = new URLSearchParams(searchParams)
+    next.delete('embarqueId')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams, state.shipments])
 
   const documents = useMemo(() => {
     const fromShipments = state.shipments.flatMap((s) =>
@@ -210,9 +225,11 @@ export function CostosFletePage() {
         onClose={() => {
           setDialogOpen(false)
           setEditDoc(null)
+          setInitialShipmentId(undefined)
           void refreshImportaciones()
         }}
         shipments={state.shipments}
+        initialShipmentId={initialShipmentId}
         document={editDoc}
         onSave={handleSave}
       />

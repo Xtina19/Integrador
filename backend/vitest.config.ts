@@ -10,8 +10,6 @@ export default defineConfig({
       include: ['src/modules/inventario/**/*.ts'],
       exclude: [
         'src/modules/inventario/**/*.test.ts',
-        'src/modules/inventario/docs/**',
-        'src/modules/inventario/infrastructure/api/openapi/**',
       ],
     },
   },

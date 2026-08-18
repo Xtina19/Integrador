@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
   TrendingUp,
@@ -22,12 +23,43 @@ import type { TooltipProps } from 'recharts'
 import { StatCard, Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Table } from '@/components/ui/Table'
-import { useERP } from '@/store/ERPProvider'
-import { dashboardService } from '@/services/dashboardService'
-import { refreshActivityTimes } from '@/services/activityService'
 import { formatDop } from '@/lib/money'
+import { refreshActivityTimes } from '@/services/activityService'
+import { getFriendlyErrorMessage } from '@/services/http'
+import {
+  dashboardApi,
+  type DashboardLowStockProduct,
+  type DashboardPayload,
+} from '@/modules/dashboard/services/dashboardApi'
+import type { Activity, DashboardMetrics, InventoryChartPoint, StockCategory } from '@/types/domain'
 
 const CATEGORY_ORDER = ['Literatura', 'Académico', 'Infantil', 'Cómics', 'Otros']
+
+const EMPTY_METRICS: DashboardMetrics = {
+  monthlySales: 0,
+  monthlyPurchases: 0,
+  avgTicket: 0,
+  openOrders: 0,
+  criticalStockCount: 0,
+  activeShipments: 0,
+  boxesInTransit: 0,
+  upcomingEvents: 0,
+}
+
+const EMPTY_CATEGORIES: StockCategory[] = CATEGORY_ORDER.map((name) => ({
+  name,
+  value: 0,
+  color:
+    name === 'Literatura'
+      ? '#1E2D86'
+      : name === 'Académico'
+        ? '#3B82F6'
+        : name === 'Infantil'
+          ? '#F4D22E'
+          : name === 'Cómics'
+            ? '#F59E0B'
+            : '#9CA3AF',
+}))
 
 function InventoryTooltip({ active, payload, label }: TooltipProps<number, string>) {
   if (!active || !payload?.length) return null
@@ -68,14 +100,45 @@ function CategoryTooltip({ active, payload }: TooltipProps<number, string>) {
 }
 
 export function Dashboard() {
-  const { state, metrics, lowStockProducts, activities } = useERP()
-  const inventoryChartData = dashboardService.getInventoryChart(state)
-  const stockByCategory = dashboardService.getStockByCategory(state)
-  const nextEventName = dashboardService.getNextEventName(state)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [metrics, setMetrics] = useState<DashboardMetrics>(EMPTY_METRICS)
+  const [nextEventName, setNextEventName] = useState<string | null>(null)
+  const [inventoryChartData, setInventoryChartData] = useState<InventoryChartPoint[]>([])
+  const [stockByCategory, setStockByCategory] = useState<StockCategory[]>(EMPTY_CATEGORIES)
+  const [lowStockProducts, setLowStockProducts] = useState<DashboardLowStockProduct[]>([])
+  const [activities, setActivities] = useState<Activity[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      setError('')
+      try {
+        const data: DashboardPayload = await dashboardApi.getOverview()
+        if (cancelled) return
+        setMetrics(data.metrics)
+        setNextEventName(data.nextEventName)
+        setInventoryChartData(data.inventoryChartData ?? [])
+        setStockByCategory(
+          data.stockByCategory?.length ? data.stockByCategory : EMPTY_CATEGORIES,
+        )
+        setLowStockProducts(data.lowStockProducts ?? [])
+        setActivities(data.activities ?? [])
+      } catch (e) {
+        if (!cancelled) setError(getFriendlyErrorMessage(e))
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const categoryData = CATEGORY_ORDER.map((name) => {
-    const item = stockByCategory.find((c) => c.name === name)!
-    return item
+    const item = stockByCategory.find((c) => c.name === name)
+    return item ?? { name, value: 0, color: '#9CA3AF' }
   })
   const categoryTotal = categoryData.reduce((sum, c) => sum + c.value, 0)
 
@@ -85,9 +148,22 @@ export function Dashboard() {
   }))
 
   const recentActivities = refreshActivityTimes(activities).slice(0, 8)
+  const chartData =
+    inventoryChartData.length > 0
+      ? inventoryChartData
+      : [{ month: '—', central: 0, sucursales: 0 }]
 
   return (
     <div className="space-y-8">
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+      {loading && (
+        <p className="text-sm text-gray-500">Cargando indicadores desde la base de datos…</p>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <StatCard
           title="Ventas del Mes"
@@ -110,7 +186,7 @@ export function Dashboard() {
         <StatCard
           title="Importaciones Activas"
           value={metrics.activeShipments}
-          detail={`${metrics.boxesInTransit} cajas en tránsito`}
+          detail={`${metrics.boxesInTransit} en tránsito / aduana`}
           icon={<Globe size={22} />}
         />
         <StatCard
@@ -125,11 +201,11 @@ export function Dashboard() {
         <Card className="lg:col-span-2">
           <CardHeader
             title="Evolución de Inventario"
-            subtitle="Últimos 6 meses"
+            subtitle="Últimos 6 meses (stock real por almacén)"
           />
           <CardBody className="pt-2 pb-6">
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={inventoryChartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+              <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                 <XAxis
                   dataKey="month"
@@ -142,7 +218,9 @@ export function Dashboard() {
                   tick={{ fontSize: 12, fill: '#9ca3af' }}
                   axisLine={false}
                   tickLine={false}
-                  tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                  tickFormatter={(v) =>
+                    Number(v) >= 1000 ? `${(Number(v) / 1000).toFixed(0)}k` : String(v)
+                  }
                   width={48}
                 />
                 <Tooltip content={<InventoryTooltip />} cursor={{ stroke: '#e5e7eb', strokeWidth: 1 }} />
@@ -235,16 +313,34 @@ export function Dashboard() {
       <Card>
         <CardHeader title="Productos con Stock Crítico" />
         <CardBody className="!p-0">
-          <Table
-            keyField="id"
-            data={lowStockProducts}
-            columns={[
-              { key: 'title', header: 'Producto', render: (p) => <span className="font-medium text-gray-900">{p.title}</span> },
-              { key: 'isbn', header: 'ISBN', className: 'text-xs font-mono text-gray-500' },
-              { key: 'stock', header: 'Stock', render: (p) => <Badge variant="danger">{p.stock} / {p.minStock}</Badge> },
-              { key: 'branch', header: 'Sucursal' },
-            ]}
-          />
+          {lowStockProducts.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">
+              No hay productos bajo el mínimo de stock.
+            </p>
+          ) : (
+            <Table
+              keyField="id"
+              data={lowStockProducts}
+              columns={[
+                {
+                  key: 'title',
+                  header: 'Producto',
+                  render: (p) => <span className="font-medium text-gray-900">{p.title}</span>,
+                },
+                { key: 'isbn', header: 'ISBN', className: 'text-xs font-mono text-gray-500' },
+                {
+                  key: 'stock',
+                  header: 'Stock',
+                  render: (p) => (
+                    <Badge variant="danger">
+                      {p.stock} / {p.minStock}
+                    </Badge>
+                  ),
+                },
+                { key: 'branch', header: 'Sucursal' },
+              ]}
+            />
+          )}
         </CardBody>
       </Card>
 
@@ -252,7 +348,9 @@ export function Dashboard() {
         <CardHeader title="Centro de Actividad" />
         <CardBody>
           {recentActivities.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">Las acciones del sistema aparecerán aquí.</p>
+            <p className="text-sm text-gray-400 text-center py-6">
+              Las acciones del sistema aparecerán aquí.
+            </p>
           ) : (
             <div className="space-y-3">
               {recentActivities.map((a) => (
@@ -260,7 +358,9 @@ export function Dashboard() {
                   <span className="w-2 h-2 rounded-full bg-gold mt-2 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-800">{a.message}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{a.relativeTime} · {a.module}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {a.relativeTime} · {a.module}
+                    </p>
                   </div>
                 </div>
               ))}

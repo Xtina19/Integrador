@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Pencil } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Pencil, ShoppingCart } from 'lucide-react'
 import type { LibroSysEvent } from '@/types/domain'
 import type { DetailEventTab, EventExtendedData } from '@/modules/eventos/types/eventExtended'
 import { EventModalShell, EventTabBar } from './EventTabBar'
@@ -51,10 +52,22 @@ function emptyExtended(eventId: string): EventExtendedData {
 }
 
 export function EventDetailDialog({ event, open, onClose, onEdit }: EventDetailDialogProps) {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<DetailEventTab>('resumen')
   const [extended, setExtended] = useState<EventExtendedData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const puedeFacturar =
+    Boolean(event) && event!.status !== 'finalized' && event!.status !== 'cancelled'
+
+  function irAFacturarEvento() {
+    if (!event) return
+    onClose()
+    navigate(
+      `/ventas/pos?tipoFactura=factura_evento&eventoId=${encodeURIComponent(event.id)}`,
+    )
+  }
 
   useEffect(() => {
     if (!open || !event) {
@@ -114,6 +127,11 @@ export function EventDetailDialog({ event, open, onClose, onEdit }: EventDetailD
           <Button variant="outline" onClick={onClose}>
             Cerrar
           </Button>
+          {puedeFacturar && (
+            <Button variant="primary" icon={ShoppingCart} onClick={irAFacturarEvento}>
+              Facturar evento
+            </Button>
+          )}
           {canEdit && (
             <Button variant="outline" icon={Pencil} onClick={onEdit}>
               Editar
@@ -177,9 +195,26 @@ export function EventDetailDialog({ event, open, onClose, onEdit }: EventDetailD
         )}
 
         {activeTab === 'ventas' && (
-          <p className="text-sm text-gray-500 text-center py-8">
-            Las facturas de venta no están vinculadas a un evento. Consulte las ventas de la sucursal en el módulo Ventas.
-          </p>
+          <div className="space-y-4 py-4 text-center">
+            <p className="text-sm text-gray-600">
+              Facture ventas asociadas a este evento desde el POS. El tipo de factura quedará como
+              «Factura de evento» y el evento quedará vinculado en la factura.
+            </p>
+            <Button
+              type="button"
+              variant="primary"
+              icon={ShoppingCart}
+              disabled={!puedeFacturar}
+              onClick={irAFacturarEvento}
+            >
+              Facturar evento
+            </Button>
+            {!puedeFacturar && (
+              <p className="text-xs text-gray-400">
+                Solo se puede facturar eventos activos (no finalizados ni cancelados).
+              </p>
+            )}
+          </div>
         )}
 
         {activeTab === 'historial' && (

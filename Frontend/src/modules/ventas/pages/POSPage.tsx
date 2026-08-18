@@ -19,6 +19,8 @@ import {
   type NotaCreditoDisponibleDto,
   type TipoVentaDto,
 } from '@/services/api/ventasApi'
+import { tiposFacturaApi, type TipoFacturaDto } from '../services/tiposFacturaApi'
+import { eventosApi, type EventoListadoApi } from '@/modules/eventos/services/eventosApi'
 import { formatDop, newIdempotencyKey } from '../utils/ventasUi'
 import { roundMoney } from '@/lib/money'
 import { getFriendlyErrorMessage } from '@/services/http'
@@ -72,6 +74,10 @@ export function POSPage() {
   const [search, setSearch] = useState('')
   const [cart, setCart] = useState<CartLine[]>([])
   const [tipoVenta, setTipoVenta] = useState<TipoVentaDto>('consumidor_final')
+  const [tiposFactura, setTiposFactura] = useState<TipoFacturaDto[]>([])
+  const [tipoFacturaId, setTipoFacturaId] = useState('')
+  const [eventosActivos, setEventosActivos] = useState<EventoListadoApi[]>([])
+  const [eventoId, setEventoId] = useState('')
   const [clienteId, setClienteId] = useState('')
   const [clienteQuery, setClienteQuery] = useState('')
   const [clientes, setClientes] = useState<Array<{ id: string; nombre: string }>>([])
@@ -105,6 +111,79 @@ export function POSPage() {
       })
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [tipos, eventos] = await Promise.all([
+          tiposFacturaApi.list(),
+          eventosApi.listEvents().catch(() => [] as EventoListadoApi[]),
+        ])
+        if (cancelled) return
+        setTiposFactura(tipos)
+        const activos = eventos.filter(
+          (e) => !['Finalizado', 'Cancelado'].includes(String(e.estado || '')),
+        )
+        setEventosActivos(activos)
+        const normal = tipos.find((t) => t.codigo === 'normal') ?? tipos[0]
+        if (normal && !tipoFacturaId) setTipoFacturaId(normal.id)
+      } catch (e) {
+        if (!cancelled) showError(getFriendlyErrorMessage(e))
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    const fromAlta = searchParams.get('clienteId')
+    const qTipo = searchParams.get('tipoFactura')
+    const qEvento = searchParams.get('eventoId')
+    if (!fromAlta && !qTipo && !qEvento) return
+
+    if (fromAlta) {
+      const cliente = getById(fromAlta)
+      if (cliente && cliente.estado === 'activo') {
+        setTipoVenta('cliente_registrado')
+        setClienteId(cliente.id)
+        setClienteQuery(cliente.nombre)
+        setClientes([{ id: cliente.id, nombre: cliente.nombre }])
+        showSuccess(`Cliente ${cliente.codigo} seleccionado`)
+        void detectarCreditoCliente(cliente.id)
+      }
+    }
+
+    if (qTipo || qEvento) {
+      const applyTipo = (tipos: TipoFacturaDto[]) => {
+        const match =
+          tipos.find((t) => t.codigo === qTipo || t.id === qTipo) ??
+          (qEvento ? tipos.find((t) => t.requiereEvento) : undefined)
+        if (match) setTipoFacturaId(match.id)
+      }
+      if (tiposFactura.length) applyTipo(tiposFactura)
+      else {
+        void tiposFacturaApi.list().then((tipos) => {
+          setTiposFactura(tipos)
+          applyTipo(tipos)
+        })
+      }
+      if (qEvento) setEventoId(qEvento)
+    }
+
+    const next = new URLSearchParams(searchParams)
+    next.delete('clienteId')
+    next.delete('tipoFactura')
+    next.delete('eventoId')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, getById, setSearchParams, showSuccess, tiposFactura])
+
+  const tipoFacturaSeleccionado = useMemo(
+    () => tiposFactura.find((t) => t.id === tipoFacturaId),
+    [tiposFactura, tipoFacturaId],
+  )
+  const requiereEvento = Boolean(tipoFacturaSeleccionado?.requiereEvento)
+
   async function detectarCreditoCliente(id: string, options?: { prompt?: boolean }) {
     if (!id) {
       setNcDisponibles([])
@@ -123,23 +202,6 @@ export function POSPage() {
       showError(getFriendlyErrorMessage(e))
     }
   }
-
-  useEffect(() => {
-    const fromAlta = searchParams.get('clienteId')
-    if (!fromAlta) return
-    const cliente = getById(fromAlta)
-    if (cliente && cliente.estado === 'activo') {
-      setTipoVenta('cliente_registrado')
-      setClienteId(cliente.id)
-      setClienteQuery(cliente.nombre)
-      setClientes([{ id: cliente.id, nombre: cliente.nombre }])
-      showSuccess(`Cliente ${cliente.codigo} seleccionado`)
-      void detectarCreditoCliente(cliente.id)
-    }
-    const next = new URLSearchParams(searchParams)
-    next.delete('clienteId')
-    setSearchParams(next, { replace: true })
-  }, [searchParams, getById, setSearchParams, showSuccess])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -329,6 +391,14 @@ export function POSPage() {
       showError('Seleccione un cliente registrado.')
       return
     }
+    if (!tipoFacturaId) {
+      showError('Seleccione el tipo de factura.')
+      return
+    }
+    if (requiereEvento && !eventoId) {
+      showError('Seleccione el evento a facturar.')
+      return
+    }
 
     const pagosNc = ncAplicadas.map((l) => ({
       formaPago: 'nota_credito' as const,
@@ -382,6 +452,8 @@ export function POSPage() {
               return { nombre: c.nombre, activo: c.estado === 'activo' }
             })()
           : undefined,
+      tipoFacturaId,
+      eventoId: requiereEvento ? eventoId : undefined,
       sucursalId: posContext.sucursalId,
       almacenId: posContext.almacenId,
       moneda: posContext.moneda,
@@ -495,6 +567,36 @@ export function POSPage() {
                   { value: 'cliente_registrado', label: 'Cliente registrado' },
                 ]}
               />
+
+              <Select
+                label="Tipo de factura"
+                value={tipoFacturaId}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setTipoFacturaId(next)
+                  const tipo = tiposFactura.find((t) => t.id === next)
+                  if (!tipo?.requiereEvento) setEventoId('')
+                }}
+                options={[
+                  { value: '', label: 'Seleccione…' },
+                  ...tiposFactura.map((t) => ({ value: t.id, label: t.nombre })),
+                ]}
+              />
+
+              {requiereEvento && (
+                <Select
+                  label="Evento"
+                  value={eventoId}
+                  onChange={(e) => setEventoId(e.target.value)}
+                  options={[
+                    { value: '', label: eventosActivos.length ? 'Seleccione evento…' : 'Sin eventos activos' },
+                    ...eventosActivos.map((ev) => ({
+                      value: String(ev.id_evento),
+                      label: `${ev.nombre} · ${ev.estado}`,
+                    })),
+                  ]}
+                />
+              )}
 
               {tipoVenta === 'cliente_registrado' && (
                 <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">

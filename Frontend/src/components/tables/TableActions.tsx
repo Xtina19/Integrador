@@ -1,13 +1,24 @@
-import { Eye, Pencil, Trash2, ArrowLeftRight, Printer } from 'lucide-react'
+import { Eye, Pencil, Trash2, ArrowLeftRight, Printer, ShoppingCart } from 'lucide-react'
 interface TableActionsProps {
   onView?: () => void
   onEdit?: () => void
   onDelete?: () => void
   onExchange?: () => void
   onPrint?: () => void
+  /** Facturar / ir a POS (p. ej. factura de evento). */
+  onInvoice?: () => void
+  invoiceTitle?: string
 }
 
-export function TableActions({ onView, onEdit, onDelete, onExchange, onPrint }: TableActionsProps) {
+export function TableActions({
+  onView,
+  onEdit,
+  onDelete,
+  onExchange,
+  onPrint,
+  onInvoice,
+  invoiceTitle = 'Facturar',
+}: TableActionsProps) {
   return (
     <div className="flex items-center gap-1">
       {onView && (
@@ -17,6 +28,15 @@ export function TableActions({ onView, onEdit, onDelete, onExchange, onPrint }: 
           title="Ver detalle"
         >
           <Eye size={16} />
+        </button>
+      )}
+      {onInvoice && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onInvoice() }}
+          className="p-1.5 rounded-md text-gray-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+          title={invoiceTitle}
+        >
+          <ShoppingCart size={16} />
         </button>
       )}
       {onExchange && (

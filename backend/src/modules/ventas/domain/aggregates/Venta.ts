@@ -31,6 +31,10 @@ export interface VentaProps {
   estado: EstadoVenta
   tipoVenta: TipoVenta
   clienteId?: string
+  /** TipoFactura.id_tipo_factura (public/scriptdb) */
+  tipoFacturaId?: string
+  /** Evento.id_evento cuando el tipo de factura requiere evento */
+  eventoId?: string
   sucursalId: string
   almacenId: string
   usuarioEmisionId: string
@@ -59,6 +63,8 @@ export interface VentaProps {
 export class Venta {
   private _events: VentasDomainEvent[] = []
   private _pendingInventory: IntencionEfectoInventario | undefined
+  private _tipoFacturaId?: string
+  private _eventoId?: string
 
   private constructor(
     readonly id: string,
@@ -114,6 +120,8 @@ export class Venta {
     historialId: string
     idempotencyKeyInventario: string
     fecha?: Date
+    tipoFacturaId?: string
+    eventoId?: string
   }): Venta {
     PoliticaEmisionVenta.assertTipoCliente(input.tipoVenta, input.clienteId)
     if (!input.sucursalId.trim() || !input.almacenId.trim()) {
@@ -242,11 +250,18 @@ export class Venta {
       },
     })
 
+    if (input.tipoFacturaId) {
+      venta.assignFacturaMeta({
+        tipoFacturaId: input.tipoFacturaId,
+        eventoId: input.eventoId,
+      })
+    }
+
     return venta
   }
 
   static rehidratar(props: VentaProps): Venta {
-    return new Venta(
+    const venta = new Venta(
       props.id,
       NumeroFactura.of(props.numeroFactura),
       props.estado,
@@ -274,6 +289,25 @@ export class Venta {
       props.notasCredito.map(NotaCredito.rehidratar),
       props.historial.map(HistorialVenta.rehidratar),
     )
+    venta.assignFacturaMeta({
+      tipoFacturaId: props.tipoFacturaId,
+      eventoId: props.eventoId,
+    })
+    return venta
+  }
+
+  /** Metadatos de facturación (TipoFactura / Evento) — public/scriptdb. */
+  assignFacturaMeta(input: { tipoFacturaId?: string; eventoId?: string }): void {
+    this._tipoFacturaId = input.tipoFacturaId?.trim() || undefined
+    this._eventoId = input.eventoId?.trim() || undefined
+  }
+
+  get tipoFacturaId(): string | undefined {
+    return this._tipoFacturaId
+  }
+
+  get eventoId(): string | undefined {
+    return this._eventoId
   }
 
   get estado(): EstadoVenta {
@@ -793,6 +827,8 @@ export class Venta {
       estado: this._estado,
       tipoVenta: this.tipoVenta,
       clienteId: this.clienteId,
+      tipoFacturaId: this._tipoFacturaId,
+      eventoId: this._eventoId,
       sucursalId: this.sucursalId,
       almacenId: this.almacenId,
       usuarioEmisionId: this.usuarioEmisionId,

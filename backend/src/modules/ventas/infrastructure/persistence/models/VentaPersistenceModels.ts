@@ -88,6 +88,8 @@ export interface VentaRecord {
   estado: string
   tipoVenta: string
   clienteId?: string
+  tipoFacturaId?: string
+  eventoId?: string
   sucursalId: string
   almacenId: string
   usuarioEmisionId: string

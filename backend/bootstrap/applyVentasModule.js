@@ -237,6 +237,102 @@ async function ensureVentasModuleTables(pool) {
         FOREIGN KEY (id_nota_credito) REFERENCES NotaCredito(id_nota_credito);
     END
     `,
+    `
+    IF OBJECT_ID(N'dbo.TipoFactura', N'U') IS NULL
+    BEGIN
+      CREATE TABLE TipoFactura (
+        id_tipo_factura INT PRIMARY KEY IDENTITY,
+        codigo VARCHAR(30) NOT NULL UNIQUE,
+        nombre VARCHAR(100) NOT NULL,
+        requiere_evento BIT NOT NULL DEFAULT 0,
+        estado VARCHAR(20) NOT NULL DEFAULT 'Activo',
+        fecha_registro DATETIME NOT NULL DEFAULT GETDATE()
+      );
+    END
+    `,
+    `
+    IF NOT EXISTS (SELECT 1 FROM TipoFactura WHERE codigo = N'normal')
+      INSERT INTO TipoFactura (codigo, nombre, requiere_evento, estado)
+      VALUES (N'normal', N'Factura normal', 0, N'Activo');
+    `,
+    `
+    IF NOT EXISTS (SELECT 1 FROM TipoFactura WHERE codigo = N'factura_evento')
+      INSERT INTO TipoFactura (codigo, nombre, requiere_evento, estado)
+      VALUES (N'factura_evento', N'Factura de evento', 1, N'Activo');
+    `,
+    `
+    IF OBJECT_ID(N'dbo.FacturaVenta', N'U') IS NOT NULL
+       AND COL_LENGTH(N'dbo.FacturaVenta', N'id_tipo_factura') IS NULL
+      ALTER TABLE FacturaVenta ADD id_tipo_factura INT NULL;
+    `,
+    `
+    IF OBJECT_ID(N'dbo.FacturaVenta', N'U') IS NOT NULL
+       AND COL_LENGTH(N'dbo.FacturaVenta', N'id_evento') IS NULL
+      ALTER TABLE FacturaVenta ADD id_evento INT NULL;
+    `,
+    `
+    IF OBJECT_ID(N'dbo.FacturaVenta', N'U') IS NOT NULL
+       AND OBJECT_ID(N'dbo.TipoFactura', N'U') IS NOT NULL
+       AND COL_LENGTH(N'dbo.FacturaVenta', N'id_tipo_factura') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'fk_fv_tipo_factura')
+    BEGIN
+      ALTER TABLE FacturaVenta ADD CONSTRAINT fk_fv_tipo_factura
+        FOREIGN KEY (id_tipo_factura) REFERENCES TipoFactura(id_tipo_factura);
+    END
+    `,
+    `
+    IF OBJECT_ID(N'dbo.FacturaVenta', N'U') IS NOT NULL
+       AND OBJECT_ID(N'dbo.Evento', N'U') IS NOT NULL
+       AND COL_LENGTH(N'dbo.FacturaVenta', N'id_evento') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'fk_fv_evento')
+    BEGIN
+      ALTER TABLE FacturaVenta ADD CONSTRAINT fk_fv_evento
+        FOREIGN KEY (id_evento) REFERENCES Evento(id_evento);
+    END
+    `,
+    `
+    IF OBJECT_ID(N'dbo.MovimientoInventario', N'U') IS NOT NULL
+       AND COL_LENGTH(N'dbo.MovimientoInventario', N'id_factura_venta') IS NULL
+    BEGIN
+      ALTER TABLE MovimientoInventario ADD id_factura_venta INT NULL;
+    END
+    `,
+    `
+    IF OBJECT_ID(N'dbo.MovimientoInventario', N'U') IS NOT NULL
+       AND COL_LENGTH(N'dbo.MovimientoInventario', N'id_detalle_factura') IS NULL
+    BEGIN
+      ALTER TABLE MovimientoInventario ADD id_detalle_factura INT NULL;
+    END
+    `,
+    `
+    IF OBJECT_ID(N'dbo.MovimientoInventario', N'U') IS NOT NULL
+       AND OBJECT_ID(N'dbo.FacturaVenta', N'U') IS NOT NULL
+       AND COL_LENGTH(N'dbo.MovimientoInventario', N'id_factura_venta') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'fk_mov_factura_venta')
+    BEGIN
+      ALTER TABLE MovimientoInventario ADD CONSTRAINT fk_mov_factura_venta
+        FOREIGN KEY (id_factura_venta) REFERENCES FacturaVenta(id_factura);
+    END
+    `,
+    `
+    IF OBJECT_ID(N'dbo.MovimientoInventario', N'U') IS NOT NULL
+       AND OBJECT_ID(N'dbo.DetalleFacturaVenta', N'U') IS NOT NULL
+       AND COL_LENGTH(N'dbo.MovimientoInventario', N'id_detalle_factura') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'fk_mov_detalle_factura')
+    BEGIN
+      ALTER TABLE MovimientoInventario ADD CONSTRAINT fk_mov_detalle_factura
+        FOREIGN KEY (id_detalle_factura) REFERENCES DetalleFacturaVenta(id_detalle);
+    END
+    `,
+    `
+    IF OBJECT_ID(N'dbo.MovimientoInventario', N'U') IS NOT NULL
+       AND COL_LENGTH(N'dbo.MovimientoInventario', N'id_factura_venta') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'ix_movimiento_factura_venta')
+    BEGIN
+      CREATE INDEX ix_movimiento_factura_venta
+        ON MovimientoInventario(id_factura_venta, fecha_movimiento DESC);
+    END
+    `,
   ]
 
   for (const sql of batches) {

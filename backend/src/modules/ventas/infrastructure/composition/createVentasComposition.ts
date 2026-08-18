@@ -19,7 +19,6 @@ import type { VentaRepository } from '../../domain/ports/VentaRepository'
 import type { InventarioComposition } from '../../../inventario/infrastructure/composition/createInventarioComposition'
 import { InMemoryVentasStore } from '../persistence/InMemoryVentasStore'
 import { InMemoryVentaRepository } from '../persistence/InMemoryVentaRepository'
-import { MysqlVentaRepository } from '../persistence/mysql/MysqlVentaRepository'
 import { SqlServerVentaRepository } from '../persistence/mssql/SqlServerVentaRepository'
 import type { SqlExecutor } from '../persistence/sql/SqlExecutor'
 import {
@@ -30,6 +29,7 @@ import {
   InMemoryProductoConsultaAdapter,
   InMemoryUsuarioPermisosAdapter,
   SequentialIdGeneratorAdapter,
+  SqlServerInventarioConsultaAdapter,
   UuidIdGeneratorAdapter,
 } from '../adapters'
 import { seedVentasJoselito } from './seedVentasJoselito'
@@ -41,7 +41,7 @@ import type {
 
 export interface VentasComposition {
   store: InMemoryVentasStore
-  /** Persistencia activa (in-memory o MySQL). */
+  /** Persistencia activa (in-memory o SQL Server). */
   ventas: VentaRepository
   ventaService: VentaApplicationService
   /** Puerto de permisos — usado por middleware HTTP de autorización. */
@@ -83,9 +83,8 @@ export function createVentasComposition(options?: {
   sequentialIds?: boolean
   seedJoselito?: boolean
   inventarioForzarError?: string
-  /** Persistencia relacional (MySQL legacy o SQL Server LibroSys). */
+  /** Persistencia SQL Server LibroSys (public/scriptdb). */
   sql?: SqlExecutor
-  sqlDialect?: 'mysql' | 'mssql'
   /** Composition Inventario compartida — Production path. */
   inventario?: InventarioComposition
   /** Si se provee, consulta productos desde SQL Server (tabla Producto). */
@@ -98,15 +97,9 @@ export function createVentasComposition(options?: {
     seedVentasJoselito(store)
   }
 
-  let ventas: VentaRepository
-  if (options?.sql) {
-    ventas =
-      options.sqlDialect === 'mssql'
-        ? new SqlServerVentaRepository(options.sql)
-        : new MysqlVentaRepository(options.sql)
-  } else {
-    ventas = new InMemoryVentaRepository(store)
-  }
+  const ventas: VentaRepository = options?.sql
+    ? new SqlServerVentaRepository(options.sql)
+    : new InMemoryVentaRepository(store)
 
   const ids = options?.sequentialIds
     ? new SequentialIdGeneratorAdapter()
@@ -128,10 +121,9 @@ export function createVentasComposition(options?: {
   }
 
   const bridge = options.inventario.engineBridge
-  const inventarioConsulta = new EngineInventarioConsultaAdapter(
-    bridge.existencias,
-    bridge.almacenes,
-  )
+  const inventarioConsulta = options.sql
+    ? new SqlServerInventarioConsultaAdapter(options.sql)
+    : new EngineInventarioConsultaAdapter(bridge.existencias, bridge.almacenes)
   const inventarioEfectos = new EngineInventarioEfectosAdapter(bridge)
 
   const ventaService = new VentaApplicationService({

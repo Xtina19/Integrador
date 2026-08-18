@@ -373,6 +373,16 @@ export function Events() {
                     return (
                       <TableActions
                         onView={() => setViewEventId(currentEvent.id)}
+                        onInvoice={
+                          currentEvent.status !== 'finalized' && currentEvent.status !== 'cancelled'
+                            ? () => {
+                                navigate(
+                                  `/ventas/pos?tipoFactura=factura_evento&eventoId=${encodeURIComponent(currentEvent.id)}`,
+                                )
+                              }
+                            : undefined
+                        }
+                        invoiceTitle="Facturar evento"
                         onEdit={
                           isEventEditable(currentEvent.status)
                             ? () => {

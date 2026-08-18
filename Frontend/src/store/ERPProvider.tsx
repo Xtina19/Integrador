@@ -957,6 +957,22 @@ export function ERPProvider({ children }: { children: React.ReactNode }) {
 
   const advanceShipment = useCallback(async (shipmentId: string) => {
     const shipment = state.shipments.find((s) => s.id === shipmentId)
+    if (!shipment) return { success: false, errors: ['Embarque no encontrado.'] }
+
+    const flow = ['registered', 'in_transit', 'customs', 'received', 'costed', 'finalized'] as const
+    const next = flow[flow.indexOf(shipment.status as (typeof flow)[number]) + 1]
+    if (next === 'costed') {
+      const hasFreightDocs = (shipment.freightDocuments ?? []).some((d) => d.status !== 'void')
+      if (!hasFreightDocs) {
+        return {
+          success: false,
+          errors: [
+            'Este embarque no tiene costeo de flete. Debe registrar el costeo de flete antes de marcar Costeado.',
+          ],
+        }
+      }
+    }
+
     if (importacionesApi.isEnabled() && isImportacionesSyncedToApi(shipment)) {
       try {
         await importacionesApi.avanzarEmbarque(shipment!.dbId!)

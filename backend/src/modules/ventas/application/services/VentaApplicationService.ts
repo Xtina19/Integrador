@@ -195,6 +195,8 @@ export class VentaApplicationService {
         })),
         historialId: this.deps.ids.generate(),
         idempotencyKeyInventario: cmd.idempotencyKey,
+        tipoFacturaId: cmd.tipoFacturaId,
+        eventoId: cmd.eventoId,
       })
 
       const intencion = venta.pullPendingInventoryEffect()
@@ -202,14 +204,24 @@ export class VentaApplicationService {
         return fail('UNEXPECTED', 'No se generó intención de inventario para la venta.')
       }
 
+      // Persistencia SQL primero: FacturaVenta + salida Inventario/MovimientoInventario.
+      try {
+        await this.deps.ventas.save(venta)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Error al persistir la venta.'
+        if (/Stock insuficiente|Sin existencia/i.test(message)) {
+          return fail('INVENTORY_FAILURE', message, { ventaId })
+        }
+        throw error
+      }
+
+      // Espejo en Inventory Engine (POS/kardex en memoria). El stock real ya está en SQL.
       const inv = await this.deps.inventarioEfectos.aplicar(intencion)
       if (!inv.ok) {
         venta.markInventoryFailed('salida_venta', inv.message)
-        return fail('INVENTORY_FAILURE', inv.message, { ventaId })
+      } else {
+        venta.markInventoryConfirmed('salida_venta')
       }
-      venta.markInventoryConfirmed('salida_venta')
-
-      await this.deps.ventas.save(venta)
 
       const ncPagos = cmd.pagos.filter((p) => p.formaPago === 'nota_credito')
       for (const pago of ncPagos) {

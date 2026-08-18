@@ -1,7 +1,7 @@
 {
   "name": "librosys-backend",
   "version": "1.0.0",
-  "description": "LibroSys backend — Inventario (DDD) + legacy Express",
+  "description": "LibroSys backend — Express + SQL Server (public/scriptdb)",
   "main": "index.js",
   "scripts": {
     "start": "node --preserve-symlinks -r ./register-paths.js -r tsx/cjs server.js",
@@ -11,8 +11,6 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "quality:report": "node scripts/quality-report.mjs",
-    "quality": "npm run typecheck && npm run test && npm run quality:report",
     "seed:ventas": "node scripts/seedVentasScriptdb.js"
   },
   "keywords": [],
@@ -23,8 +21,7 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "mssql": "^12.6.0",
-    "multer": "^2.2.0",
-    "mysql2": "^3.23.0"
+    "multer": "^2.2.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

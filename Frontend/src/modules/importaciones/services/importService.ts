@@ -263,6 +263,19 @@ export const importService = {
       return { success: false as const, errors: ['No hay transición disponible.'] }
     }
 
+    // Recibido → Costeado: exige costeo de flete (documentos), no solo montos legacy
+    if (next === 'costed') {
+      const hasFreightDocs = (shipment.freightDocuments ?? []).some((d) => d.status !== 'void')
+      if (!hasFreightDocs) {
+        return {
+          success: false as const,
+          errors: [
+            'Este embarque no tiene costeo de flete. Debe registrar el costeo de flete antes de marcar Costeado.',
+          ],
+        }
+      }
+    }
+
     const invoice = shipment.invoiceId ? findInvoice(state, shipment.invoiceId) : undefined
     const order = shipment.orderId ? findOrder(state, shipment.orderId) : undefined
 
@@ -297,13 +310,7 @@ export const importService = {
         }
       }
 
-      if (next === 'costed' && order) {
-        if (!hasShipmentCosts(shipment.costs)) {
-          return {
-            success: false as const,
-            errors: ['El embarque no tiene costos registrados para calcular el costeo por libro.'],
-          }
-        }
+      if (next === 'costed' && order && hasShipmentCosts(shipment.costs)) {
         const freightTotal = computeShipmentCostsTotal(shipment.costs!)
         bookCosting = buildBookCosting(order, shipment.id, freightTotal)
         updatedInvoice = { ...updatedInvoice, stage: 'costing' }

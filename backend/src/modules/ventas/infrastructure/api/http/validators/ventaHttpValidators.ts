@@ -123,6 +123,8 @@ export function validateEmitirVentaBody(body: unknown) {
     tipoVenta: tipoVenta as 'consumidor_final' | 'cliente_registrado',
     clienteId: optionalString(b.clienteId),
     clienteSnapshot: parseClienteSnapshot(b.clienteSnapshot),
+    tipoFacturaId: optionalString(b.tipoFacturaId),
+    eventoId: optionalString(b.eventoId),
     sucursalId: requireString(b.sucursalId, 'sucursalId'),
     almacenId: requireString(b.almacenId, 'almacenId'),
     moneda: moneda as 'DOP' | 'USD' | 'COP',

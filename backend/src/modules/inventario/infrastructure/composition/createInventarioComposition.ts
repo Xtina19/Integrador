@@ -308,8 +308,9 @@ export function seedInventarioOperativo(db: InMemoryDatabaseAdapter): void {
 /**
  * Semilla operativa extendida ("Joselito"): almacenes/mínimos + catálogo rico de
  * productos, existencias por sucursal y documentos de ejemplo (transferencias,
- * ajustes, descartes, conteos, movimientos, auditorías). Pensada para el servidor
- * montado (mountInventarioModule) y para exploración manual/QA.
+ * ajustes, descartes, conteos, movimientos, auditorías). Usada por tests y por
+ * createVentasHttpApp (QA); en producción el catálogo se sincroniza desde SQL
+ * (syncVentasSqlServer).
  */
 export function seedInventarioJoselitoCompleto(composition: InventarioComposition): void {
   // Si ya hay productos (p. ej. restaurados desde el snapshot durable), no se

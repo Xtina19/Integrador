@@ -250,6 +250,10 @@ export interface EmitirVentaRequest {
   clienteId?: string
   /** Identidad del maestro Administración (única fuente de verdad). */
   clienteSnapshot?: { nombre: string; activo: boolean }
+  /** TipoFactura.id_tipo_factura — public/scriptdb */
+  tipoFacturaId?: string
+  /** Evento.id_evento cuando el tipo requiere evento */
+  eventoId?: string
   sucursalId: string
   almacenId: string
   moneda: MonedaDto

@@ -63,47 +63,19 @@ async function syncVentasCatalogFromSqlServer(inventario, ventasStore) {
     FROM Inventario
   `)
 
-  const principalAlmacen =
-    almacenesRes.recordset.find((a) => /central/i.test(String(a.nombre || ''))) ??
-    almacenesRes.recordset[0]
-  const principalAlmacenId = principalAlmacen ? String(principalAlmacen.id_almacen) : '1'
-  const MIN_STOCK_POS = Number(process.env.VENTAS_MIN_STOCK_POS ?? 500)
-
   for (const e of existenciasRes.recordset) {
-    const saldoSql = Number(e.stock_actual) || 0
-    const almacenId = String(e.id_almacen)
-    const esPrincipal = almacenId === principalAlmacenId
     db.seedExistencia({
       id: String(e.id_inventario),
       productoId: String(e.id_producto),
-      almacenId,
-      saldo: esPrincipal ? Math.max(saldoSql, MIN_STOCK_POS) : saldoSql,
+      almacenId: String(e.id_almacen),
+      saldo: Number(e.stock_actual) || 0,
       version: Number(e.version) || 1,
-    })
-  }
-
-  const stockKeys = new Set(
-    existenciasRes.recordset.map((e) => `${e.id_producto}::${e.id_almacen}`),
-  )
-
-  let stockDefault = 0
-  for (const p of productosRes.recordset) {
-    const pid = String(p.id_producto)
-    const key = `${pid}::${principalAlmacenId}`
-    if (stockKeys.has(key)) continue
-    stockDefault += 1
-    db.seedExistencia({
-      id: `ex-ventas-${pid}-${principalAlmacenId}`,
-      productoId: pid,
-      almacenId: principalAlmacenId,
-      saldo: MIN_STOCK_POS,
-      version: 1,
     })
   }
 
   console.log(
     `[Ventas] catálogo SQL sincronizado: ${productosRes.recordset.length} productos, ` +
-      `${existenciasRes.recordset.length} existencias SQL, ${stockDefault} existencias POS por defecto, ` +
+      `${existenciasRes.recordset.length} existencias SQL, 0 existencias POS por defecto, ` +
       `${almacenesRes.recordset.length} almacenes`,
   )
 

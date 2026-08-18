@@ -5,6 +5,7 @@ export { SqlServerProductoConsultaAdapter } from './SqlServerProductoConsultaAda
 export { SqlServerClienteConsultaAdapter } from './SqlServerClienteConsultaAdapter'
 export { SqlServerUsuarioPermisosAdapter } from './SqlServerUsuarioPermisosAdapter'
 export { EngineInventarioConsultaAdapter } from './EngineInventarioConsultaAdapter'
+export { SqlServerInventarioConsultaAdapter } from './SqlServerInventarioConsultaAdapter'
 export { EngineInventarioEfectosAdapter } from './EngineInventarioEfectosAdapter'
 export { InMemoryUsuarioPermisosAdapter } from './UsuarioPermisosAdapter'
 export { InMemoryAuditoriaComercialAdapter } from './AuditoriaComercialAdapter'

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Calculator, CheckCircle2, ExternalLink } from 'lucide-react'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
@@ -52,8 +52,19 @@ export function CosteoLibroPage() {
     })
   }, [search, state.bookCosting, selectedShipmentId])
 
-  const pendingCount = filtered.filter((b) => !b.appliedToInventory).length
+  const pendingRows = useMemo(
+    () => filtered.filter((b) => !b.appliedToInventory),
+    [filtered],
+  )
+  const pendingCount = pendingRows.length
   const allApplied = filtered.length > 0 && pendingCount === 0
+
+  useEffect(() => {
+    const sample = state.bookCosting.find(
+      (b) => b.shipmentId === selectedShipmentId && !b.appliedToInventory,
+    )
+    setBulkMargin(String(sample?.marginPercent ?? BOOK_COSTING_MARGIN_PERCENT))
+  }, [selectedShipmentId])
 
   async function handleApplyToInventory() {
     if (!selectedShipmentId) return
@@ -83,12 +94,14 @@ export function CosteoLibroPage() {
 
   function handleApplyMarginToAll() {
     if (!selectedShipmentId || pendingCount === 0) return
+    const marginPercent = clampBookCostingMargin(Number(bulkMargin))
     updateBookCostingMargin({
       shipmentId: selectedShipmentId,
-      marginPercent: clampBookCostingMargin(Number(bulkMargin)),
+      marginPercent,
       applyToAllPending: true,
     })
-    showSuccess(`Margen ${clampBookCostingMargin(Number(bulkMargin))}% aplicado a ${pendingCount} libro(s).`)
+    setBulkMargin(String(marginPercent))
+    showSuccess(`Margen ${marginPercent}% aplicado a ${pendingCount} libro(s).`)
   }
 
   return (
@@ -120,13 +133,17 @@ export function CosteoLibroPage() {
                   step={0.5}
                   value={bulkMargin}
                   onChange={(e) => setBulkMargin(e.target.value)}
-                  disabled={pendingCount === 0}
                 />
               </div>
               <Button
                 variant="outline"
                 disabled={!selectedShipmentId || pendingCount === 0}
                 onClick={handleApplyMarginToAll}
+                title={
+                  pendingCount === 0
+                    ? 'No hay libros pendientes en este embarque'
+                    : 'Aplicar el margen a todos los libros pendientes'
+                }
               >
                 Aplicar a todos
               </Button>
@@ -144,6 +161,13 @@ export function CosteoLibroPage() {
               </Link>
             </div>
           </div>
+          {pendingCount === 0 && selectedShipmentId && (
+            <p className="mt-3 text-sm text-gray-500">
+              {filtered.length === 0
+                ? 'Este embarque aún no tiene líneas de costeo por libro. Puede editar el margen (%); «Aplicar a todos» se habilita cuando existan libros pendientes.'
+                : 'Todos los libros de este embarque ya están aplicados a inventario. El margen solo se edita en libros pendientes.'}
+            </p>
+          )}
           {allApplied && (
             <div className="mt-3 flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-4 py-2">
               <CheckCircle2 size={16} />

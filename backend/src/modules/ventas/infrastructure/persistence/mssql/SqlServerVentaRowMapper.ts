@@ -4,7 +4,7 @@ import type {
   VentaLineaRecord,
   VentaRecord,
 } from '../models/VentaPersistenceModels'
-import { mysqlDateToIso } from '../mysql/MysqlVentaRowMapper'
+import { sqlDateToIso as mysqlDateToIso } from '../sql/sqlDateToIso'
 
 /** Cabecera FacturaVenta + codigo_iso (Moneda). */
 export interface FacturaVentaCabeceraRow {
@@ -13,6 +13,8 @@ export interface FacturaVentaCabeceraRow {
   numero_factura: string
   estado: string
   tipo_venta: string
+  id_tipo_factura: number | null
+  id_evento: number | null
   id_persona: number | null
   id_sucursal: number
   id_almacen: number
@@ -67,6 +69,8 @@ export const SqlServerVentaRowMapper = {
       estado: row.estado,
       tipoVenta: row.tipo_venta,
       clienteId: row.id_persona != null ? String(row.id_persona) : undefined,
+      tipoFacturaId: row.id_tipo_factura != null ? String(row.id_tipo_factura) : undefined,
+      eventoId: row.id_evento != null ? String(row.id_evento) : undefined,
       sucursalId: String(row.id_sucursal),
       almacenId: String(row.id_almacen),
       usuarioEmisionId: String(row.id_usuario_emision),

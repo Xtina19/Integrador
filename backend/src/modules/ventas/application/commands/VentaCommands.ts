@@ -8,6 +8,10 @@ export interface EmitirVentaCommand {
    * Si se envía, Ventas actualiza su ACL de identidad sin catálogo duplicado ni sync.
    */
   clienteSnapshot?: { nombre: string; activo: boolean }
+  /** TipoFactura.id_tipo_factura — public/scriptdb */
+  tipoFacturaId?: string
+  /** Obligatorio si el tipo de factura requiere evento */
+  eventoId?: string
   sucursalId: string
   almacenId: string
   usuarioId: string
