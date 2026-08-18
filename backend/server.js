@@ -77,7 +77,17 @@ async function start() {
     if (pool) await ensureScriptdbCompras(pool);
     await mountVentasDdd(app);
     app.use(errorHandler);
-    app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));
+    const server = app.listen(PORT, '127.0.0.1', () => {
+      console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    });
+    server.on('error', (listenErr) => {
+      if (listenErr && listenErr.code === 'EADDRINUSE') {
+        console.error(`[Backend] El puerto ${PORT} ya está en uso. Cierre el otro proceso o cambie PORT en .env.`);
+        process.exit(1);
+      }
+      console.error('[Backend] Error al escuchar:', listenErr);
+      process.exit(1);
+    });
   } catch (err) {
     console.error('[Backend] Error al iniciar:', err);
     process.exit(1);
